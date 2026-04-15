@@ -59,22 +59,22 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2 leading-tight flex items-center gap-3">
-          <Settings size={32} className="text-primary" />
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-1 sm:mb-2 leading-tight flex items-center gap-3">
+          <Settings size={28} className="text-primary flex-shrink-0" />
           <span>Pengaturan Akun</span>
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 font-medium">
+        <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
           Kelola informasi profil, keamanan, dan preferensi akun Anda.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         {/* Left Column: Profile Overview */}
-        <div className="lg:col-span-1 space-y-6">
-           <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-8 flex flex-col items-center text-center shadow-sm">
+        <div className="lg:col-span-1 space-y-5">
+           <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 flex flex-col items-center text-center shadow-sm">
               <div className="w-24 h-24 rounded-3xl gradient-primary flex items-center justify-center text-white text-3xl font-bold shadow-xl mb-6">
                  {user?.fullName?.charAt(0) || "U"}
               </div>
@@ -108,7 +108,7 @@ const SettingsPage = () => {
         {/* Right Column: Security & Preferences */}
         <div className="lg:col-span-2 space-y-8">
            {/* 2FA Section */}
-           <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm p-8 space-y-6">
+           <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-8 space-y-5 sm:space-y-6">
               <div className="flex items-center justify-between">
                  <div className="flex items-center gap-3">
                     <Smartphone size={24} className="text-primary" />
@@ -143,7 +143,7 @@ const SettingsPage = () => {
 
               {isEnabling2FA ? (
                 <div className="space-y-6 p-6 border-2 border-dashed border-primary/20 rounded-3xl bg-primary/5 animate-in zoom-in-95 duration-300">
-                   <div className="flex flex-col md:flex-row items-center gap-8">
+                   <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8">
                       {qrCode && (
                         <div className="bg-white p-2 rounded-2xl shadow-inner shrink-0">
                            <img src={qrCode} alt="2FA QR Code" className="w-32 h-32" />
@@ -201,7 +201,7 @@ const SettingsPage = () => {
            </div>
 
            {/* Password Section */}
-           <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm p-8 space-y-6 opacity-60">
+           <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-8 space-y-5 sm:space-y-6 opacity-60">
               <div className="flex items-center gap-3">
                  <Lock size={24} className="text-primary" />
                  <div>

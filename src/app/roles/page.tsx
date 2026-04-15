@@ -90,33 +90,53 @@ const RolesPage = () => {
   const selectedRole = roles.find(r => r.id === selectedRoleId);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2 leading-tight flex items-center gap-3">
-            <ShieldCheck size={32} className="text-primary" />
-            <span>Role & Permission</span>
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">
-            Kelola matriks kewenangan dan hak akses untuk setiap tingkat jabatan.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-1 sm:mb-2 leading-tight flex items-center gap-3">
+          <ShieldCheck size={28} className="text-primary flex-shrink-0" />
+          <span>Role & Permission</span>
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
+          Kelola matriks kewenangan dan hak akses untuk setiap tingkat jabatan.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Roles List Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">Daftar Role</h3>
-          <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
+        {/* Roles List — Horizontal scroll on mobile, vertical on desktop */}
+        <div className="lg:col-span-1">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1">Daftar Role</h3>
+          {/* Mobile: horizontal scroll tabs */}
+          <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {roles.map((role) => (
+              <button
+                key={role.id}
+                onClick={() => setSelectedRoleId(role.id)}
+                className={cn(
+                  "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-sm font-bold transition-all",
+                  selectedRoleId === role.id
+                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/20"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                )}
+              >
+                <span>{role.name}</span>
+                <span className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                  selectedRoleId === role.id ? "bg-white/20" : "bg-slate-100 dark:bg-slate-800"
+                )}>{role._count?.users || 0}</span>
+              </button>
+            ))}
+          </div>
+          {/* Desktop: vertical list */}
+          <div className="hidden lg:flex flex-col gap-2">
             {roles.map((role) => (
               <button
                 key={role.id}
                 onClick={() => setSelectedRoleId(role.id)}
                 className={cn(
                   "flex flex-col items-start gap-1 p-4 rounded-2xl transition-all text-left border",
-                  selectedRoleId === role.id 
-                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
+                  selectedRoleId === role.id
+                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/20"
                     : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-primary/50"
                 )}
               >
@@ -149,22 +169,22 @@ const RolesPage = () => {
                <p className="text-sm font-medium text-slate-400">Menyiapkan matriks...</p>
              </div>
           ) : selectedRole ? (
-            <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
               {/* Role Header */}
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-50/50 dark:bg-slate-800/30">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center text-white shadow-lg shrink-0">
-                    <Lock size={24} />
+              <div className="p-5 sm:p-8 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-800/30">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl gradient-primary flex items-center justify-center text-white shadow-lg shrink-0">
+                    <Lock size={20} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Permission Matrix: {selectedRole.name}</h2>
+                    <h2 className="text-base sm:text-xl font-bold text-slate-900 dark:text-white mb-1">Matrix: {selectedRole.name}</h2>
                     <p className="text-xs text-slate-500 font-medium">Centang untuk memberikan akses ke modul tertentu.</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 text-sm w-full sm:w-auto justify-center"
                 >
                   {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                   <span>Simpan Perubahan</span>
@@ -172,7 +192,7 @@ const RolesPage = () => {
               </div>
 
               {/* Matrix Grid */}
-              <div className="p-8">
+              <div className="p-4 sm:p-8">
                 {permissions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
                     <Info size={32} />

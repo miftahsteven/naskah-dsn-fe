@@ -104,21 +104,23 @@ const CreateDocumentPage = () => {
         <span>Kembali ke Daftar</span>
       </button>
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
-          <FilePlus size={32} className="text-primary" />
-          <span>Buat Dokumen Baru</span>
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 font-medium">
-          Unggah file dan lengkapi metadata untuk memulai proses administrasi digital.
-        </p>
+      <div className="space-y-6 sm:space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-1 sm:mb-2 flex items-center gap-3">
+            <FilePlus size={28} className="text-primary flex-shrink-0" />
+            <span>Buat Dokumen Baru</span>
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 font-medium text-sm sm:text-base">
+            Unggah file dan lengkapi metadata untuk memulai proses administrasi digital.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         {/* Main Form */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm p-8 space-y-8">
+          <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6 sm:space-y-8">
             {/* Error/Success Feedbacks */}
             {error && (
               <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 flex items-start gap-3 text-red-600 dark:text-red-400 text-sm animate-in fade-in zoom-in duration-300">
@@ -163,13 +165,13 @@ const CreateDocumentPage = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Category */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Kategori</label>
                   <select
                     required
-                    className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                   >
@@ -183,7 +185,7 @@ const CreateDocumentPage = () => {
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Klasifikasi</label>
                   <select
                     required
-                    className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
                     value={classificationId}
                     onChange={(e) => setClassificationId(e.target.value)}
                   >
@@ -197,7 +199,7 @@ const CreateDocumentPage = () => {
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">File Dokumen (PDF/DOCX)</label>
                 <div className={cn(
-                  "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center transition-all cursor-pointer relative",
+                  "border-2 border-dashed rounded-[24px] sm:rounded-[32px] p-6 sm:p-10 flex flex-col items-center justify-center transition-all cursor-pointer relative min-h-[160px]",
                   file ? "border-primary/50 bg-primary/5" : "border-slate-200 dark:border-slate-800 hover:border-primary/30"
                 )}>
                   <input
@@ -266,7 +268,7 @@ const CreateDocumentPage = () => {
 
         {/* Info Sidebar */}
         <div className="space-y-6">
-           <div className="bg-primary p-8 rounded-[32px] text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
+           <div className="bg-primary p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
               <div className="relative z-10 flex flex-col gap-4">
                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
                    <Info size={20} />

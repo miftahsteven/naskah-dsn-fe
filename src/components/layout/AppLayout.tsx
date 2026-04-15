@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
@@ -14,6 +14,27 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, hasHydrated } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [sidebarOpen]);
 
   // Protected Routes Check
   useEffect(() => {
@@ -23,7 +44,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     if (!isAuthenticated && !publicPaths.includes(pathname)) {
       router.push("/login");
     }
-    
+
     // Redirect authenticated users away from public paths
     if (isAuthenticated && publicPaths.includes(pathname)) {
       router.push("/dashboard");
@@ -48,13 +69,22 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-900/50 backdrop-blur-sm lg:hidden"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 p-8 overflow-auto">
+        <Topbar onMenuClick={toggleSidebar} />
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-auto">
           <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
             {children}
           </div>
