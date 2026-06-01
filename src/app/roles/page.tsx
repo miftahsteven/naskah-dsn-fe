@@ -89,6 +89,18 @@ const RolesPage = () => {
 
   const selectedRole = roles.find(r => r.id === selectedRoleId);
 
+  // Group permissions
+  const groupedPermissions = permissions.reduce((acc: any, perm) => {
+    let group = "LAINNYA";
+    if (perm.code.startsWith("DOC_")) group = "MANAJEMEN DOKUMEN";
+    if (perm.code.startsWith("USER_")) group = "MANAJEMEN USER";
+    if (perm.code.startsWith("ROLE_")) group = "MANAJEMEN ROLE";
+    
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(perm);
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
@@ -103,10 +115,9 @@ const RolesPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
-        {/* Roles List — Horizontal scroll on mobile, vertical on desktop */}
+        {/* Roles List */}
         <div className="lg:col-span-1">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1">Daftar Role</h3>
-          {/* Mobile: horizontal scroll tabs */}
           <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 scrollbar-none">
             {roles.map((role) => (
               <button
@@ -127,7 +138,6 @@ const RolesPage = () => {
               </button>
             ))}
           </div>
-          {/* Desktop: vertical list */}
           <div className="hidden lg:flex flex-col gap-2">
             {roles.map((role) => (
               <button
@@ -191,47 +201,59 @@ const RolesPage = () => {
                 </button>
               </div>
 
-              {/* Matrix Grid */}
-              <div className="p-4 sm:p-8">
-                {permissions.length === 0 ? (
+              {/* Matrix Grid Grouped */}
+              <div className="p-4 sm:p-8 space-y-10">
+                {Object.keys(groupedPermissions).length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
                     <Info size={32} />
                     <p className="italic">Belum ada permission yang terdaftar di database.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {permissions.map((perm) => {
-                      const isActive = rolePermissions.includes(perm.id);
-                      return (
-                        <button
-                          key={perm.id}
-                          onClick={() => togglePermission(perm.id)}
-                          className={cn(
-                            "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left group",
-                            isActive 
-                              ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50" 
-                              : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-primary/30"
-                          )}
-                        >
-                          <div className={cn(
-                            "shrink-0 transition-transform group-hover:scale-110",
-                            isActive ? "text-emerald-600" : "text-slate-300 dark:text-slate-700"
-                          )}>
-                            {isActive ? <CheckSquare size={24} /> : <Square size={24} />}
-                          </div>
-                          <div>
-                            <p className={cn(
-                              "text-sm font-bold transition-colors",
-                              isActive ? "text-emerald-900 dark:text-emerald-100" : "text-slate-700 dark:text-slate-300"
-                            )}>
-                              {perm.name}
-                            </p>
-                            <p className="text-[10px] font-mono text-slate-400 mt-0.5">{perm.code}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  Object.entries(groupedPermissions).map(([groupName, groupPerms]: [string, any]) => (
+                    <div key={groupName} className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-full border border-slate-100 dark:border-slate-800">
+                          {groupName}
+                        </h4>
+                        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {groupPerms.map((perm: any) => {
+                          const isActive = rolePermissions.includes(perm.id);
+                          return (
+                            <button
+                              key={perm.id}
+                              onClick={() => togglePermission(perm.id)}
+                              className={cn(
+                                "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left group",
+                                isActive 
+                                  ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50" 
+                                  : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-primary/30"
+                              )}
+                            >
+                              <div className={cn(
+                                "shrink-0 transition-transform group-hover:scale-110",
+                                isActive ? "text-emerald-600" : "text-slate-300 dark:text-slate-700"
+                              )}>
+                                {isActive ? <CheckSquare size={24} /> : <Square size={24} />}
+                              </div>
+                              <div>
+                                <p className={cn(
+                                  "text-sm font-bold transition-colors",
+                                  isActive ? "text-emerald-900 dark:text-emerald-100" : "text-slate-700 dark:text-slate-300"
+                                )}>
+                                  {perm.name}
+                                </p>
+                                <p className="text-[9px] font-mono text-slate-400 mt-0.5 uppercase">{perm.code}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

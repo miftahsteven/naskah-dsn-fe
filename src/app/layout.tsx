@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MUI Naskah Digital",
-  description: "Sistem Manajemen Dokumen & Tanda Tangan Digital DSN-MUI",
+  title: "Amanah Dashboard",
+  description: "Sistem Manajemen Dokumen & Tanda Tangan Digital — Amanah Admin",
 };
 
 export const viewport: Viewport = {

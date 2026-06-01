@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  FilePlus, 
-  Upload, 
-  X, 
-  Check, 
-  Loader2, 
+import {
+  FilePlus,
+  Upload,
+  X,
+  Check,
+  Loader2,
   AlertCircle,
   FileText,
   ChevronLeft,
@@ -18,18 +18,19 @@ import { cn } from "@/lib/utils";
 
 const CreateDocumentPage = () => {
   const router = useRouter();
-  
+
   const [categories, setCategories] = useState<any[]>([]);
   const [classifications, setClassifications] = useState<any[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
-  
+
   // Form State
   const [title, setTitle] = useState("");
   const [docNumber, setDocNumber] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [classificationId, setClassificationId] = useState("");
+  const [approvalFlowType, setApprovalFlowType] = useState("SEQUENTIAL");
   const [file, setFile] = useState<File | null>(null);
-  
+
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -72,6 +73,8 @@ const CreateDocumentPage = () => {
     formData.append("documentNumber", docNumber);
     formData.append("categoryId", categoryId);
     formData.append("classificationId", classificationId);
+    formData.append("documentType", "INCOMING");
+    formData.append("approvalFlowType", approvalFlowType);
 
     try {
       await api.post("/documents", formData, {
@@ -84,7 +87,7 @@ const CreateDocumentPage = () => {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push("/documents");
+        router.push("/surat-masuk");
       }, 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || "Gagal mengunggah dokumen");
@@ -96,7 +99,7 @@ const CreateDocumentPage = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       {/* Breadcrumb / Back */}
-      <button 
+      <button
         onClick={() => router.back()}
         className="flex items-center gap-2 text-slate-500 hover:text-primary font-bold transition-colors group"
       >
@@ -109,7 +112,7 @@ const CreateDocumentPage = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-1 sm:mb-2 flex items-center gap-3">
             <FilePlus size={28} className="text-primary flex-shrink-0" />
-            <span>Buat Dokumen Baru</span>
+            <span>Input Surat Masuk</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium text-sm sm:text-base">
             Unggah file dan lengkapi metadata untuk memulai proses administrasi digital.
@@ -145,7 +148,7 @@ const CreateDocumentPage = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Fatwa tentang Investasi Saham"
+                    placeholder="Judul Dokumen"
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -193,6 +196,20 @@ const CreateDocumentPage = () => {
                     {classifications.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
                   </select>
                 </div>
+
+                {/* Approval Flow Type */}
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tipe Alur Persetujuan</label>
+                  <select
+                    required
+                    className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
+                    value={approvalFlowType}
+                    onChange={(e) => setApprovalFlowType(e.target.value)}
+                  >
+                    <option value="SEQUENTIAL">Bertingkat (Waterfall)</option>
+                    <option value="PARALLEL">Paralel (Semua approver secara bersamaan)</option>
+                  </select>
+                </div>
               </div>
 
               {/* File Upload Dropzone */}
@@ -215,7 +232,7 @@ const CreateDocumentPage = () => {
                       </div>
                       <p className="text-sm font-bold text-slate-800 dark:text-white mb-1">{file.name}</p>
                       <p className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                      <button 
+                      <button
                         type="button"
                         onClick={() => setFile(null)}
                         className="mt-4 text-xs font-bold text-red-500 hover:underline"
@@ -238,68 +255,68 @@ const CreateDocumentPage = () => {
 
             {/* Actions */}
             <div className="flex items-center gap-4 pt-4">
-               <button
-                 type="submit"
-                 disabled={uploading || success}
-                 className="flex-1 gradient-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-               >
-                 {uploading ? (
-                   <>
-                     <Loader2 className="animate-spin" size={20} />
-                     <span>Mengunggah {progress}%</span>
-                   </>
-                 ) : (
-                   <>
-                     <Upload size={20} />
-                     <span>Unggah Dokumen</span>
-                   </>
-                 )}
-               </button>
-               <button 
-                type="button" 
+              <button
+                type="submit"
+                disabled={uploading || success}
+                className="flex-1 gradient-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    <span>Mengunggah {progress}%</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={20} />
+                    <span>Unggah Dokumen</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={() => router.back()}
                 className="px-8 py-4 text-slate-500 font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-800"
-               >
-                 Batal
-               </button>
+              >
+                Batal
+              </button>
             </div>
           </form>
         </div>
 
         {/* Info Sidebar */}
         <div className="space-y-6">
-           <div className="bg-primary p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
-              <div className="relative z-10 flex flex-col gap-4">
-                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                   <Info size={20} />
-                 </div>
-                 <h3 className="text-lg font-bold">Panduan Pengunggahan</h3>
-                 <p className="text-sm text-white/80 leading-relaxed">
-                   Pastikan dokumen telah diperiksa isinya sebelum diunggah. Dokumen yang baru diunggah akan masuk ke status <strong>"Draft"</strong> secara default.
-                 </p>
-                 <ul className="text-xs space-y-2 mt-2">
-                   <li className="flex items-start gap-2">
-                     <span className="w-1.5 h-1.5 bg-white rounded-full mt-1 shrink-0"></span>
-                     <span>Maksimal ukuran file 10MB</span>
-                   </li>
-                   <li className="flex items-start gap-2">
-                     <span className="w-1.5 h-1.5 bg-white rounded-full mt-1 shrink-0"></span>
-                     <span>Gunakan judul yang deskriptif</span>
-                   </li>
-                 </ul>
+          <div className="bg-primary p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] text-white shadow-xl shadow-primary/20 relative overflow-hidden group">
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Info size={20} />
               </div>
-              {/* Abstract pattern */}
-              <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-1000"></div>
-           </div>
-
-           <div className="p-8 rounded-[32px] border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300">
-                 <FilePlus size={32} />
-              </div>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed px-4">
-                Dokumen Anda dienkripsi dan disimpan secara aman dalam sistem arsip digital kami.
+              <h3 className="text-lg font-bold">Panduan Pengunggahan</h3>
+              <p className="text-sm text-white/80 leading-relaxed">
+                Pastikan dokumen telah diperiksa isinya sebelum diunggah. Dokumen yang baru diunggah akan masuk ke status <strong>"Draft"</strong> secara default.
               </p>
-           </div>
+              <ul className="text-xs space-y-2 mt-2">
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full mt-1 shrink-0"></span>
+                  <span>Maksimal ukuran file 10MB</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full mt-1 shrink-0"></span>
+                  <span>Gunakan judul yang deskriptif</span>
+                </li>
+              </ul>
+            </div>
+            {/* Abstract pattern */}
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-1000"></div>
+          </div>
+
+          <div className="p-8 rounded-[32px] border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300">
+              <FilePlus size={32} />
+            </div>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed px-4">
+              Dokumen Anda dienkripsi dan disimpan secara aman dalam sistem arsip digital kami.
+            </p>
+          </div>
         </div>
       </div>
     </div>

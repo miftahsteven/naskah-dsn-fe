@@ -34,65 +34,66 @@
 }
 
 :root {
-  --background: #F8FAFC;
-  --foreground: #0F172A;
-  
+  /* Amanah Brand Colors */
+  --background: #F7F5EC;   /* Cream */
+  --foreground: #1C1C1C;   /* Arang */
+
   --card: #FFFFFF;
-  --card-foreground: #0F172A;
-  
+  --card-foreground: #1C1C1C;
+
   --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
-  
-  --primary: #0F6B4B; /* MUI Green */
+  --popover-foreground: #1C1C1C;
+
+  --primary: #006633;        /* Hijau MUI */
   --primary-foreground: #FFFFFF;
-  
-  --secondary: #EAF7FB; /* Soft Sky */
-  --secondary-foreground: #0A4F38; /* Deep Emerald */
-  
-  --muted: #F1F5F9;
-  --muted-foreground: #64748B;
-  
-  --accent: #22C7F0; /* Modern Cyan */
+
+  --secondary: #E8F5EE;      /* Hijau Muda 10% tint */
+  --secondary-foreground: #006633;
+
+  --muted: #F1EFE6;          /* Slightly darker cream */
+  --muted-foreground: #5A5A5A;
+
+  --accent: #D4AF37;         /* Gold Premium */
   --accent-foreground: #FFFFFF;
-  
-  --destructive: #D9534F; /* Danger Red */
+
+  --destructive: #D9534F;
   --destructive-foreground: #FFFFFF;
-  
-  --border: #D8E2E8;
-  --input: #D8E2E8;
-  --ring: #0F6B4B;
-  
+
+  --border: #DDDBC9;
+  --input: #DDDBC9;
+  --ring: #006633;
+
   --radius: 0.75rem;
 }
 
 .dark {
-  --background: #0F172A;
-  --foreground: #F8FAFC;
-  
-  --card: #1E293B;
-  --card-foreground: #F8FAFC;
-  
-  --popover: #1E293B;
-  --popover-foreground: #F8FAFC;
-  
-  --primary: #8FE3C2; /* Neo Mint for Dark Mode */
-  --primary-foreground: #0A4F38;
-  
-  --secondary: #0A4F38;
-  --secondary-foreground: #8FE3C2;
-  
-  --muted: #334155;
-  --muted-foreground: #94A3B8;
-  
-  --accent: #22C7F0;
-  --accent-foreground: #FFFFFF;
-  
+  --background: #0F1A12;
+  --foreground: #F7F5EC;
+
+  --card: #172019;
+  --card-foreground: #F7F5EC;
+
+  --popover: #172019;
+  --popover-foreground: #F7F5EC;
+
+  --primary: #1B7F4A;        /* Hijau Muda for dark mode */
+  --primary-foreground: #F7F5EC;
+
+  --secondary: #0D3320;
+  --secondary-foreground: #A8D4B8;
+
+  --muted: #1E2D22;
+  --muted-foreground: #8A9E8F;
+
+  --accent: #D4AF37;         /* Gold stays in dark mode */
+  --accent-foreground: #1C1C1C;
+
   --destructive: #F87171;
   --destructive-foreground: #FFFFFF;
-  
-  --border: #334155;
-  --input: #334155;
-  --ring: #8FE3C2;
+
+  --border: #243329;
+  --input: #243329;
+  --ring: #1B7F4A;
 }
 
 @layer base {
@@ -110,14 +111,22 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-white/20 dark:border-white/10;
+    @apply bg-white/70 dark:bg-[#172019]/70 backdrop-blur-md border border-white/20 dark:border-white/10;
   }
-  
+
+  /* Amanah gradient: deep green → medium green */
   .gradient-primary {
-    @apply bg-gradient-to-br from-[#0F6B4B] to-[#0A4F38];
+    background: linear-gradient(135deg, #006633 0%, #1B7F4A 100%);
   }
-  
+
+  /* Gold shimmer gradient for premium accents */
+  .gradient-gold {
+    background: linear-gradient(135deg, #D4AF37 0%, #F0D060 50%, #D4AF37 100%);
+  }
+
+  /* Brand text gradient: green → gold */
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#0F6B4B] to-[#22C7F0];
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(90deg, #006633, #D4AF37);
   }
 }

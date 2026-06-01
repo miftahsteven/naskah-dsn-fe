@@ -16,10 +16,14 @@ import {
   User as UserIcon,
   Download,
   ChevronRight,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import DocumentReader from "@/components/documents/DocumentReader";
+import Can from "@/components/auth/Can";
+
 
 const ApprovalsPage = () => {
   const [queue, setQueue] = useState<any[]>([]);
@@ -30,6 +34,12 @@ const ApprovalsPage = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [actionComment, setActionComment] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [otpToken, setOtpToken] = useState("");
+  const [confirmAction, setConfirmAction] = useState<'APPROVE' | 'REJECT' | 'REVISION' | null>(null);
+
+  // Reader State
+  const [readerDoc, setReaderDoc] = useState<{title: string, fileUrl: string} | null>(null);
+
 
   const fetchQueue = async () => {
     try {
@@ -47,17 +57,26 @@ const ApprovalsPage = () => {
     fetchQueue();
   }, []);
 
-  const handleAction = async (action: 'APPROVE' | 'REJECT') => {
-    if (!selectedItem) return;
+  const handleAction = async () => {
+    if (!selectedItem || !confirmAction) return;
+    
+    if (confirmAction === 'APPROVE' && !otpToken) {
+      alert("Harap masukkan kode OTP Google Authenticator");
+      return;
+    }
+
     try {
       setProcessing(true);
       await api.post("/workflow/action", {
         stepId: selectedItem.id,
-        action,
-        comment: actionComment
+        action: confirmAction,
+        comment: actionComment,
+        twoFactorToken: otpToken
       });
       setSelectedItem(null);
+      setConfirmAction(null);
       setActionComment("");
+      setOtpToken("");
       fetchQueue();
     } catch (err: any) {
       alert("Gagal memproses aksi: " + (err.response?.data?.message || err.message));
@@ -65,6 +84,7 @@ const ApprovalsPage = () => {
       setProcessing(false);
     }
   };
+
 
   return (
     <div className="space-y-6 sm:space-y-10">
@@ -109,19 +129,36 @@ const ApprovalsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {queue.map((item) => {
-            const doc = item.instance.document;
+            const doc = item.workflowInstance.document;
+            const currentVersion = doc.versions?.[doc.versions.length - 1]; // Get latest version
+            
             return (
               <div key={item.id} className="bg-white dark:bg-slate-900 rounded-[28px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 p-5 sm:p-7 flex flex-col shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group animate-in fade-in slide-in-from-bottom-4 duration-500">
                  {/* Card Header */}
                  <div className="flex justify-between items-start mb-5">
-                    <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-tight">
-                         Langkah {item.stepNumber} / {item.instance.totalSteps}
-                       </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                       {item.status === 'REVISION' ? (
+                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-red-50 text-red-600 border border-red-100 uppercase tracking-tight shadow-sm">
+                           Revisi Diperlukan
+                         </span>
+                       ) : (
+                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-tight">
+                           Langkah {item.stepNumber} / {item.workflowInstance.steps?.length || "?"}
+                         </span>
+                       )}
+                       {currentVersion && currentVersion.versionNum > 1 && (
+                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-tight shadow-sm" title={`Direvisi pada: ${new Date(currentVersion.createdAt).toLocaleString('id-ID', {day: 'numeric', month: 'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}`}>
+                           Revisi v{currentVersion.versionNum}
+                         </span>
+                       )}
                     </div>
-                    <Link href={`/documents/${doc.id}`} className="text-slate-300 hover:text-primary transition-colors p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                    <button 
+                      onClick={() => setReaderDoc({title: doc.title, fileUrl: currentVersion?.fileUrl || ""})}
+                      className="text-slate-300 hover:text-primary transition-colors p-2 bg-slate-50 dark:bg-slate-800 rounded-xl"
+                      title="Preview Document"
+                    >
                        <ExternalLink size={18} />
-                    </Link>
+                    </button>
                  </div>
 
                  {/* Document Info */}
@@ -140,10 +177,11 @@ const ApprovalsPage = () => {
                           <div className="w-5 h-5 rounded-md bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
                              <UserIcon size={14} />
                           </div>
-                          <span className="truncate">Oleh: {doc.creator.fullName}</span>
+                          <span className="truncate">Oleh: {doc.creator?.fullName || "Admin"}</span>
                        </div>
                     </div>
                  </div>
+
 
                  {/* Meta Badges */}
                  <div className="flex flex-wrap gap-2 mb-8">
@@ -159,22 +197,36 @@ const ApprovalsPage = () => {
                  </div>
 
                  {/* Action Footer */}
-                 <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
-                    <button 
-                      onClick={() => setSelectedItem(item)}
-                      className="flex items-center justify-center gap-2 py-3 bg-slate-50 hover:bg-emerald-500 hover:text-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all active:scale-[0.95] text-sm"
-                    >
-                      <CheckCircle2 size={16} />
-                      <span>Setujui</span>
-                    </button>
-                    <button 
-                      onClick={() => setSelectedItem(item)}
-                      className="flex items-center justify-center gap-2 py-3 bg-slate-50 hover:bg-red-500 hover:text-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all active:scale-[0.95] text-sm"
-                    >
-                      <XSquare size={16} />
-                      <span>Tolak</span>
-                    </button>
+                 <div className="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                    <Can perform="DOC_APPROVE">
+                      <button 
+                        onClick={() => { setSelectedItem(item); setConfirmAction('APPROVE'); }}
+                        className="flex flex-col items-center justify-center gap-1.5 py-3 bg-slate-50 hover:bg-emerald-500 hover:text-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all active:scale-[0.95] text-[10px]"
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>Setujui</span>
+                      </button>
+                    </Can>
+                    <Can perform="DOC_REVISE">
+                      <button 
+                        onClick={() => { setSelectedItem(item); setConfirmAction('REVISION'); }}
+                        className="flex flex-col items-center justify-center gap-1.5 py-3 bg-slate-50 hover:bg-amber-500 hover:text-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all active:scale-[0.95] text-[10px]"
+                      >
+                        <RefreshCw size={16} />
+                        <span>Revisi</span>
+                      </button>
+                    </Can>
+                    <Can perform="DOC_REJECT">
+                      <button 
+                        onClick={() => { setSelectedItem(item); setConfirmAction('REJECT'); }}
+                        className="flex flex-col items-center justify-center gap-1.5 py-3 bg-slate-50 hover:bg-red-500 hover:text-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all active:scale-[0.95] text-[10px]"
+                      >
+                        <XSquare size={16} />
+                        <span>Tolak</span>
+                      </button>
+                    </Can>
                  </div>
+
               </div>
             );
           })}
@@ -182,7 +234,7 @@ const ApprovalsPage = () => {
       )}
 
       {/* Action Dialog */}
-      {selectedItem && (
+      {selectedItem && confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => !processing && setSelectedItem(null)}></div>
            <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl p-6 sm:p-10 border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
@@ -195,24 +247,49 @@ const ApprovalsPage = () => {
               </button>
 
               <div className="flex flex-col items-center text-center gap-5 mb-10">
-                 <div className="w-20 h-20 rounded-[24px] bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                    <ShieldCheck size={40} />
+                 <div className={cn(
+                   "w-20 h-20 rounded-[24px] flex items-center justify-center shadow-inner",
+                   confirmAction === 'APPROVE' ? "bg-emerald-50 text-emerald-500" :
+                   confirmAction === 'REVISION' ? "bg-amber-50 text-amber-500" :
+                   "bg-red-50 text-red-500"
+                 )}>
+                    {confirmAction === 'APPROVE' ? <ShieldCheck size={40} /> : 
+                     confirmAction === 'REVISION' ? <RefreshCw size={40} /> : 
+                     <XSquare size={40} />}
                  </div>
                  <div>
-                    <h4 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">Konfirmasi Aksi</h4>
+                    <h4 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+                      {confirmAction === 'APPROVE' ? 'Konfirmasi Persetujuan' : 
+                       confirmAction === 'REVISION' ? 'Minta Revisi' : 
+                       'Konfirmasi Penolakan'}
+                    </h4>
                     <p className="text-sm text-slate-500 font-medium px-4">
-                      Anda sedang memproses dokumen: <br/> 
-                      <span className="text-slate-900 dark:text-slate-200 font-bold">&ldquo;{selectedItem.instance.document.title}&rdquo;</span>
+                      Dokumen: <br/> 
+                      <span className="text-slate-900 dark:text-slate-200 font-bold">&ldquo;{selectedItem.workflowInstance.document.title}&rdquo;</span>
                     </p>
                  </div>
               </div>
 
-              <div className="space-y-8">
+              <div className="space-y-6">
+                 {confirmAction === 'APPROVE' && (
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Kode Google Authenticator (OTP)</label>
+                      <input 
+                        type="text"
+                        maxLength={6}
+                        placeholder="000000"
+                        className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary/20 rounded-[24px] outline-none transition-all text-xl font-bold tracking-[0.5em] text-center"
+                        value={otpToken}
+                        onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ''))}
+                      />
+                   </div>
+                 )}
+
                  <div className="space-y-3">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Komentar / Catatan Khusus</label>
                     <textarea 
-                      rows={4}
-                      placeholder="Berikan alasan atau catatan tambahan..."
+                      rows={3}
+                      placeholder={confirmAction === 'REVISION' ? "Jelaskan apa yang perlu diperbaiki..." : "Berikan alasan atau catatan tambahan..."}
                       className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary/20 rounded-[24px] outline-none transition-all text-sm font-medium resize-none"
                       value={actionComment}
                       onChange={(e) => setActionComment(e.target.value)}
@@ -220,26 +297,31 @@ const ApprovalsPage = () => {
                  </div>
 
                  <div className="flex flex-col gap-3">
-                    <div className="flex gap-3">
-                      <button 
-                        disabled={processing}
-                        onClick={() => handleAction('APPROVE')}
-                        className="flex-1 py-4.5 bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all disabled:opacity-70 active:scale-[0.98]"
-                      >
-                        {processing ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20} /> <span>Setujui</span></>}
-                      </button>
-                      <button 
-                        disabled={processing}
-                        onClick={() => handleAction('REJECT')}
-                        className="flex-1 py-4.5 bg-red-500 text-white font-bold rounded-2xl shadow-xl shadow-red-500/20 flex items-center justify-center gap-2 hover:bg-red-600 transition-all disabled:opacity-70 active:scale-[0.98]"
-                      >
-                        {processing ? <Loader2 className="animate-spin" size={20} /> : <><XSquare size={20} /> <span>Tolak</span></>}
-                      </button>
-                    </div>
+                     <Can perform={confirmAction === 'APPROVE' ? 'DOC_APPROVE' : confirmAction === 'REVISION' ? 'DOC_REVISE' : 'DOC_REJECT'}>
+                        <button 
+                          disabled={processing || (confirmAction === 'APPROVE' && otpToken.length < 6)}
+                          onClick={handleAction}
+                          className={cn(
+                            "w-full py-4.5 text-white font-bold rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 active:scale-[0.98]",
+                            confirmAction === 'APPROVE' ? "bg-emerald-500 shadow-emerald-500/20" :
+                            confirmAction === 'REVISION' ? "bg-amber-500 shadow-amber-500/20" :
+                            "bg-red-500 shadow-red-500/20"
+                          )}
+                        >
+                          {processing ? <Loader2 className="animate-spin" size={20} /> : (
+                            <>
+                              {confirmAction === 'APPROVE' ? <CheckCircle2 size={20} /> : 
+                               confirmAction === 'REVISION' ? <RefreshCw size={20} /> : 
+                               <XSquare size={20} />}
+                              <span>Konfirmasi {confirmAction === 'APPROVE' ? 'Setujui' : confirmAction === 'REVISION' ? 'Revisi' : 'Tolak'}</span>
+                            </>
+                          )}
+                        </button>
+                     </Can>
                     <button 
                       disabled={processing}
                       onClick={() => setSelectedItem(null)}
-                      className="w-full py-4 text-slate-400 font-bold hover:text-slate-600 dark:hover:text-slate-200 transition-colors text-sm"
+                      className="w-full py-2 text-slate-400 font-bold hover:text-slate-600 dark:hover:text-slate-200 transition-colors text-xs"
                     >
                       Batalkan dan Kembali
                     </button>
@@ -248,6 +330,14 @@ const ApprovalsPage = () => {
            </div>
         </div>
       )}
+
+      {/* Document Reader Modal */}
+      <DocumentReader 
+        isOpen={!!readerDoc}
+        onClose={() => setReaderDoc(null)}
+        title={readerDoc?.title || ""}
+        fileUrl={readerDoc?.fileUrl || ""}
+      />
     </div>
   );
 };
