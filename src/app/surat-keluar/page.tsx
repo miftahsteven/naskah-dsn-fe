@@ -394,7 +394,7 @@ const DocumentsPage = () => {
         </Can>
       </div>
 
-      {/* Search + Mobile Filter Toggle */}
+      {/* Search + Filter Button */}
       <div className="flex gap-3">
         <form onSubmit={handleSearch} className="flex-1 relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={18} />
@@ -402,46 +402,48 @@ const DocumentsPage = () => {
             className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl outline-none focus:border-primary/50 transition-all text-sm shadow-sm"
             value={search} onChange={(e) => setSearch(e.target.value)} />
         </form>
-        {/* Mobile filter button */}
+        {/* Filter button — always visible, opens modal */}
         <button onClick={() => setFilterOpen(true)}
-          className="lg:hidden flex items-center gap-2 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex-shrink-0">
+          className={`flex items-center gap-2 px-4 py-3 border rounded-2xl font-bold shadow-sm transition-all flex-shrink-0 text-sm
+            ${ (statusFilter || categoryFilter || classFilter)
+              ? 'bg-primary text-white border-primary hover:bg-primary/90'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}>
           <Filter size={18} />
-          <span className="hidden sm:inline">Filter</span>
+          <span>Filter{(statusFilter || categoryFilter || classFilter) ? ' ●' : ''}</span>
         </button>
       </div>
 
-      {/* Mobile Filter Drawer Overlay */}
+      {/* Filter Modal — centered, all screen sizes */}
       {filterOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setFilterOpen(false)} />
-          <div className="relative ml-auto w-80 max-w-[90vw] h-full bg-white dark:bg-slate-900 shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setFilterOpen(false)} />
+          <div className="relative bg-white dark:bg-slate-900 w-full max-w-sm rounded-[28px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-base">
                 <Filter size={18} className="text-primary" /> Filter Dokumen
               </h3>
-              <button onClick={() => setFilterOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-all">
-                <X size={20} />
+              <button onClick={() => setFilterOpen(false)} className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-all">
+                <X size={18} />
               </button>
             </div>
-            <FilterPanel />
+            <div className="p-6">
+              <FilterPanel />
+            </div>
+            <div className="px-6 pb-6">
+              <button
+                onClick={() => { resetFilters(); setFilterOpen(false); }}
+                className="w-full py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                Reset &amp; Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
-        {/* Desktop Filter Sidebar */}
-        <aside className="hidden lg:flex lg:flex-col lg:col-span-1">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm sticky top-24">
-            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold mb-5">
-              <Filter size={18} className="text-primary" />
-              <span>Filter Dokumen</span>
-            </div>
-            <FilterPanel />
-          </div>
-        </aside>
-
-        {/* Document List */}
-        <div className="lg:col-span-3">
+      <div className="w-full">
+        {/* Document List — full width */}
+        <div>
           <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm relative z-10 w-full pb-2">
             {loading ? (
               <div className="py-24 sm:py-32 flex flex-col items-center justify-center gap-4 text-slate-400">
@@ -462,78 +464,139 @@ const DocumentsPage = () => {
             ) : (
               <>
                 {/* Desktop Table */}
-                <div className="hidden md:block relative">
-                  <table className="w-full">
+                <div className="hidden md:block relative overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/50">
-                        <th className="rounded-tl-[24px] sm:rounded-tl-[32px] text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Judul & Metadata</th>
-                        <th className="text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Status</th>
-                        <th className="text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Pembuat</th>
-                        <th className="rounded-tr-[24px] sm:rounded-tr-[32px] text-right py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Aksi</th>
+                        <th className="rounded-tl-[24px] sm:rounded-tl-[32px] text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800 w-[30%]">Judul & Metadata</th>
+                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Klasifikasi & Versi</th>
+                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Progress Alur</th>
+                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Status</th>
+                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Pembuat & Tanggal</th>
+                        <th className="rounded-tr-[24px] sm:rounded-tr-[32px] text-right py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {documents.map((doc) => (
+                      {documents.map((doc) => {
+                        const wf = doc.workflowInstances?.[0];
+                        const steps = wf?.steps ?? [];
+                        const totalSteps = steps.length;
+                        const doneSteps = steps.filter((s: any) => s.status === 'APPROVED').length;
+                        const currentVersion = doc.versions?.[doc.versions.length - 1]?.versionNum ?? doc.currentVersion ?? 1;
+
+                        return (
                         <tr key={doc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
-                          <td className="py-5 px-6">
-                            <div className="flex flex-col">
-                              <Link href={`/surat-keluar/${doc.id}`} className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors text-sm mb-1 line-clamp-1">
+                          {/* ── Judul & Metadata ── */}
+                          <td className="py-4 px-5">
+                            <div className="flex flex-col gap-0.5">
+                              <Link href={`/surat-keluar/${doc.id}`} className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors text-sm line-clamp-2 leading-snug">
                                 {doc.title}
                               </Link>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-[10px] font-mono text-slate-400">{doc.documentNumber || "No Number"}</span>
-                                <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                <span className="text-[10px] font-bold text-slate-500 uppercase">{doc.category.name}</span>
+                              <div className="flex items-center gap-2 flex-wrap mt-1">
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{doc.documentNumber || "No Nomor"}</span>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{doc.category?.name ?? "—"}</span>
                               </div>
-                              {doc.status === 'REVISION' && doc.workflowInstances?.[0]?.steps?.find((s: any) => s.status === 'REVISION') && (
-                                <div className="mt-2.5 p-2.5 bg-blue-50/80 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl max-w-sm">
-                                   <p className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-1">
-                                     <AlertCircle size={12} /> Diminta Revisi oleh: {doc.workflowInstances[0].steps.findLast((s: any) => s.status === 'REVISION')?.user?.fullName}
-                                   </p>
-                                   <p className="text-[10px] text-blue-600/80 dark:text-blue-300/80 italic leading-snug pl-4 line-clamp-2">
-                                     &ldquo;{doc.workflowInstances[0].steps.findLast((s: any) => s.status === 'REVISION')?.comment || "Revisi diperlukan."}&rdquo;
-                                   </p>
+                              {/* Inline status alerts */}
+                              {doc.status === 'REVISION' && wf?.steps?.find((s: any) => s.status === 'REVISION') && (
+                                <div className="mt-2 px-2.5 py-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                                  <p className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                                    <AlertCircle size={11} /> Revisi dari: {wf.steps.findLast((s: any) => s.status === 'REVISION')?.user?.fullName}
+                                  </p>
                                 </div>
                               )}
                               {doc.status === 'REJECTED' && (
-                                <div className="mt-2.5 p-2.5 bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl max-w-sm">
-                                   <p className="text-[10px] font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5 mb-1">
-                                     <X size={12} /> Ditolak oleh: {doc.workflowInstances?.[0]?.steps?.findLast((s: any) => s.status === 'REJECTED')?.user?.fullName || "Approver"}
-                                   </p>
-                                   <p className="text-[10px] text-red-600/80 dark:text-red-300/80 italic leading-snug pl-4 line-clamp-2">
-                                     &ldquo;{doc.workflowInstances?.[0]?.steps?.findLast((s: any) => s.status === 'REJECTED')?.comment || "Dokumen tidak disetujui."}&rdquo;
-                                   </p>
-                                </div>
-                              )}
-                              {doc.status === 'SIGNED' && (
-                                <div className="mt-2.5 p-2.5 bg-emerald-50/80 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl max-w-sm">
-                                   <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                                     <CheckCircle2 size={12} /> Dokumen Selesai & Ditandatangani
-                                   </p>
+                                <div className="mt-2 px-2.5 py-2 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl">
+                                  <p className="text-[10px] font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                                    <X size={11} /> Ditolak: {wf?.steps?.findLast((s: any) => s.status === 'REJECTED')?.user?.fullName || "Approver"}
+                                  </p>
                                 </div>
                               )}
                             </div>
                           </td>
-                          <td className="py-5 px-6">
-                            <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm", statusClass(doc.status))}>
+
+                          {/* ── Klasifikasi & Versi ── */}
+                          <td className="py-4 px-5">
+                            <div className="flex flex-col gap-2">
+                              {doc.classification?.name ? (
+                                <span className="inline-flex items-center text-[10px] font-bold text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/40 px-2 py-0.5 rounded-full w-fit">
+                                  {doc.classification.name}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">—</span>
+                              )}
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full w-fit">
+                                v{currentVersion}
+                                {currentVersion > 1 && <span className="text-emerald-500">↑</span>}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* ── Progress Alur ── */}
+                          <td className="py-4 px-5">
+                            {totalSteps === 0 ? (
+                              <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">Belum ada alur</span>
+                            ) : (
+                              <div className="flex flex-col gap-1.5 min-w-[80px]">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{doneSteps}/{totalSteps} Step</span>
+                                  {doneSteps === totalSteps && totalSteps > 0 && (
+                                    <CheckCircle2 size={12} className="text-emerald-500" />
+                                  )}
+                                </div>
+                                {/* Mini step dots */}
+                                <div className="flex items-center gap-1">
+                                  {steps.map((s: any, i: number) => (
+                                    <div key={i} className={cn(
+                                      "h-1.5 flex-1 rounded-full transition-all",
+                                      s.status === 'APPROVED' ? "bg-emerald-500" :
+                                      s.status === 'REJECTED' ? "bg-red-400" :
+                                      s.status === 'PENDING'  ? "bg-amber-400 animate-pulse" :
+                                      "bg-slate-200 dark:bg-slate-700"
+                                    )} />
+                                  ))}
+                                </div>
+                                {/* Current pending approver */}
+                                {steps.find((s: any) => s.status === 'PENDING') && (
+                                  <p className="text-[9px] text-slate-400 truncate max-w-[110px]">
+                                    ⏳ {steps.find((s: any) => s.status === 'PENDING')?.user?.fullName}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* ── Status ── */}
+                          <td className="py-4 px-5">
+                            <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm whitespace-nowrap", statusClass(doc.status))}>
                               {doc.status}
                             </span>
                           </td>
-                          <td className="py-5 px-6">
-                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{doc.creator.fullName}</p>
-                            <p className="text-[10px] text-slate-400">{new Date(doc.createdAt).toLocaleString('id-ID', {day: 'numeric', month: 'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</p>
+
+                          {/* ── Pembuat & Tanggal ── */}
+                          <td className="py-4 px-5">
+                            <div className="flex flex-col gap-0.5">
+                              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">{doc.creator?.fullName}</p>
+                              {doc.creator?.jobTitle && (
+                                <p className="text-[9px] text-slate-400 truncate max-w-[130px]">{doc.creator.jobTitle}</p>
+                              )}
+                              <p className="text-[9px] text-slate-400 mt-0.5">📅 {new Date(doc.createdAt).toLocaleString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</p>
+                              {doc.updatedAt && doc.updatedAt !== doc.createdAt && (
+                                <p className="text-[9px] text-slate-300 dark:text-slate-600">🔄 {new Date(doc.updatedAt).toLocaleString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</p>
+                              )}
+                            </div>
                           </td>
-                          <td className="py-5 px-6 text-right">
+
+                          {/* ── Aksi ── */}
+                          <td className="py-4 px-5 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              {/* Hydration fix: Avoid <button> inside Next <Link> */}
-                              <Link href={`/surat-keluar/${doc.id}`} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all inline-flex items-center">
+                              <Link href={`/surat-keluar/${doc.id}`} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all inline-flex items-center" title="Lihat Detail">
                                 <Eye size={17} />
                               </Link>
-                              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all">
+                              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all" title="Unduh">
                                 <Download size={17} />
                               </button>
                               <div className="relative inline-block">
-                                <button 
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setActiveDropdown(activeDropdown === doc.id ? null : doc.id);
@@ -571,7 +634,8 @@ const DocumentsPage = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

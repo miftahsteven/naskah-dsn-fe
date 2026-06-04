@@ -142,6 +142,162 @@ const ApprovalSubmitModal = ({
   );
 };
 
+// ── Workflow Edit Modal ────────────────────────────────────────────────────
+const WorkflowEditModal = ({
+  documentId,
+  onClose,
+  onSuccess,
+}: {
+  documentId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [steps, setSteps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    api.get("/users")
+      .then((res) => setUsers(res.data.data))
+      .catch((err) => console.error("Failed to fetch users", err));
+
+    api.get(`/workflow/document/${documentId}`)
+      .then((res) => {
+        if (res.data.status === "success" && res.data.data.length > 0) {
+          setSteps(res.data.data);
+        } else {
+          setSteps([{ userId: "" }]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch current steps", err);
+        setSteps([{ userId: "" }]);
+      })
+      .finally(() => setFetching(false));
+  }, [documentId]);
+
+  const handleAddStep = () => setSteps([...steps, { userId: "", status: "WAITING" }]);
+  const handleRemoveStep = (index: number) => {
+    if (steps[index].status === "APPROVED") return;
+    setSteps(steps.filter((_, i) => i !== index));
+  };
+  const handleUserChange = (index: number, val: string) => {
+    if (steps[index].status === "APPROVED") return;
+    const newSteps = [...steps];
+    newSteps[index].userId = val;
+    setSteps(newSteps);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (steps.some((s) => !s.userId)) {
+      alert("Harap pilih penandatangan untuk semua urutan.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.put(`/workflow/document/${documentId}`, {
+        stepConfig: steps.map((s, i) => ({ stepNumber: i + 1, userId: s.userId })),
+      });
+      onSuccess();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Gagal mengubah alur persetujuan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 rounded-[24px] shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Ubah Alur Persetujuan</h2>
+            <p className="text-xs text-slate-500 font-medium mt-1">Langkah yang sudah disetujui terkunci dan tidak dapat diubah.</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+            <X size={18} />
+          </button>
+        </div>
+
+        {fetching ? (
+          <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2">
+              {steps.map((step, idx) => {
+                const isApproved = step.status === "APPROVED";
+                return isApproved ? (
+                  <div key={idx} className="flex gap-3 items-start group">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-2">
+                      <CheckCircle2 size={12} />
+                    </div>
+                    <div className="flex-1 p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-800 dark:text-white">{step.approver || "Approver " + (idx + 1)}</p>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                          APPROVED
+                        </span>
+                      </div>
+                      {step.actionedAt && (
+                        <p className="text-[9px] text-slate-400 font-mono">
+                          {new Date(step.actionedAt).toLocaleString('id-ID')}
+                        </p>
+                      )}
+                      {step.comment && (
+                        <p className="text-[10px] text-slate-600 dark:text-slate-400 italic mt-1 leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                          &ldquo;{step.comment}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={idx} className="flex gap-3 items-center group">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                      {idx + 1}
+                    </div>
+                    <select
+                      required
+                      value={step.userId || ""}
+                      onChange={(e) => handleUserChange(idx, e.target.value)}
+                      className="flex-1 px-4 py-3 bg-[#F7F5EC] border border-[#DDDBC9] rounded-xl outline-none focus:border-[#006633]/50 focus:bg-white text-sm appearance-none"
+                    >
+                      <option value="">— Pilih Penandatangan —</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.fullName} ({u.role.name})</option>
+                      ))}
+                    </select>
+                    {steps.length > 1 && (
+                      <button type="button" onClick={() => handleRemoveStep(idx)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button type="button" onClick={handleAddStep} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-all">
+              <Plus size={16} /> Tambah Penandatangan
+            </button>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 border border-slate-200 transition-all">
+                Batal
+              </button>
+              <button type="submit" disabled={loading} className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)' }}>
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <><Send size={16} /> Simpan Perubahan</>}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Revision Modal ──────────────────────────────────────────────────
 const RevisionModal = ({
   documentId,
@@ -234,6 +390,7 @@ const DocumentDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [isWorkflowEditModalOpen, setIsWorkflowEditModalOpen] = useState(false);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
   const [readerDoc, setReaderDoc] = useState<{ title: string, fileUrl: string } | null>(null);
   const user = useAuthStore((state) => state.user);
@@ -470,10 +627,22 @@ const DocumentDetailPage = () => {
         <div className="space-y-8">
           {/* Workflow Status Card */}
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ShieldCheck size={20} className="text-primary" />
-              Status Workflow
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck size={20} className="text-primary" />
+                Status Workflow
+              </h3>
+              {doc.workflowInstances && doc.workflowInstances.length > 0 &&
+                !['COMPLETED', 'REJECTED'].includes(doc.workflowInstances[doc.workflowInstances.length - 1].status) &&
+                (doc.creatorId === user?.id || isSuperOrAdmin || (user && user.role === 'ADMIN')) && (
+                  <button
+                    onClick={() => setIsWorkflowEditModalOpen(true)}
+                    className="px-4 py-1.5 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                  >
+                    Ubah
+                  </button>
+              )}
+            </div>
 
             {doc.workflowInstances && doc.workflowInstances.length > 0 ? (
               <div className="relative space-y-6 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-slate-800">
@@ -591,6 +760,17 @@ const DocumentDetailPage = () => {
           onClose={() => setIsApprovalModalOpen(false)}
           onSuccess={() => {
             setIsApprovalModalOpen(false);
+            fetchDetail();
+          }}
+        />
+      )}
+
+      {isWorkflowEditModalOpen && (
+        <WorkflowEditModal
+          documentId={doc.id}
+          onClose={() => setIsWorkflowEditModalOpen(false)}
+          onSuccess={() => {
+            setIsWorkflowEditModalOpen(false);
             fetchDetail();
           }}
         />
