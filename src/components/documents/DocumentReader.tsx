@@ -11,20 +11,50 @@ interface DocumentReaderProps {
 }
 
 const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen, onClose }) => {
-  if (!isOpen) return null;
+  const [htmlContent, setHtmlContent] = React.useState<string | null>(null);
 
-  // Assume fileUrl is something like "uploads/filename.pdf"
-  // The backend serves static files from /uploads
-  const fullUrl = `http://localhost:4002/${fileUrl}`;
+  // Safely check properties to avoid errors when closed with empty props
+  const safeFileUrl = fileUrl || "";
+  const safeTitle = title || "";
 
-  const isDocx = title.toLowerCase().endsWith('.docx') || title.toLowerCase().endsWith('.doc') || fileUrl.toLowerCase().endsWith('.docx') || fileUrl.toLowerCase().endsWith('.doc');
+  const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
+    ? safeFileUrl
+    : `http://localhost:4002/${safeFileUrl.startsWith("/") ? safeFileUrl.slice(1) : safeFileUrl}`;
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  let fullUrlWithToken = fullUrl;
+  if (token && (fullUrl.startsWith("http://") || fullUrl.startsWith("https://"))) {
+    const separator = fullUrl.includes('?') ? '&' : '?';
+    fullUrlWithToken = `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
+
+  const isDocx = safeTitle.toLowerCase().endsWith('.docx') || safeTitle.toLowerCase().endsWith('.doc') || safeFileUrl.toLowerCase().endsWith('.docx') || safeFileUrl.toLowerCase().endsWith('.doc');
+  const isHtml = safeTitle.toLowerCase().endsWith('.html') || safeFileUrl.toLowerCase().endsWith('.html');
   const isLocalhost = fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1');
+
+  React.useEffect(() => {
+    if (isOpen && isHtml && fullUrl) {
+      setHtmlContent(null);
+      
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      fetch(fullUrl, { headers })
+        .then(res => res.text())
+        .then(text => setHtmlContent(text))
+        .catch(err => console.error("Failed to load HTML:", err));
+    }
+  }, [isOpen, isHtml, fullUrl, token]);
+
+  if (!isOpen) return null;
 
   // Use Google Docs viewer or Microsoft Office Online Viewer for Office documents
   // Note: These public viewer APIs require the file URL to be publicly accessible from the internet.
   const viewerUrl = isDocx 
-    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrl)}` 
-    : fullUrl;
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrlWithToken)}` 
+    : fullUrlWithToken;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 sm:p-4 md:p-8">
@@ -37,7 +67,6 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
       {/* Reader Container */}
       <div className="relative w-full h-full max-w-6xl bg-white dark:bg-slate-950 rounded-none sm:rounded-[32px] flex flex-col shadow-2xl animate-in zoom-in-95 duration-500 overflow-hidden">
         
-        {/* ...Toolbar omitted for brevity but I need to keep the exact same lines... */}
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 z-10 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -52,7 +81,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
           <div className="flex items-center gap-2">
             <a 
-              href={fullUrl} 
+              href={fullUrlWithToken} 
               target="_blank" 
               rel="noopener noreferrer"
               className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
@@ -60,14 +89,50 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
             >
               <ExternalLink size={20} />
             </a>
-            <a 
-              href={fullUrl} 
-              download
-              className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-              title="Download file"
-            >
-              <Download size={20} />
-            </a>
+            {isHtml ? (
+              <button 
+                onClick={() => {
+                  const iframe = document.getElementById('document-iframe') as HTMLIFrameElement;
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                  }
+                }}
+                className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                title="Cetak / Simpan ke PDF"
+              >
+                <Download size={20} />
+              </button>
+            ) : (
+              <button 
+                onClick={async () => {
+                  try {
+                    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+                    const headers: Record<string, string> = {};
+                    if (token) {
+                      headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    const res = await fetch(fullUrl, { headers });
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', title);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.parentNode?.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  } catch (err) {
+                    console.error("Gagal mendownload berkas:", err);
+                    alert("Gagal mendownload berkas");
+                  }
+                }}
+                className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                title="Download file"
+              >
+                <Download size={20} />
+              </button>
+            )}
             <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
             <button 
               onClick={onClose}
@@ -101,14 +166,18 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
             </div>
           ) : (
             <>
-              <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none">
-                 <div className="flex flex-col items-center gap-3">
-                    <Loader2 size={32} className="animate-spin text-primary/30" />
-                    <p className="text-xs font-bold uppercase tracking-widest opacity-50">Memuat berkas amanah...</p>
-                 </div>
-              </div>
+              {(!isHtml || htmlContent !== null) && (
+                <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none">
+                   <div className="flex flex-col items-center gap-3">
+                      <Loader2 size={32} className="animate-spin text-primary/30" />
+                      <p className="text-xs font-bold uppercase tracking-widest opacity-50">Memuat berkas amanah...</p>
+                   </div>
+                </div>
+              )}
               <iframe 
-                src={viewerUrl} 
+                id="document-iframe"
+                src={isHtml ? undefined : viewerUrl}
+                srcDoc={isHtml ? (htmlContent || "") : undefined}
                 className="w-full h-full border-none relative z-10 bg-white"
                 title={title}
               />

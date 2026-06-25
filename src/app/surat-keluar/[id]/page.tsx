@@ -444,6 +444,34 @@ const DocumentDetailPage = () => {
     </div>
   );
 
+  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
+    try {
+      const response = await api.get(fileUrl, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Gagal mengunduh berkas", err);
+      alert("Gagal mengunduh berkas");
+    }
+  };
+
+  const handleDownloadLatest = () => {
+    if (!doc || !doc.versions || doc.versions.length === 0) return;
+    const latestVersion = doc.versions[0];
+    const isTemplate = latestVersion.fileName?.endsWith('.html') || latestVersion.mimeType === 'text/html';
+    if (isTemplate) {
+      setReaderDoc({ title: latestVersion.fileName, fileUrl: latestVersion.fileUrl });
+    } else {
+      handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
+    }
+  };
+
   return (
     <div className="space-y-8 pb-20">
       {/* Breadcrumb & Navigation */}
@@ -467,7 +495,7 @@ const DocumentDetailPage = () => {
               </button>
             )}
           </Can>
-          <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-primary transition-all">
+          <button onClick={handleDownloadLatest} className="flex-1 sm:flex-none flex items-center justify-center gap-2 p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-primary transition-all">
             <Download size={20} />
             <span className="sm:hidden text-xs font-bold">Unduh</span>
           </button>
@@ -570,9 +598,9 @@ const DocumentDetailPage = () => {
                                 <Eye size={16} />
                               </button>
                             </Can>
-                            <a href={`http://localhost:4002/${v.fileUrl}`} download={v.fileName} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Unduh">
+                            <button onClick={() => handleDownloadFile(v.fileUrl, v.fileName)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Unduh">
                               <Download size={16} />
-                            </a>
+                            </button>
                             <Can perform="DOC_DELETE">
                               {doc.versions.length > 1 && v.versionNum > 1 && (
                                 <button onClick={() => handleDeleteVersion(v.id)} className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-500 rounded-lg transition-all" title="Hapus Versi">
@@ -611,9 +639,9 @@ const DocumentDetailPage = () => {
                             </button>
                           )}
                         </Can>
-                        <a href={`http://localhost:4002/${v.fileUrl}`} download={v.fileName} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-primary transition-all">
+                        <button onClick={() => handleDownloadFile(v.fileUrl, v.fileName)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-primary transition-all">
                           <Download size={14} /> Unduh
-                        </a>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -647,7 +675,7 @@ const DocumentDetailPage = () => {
             {doc.workflowInstances && doc.workflowInstances.length > 0 ? (
               <div className="relative space-y-6 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-slate-800">
                 {doc.workflowInstances[doc.workflowInstances.length - 1].steps
-                  .sort((a: any, b: any) => a.stepNumber - b.stepNumber)
+                  .sort((a: any, b: any) => b.stepNumber - a.stepNumber)
                   .map((step: any, idx: number) => (
                     <div key={step.id} className="relative pl-10">
                       {/* Step dot */}

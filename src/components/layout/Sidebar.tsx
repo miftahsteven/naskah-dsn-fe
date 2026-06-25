@@ -1,29 +1,40 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
+  Home,
+  Mail,
+  Send,
+  GitPullRequest,
+  Archive,
+  StickyNote,
+  Workflow,
+  FilePen,
+  Database,
+  Globe,
   LayoutDashboard,
-  FileText,
-  Users,
+  Users as UsersIcon,
+  FileBarChart,
+  Building2,
+  MapPin,
+  UserCog,
   Settings,
-  ShieldCheck,
-  FileCheck,
-  Activity,
   LogOut,
-  ChevronRight,
-  ChevronDown,
   X,
   Shield,
-  Inbox,
-  FolderArchive,
-  Send,
-  List,
-  FileSignature,
-  MessageSquare,
-  LayoutTemplate,
-  BookOpen,
+  Calendar,
+  ClipboardList,
+  CheckSquare,
+  Award,
+  Presentation,
+  Briefcase,
+  Receipt,
+  Coins,
+  Wallet,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
@@ -33,7 +44,7 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-// ── Single nav item (leaf) ───────────────────────────────────────────────────
+/* ─── Leaf Menu Item ──────────────────────────────────────────────── */
 interface LeafItemProps {
   href: string;
   icon: React.ElementType;
@@ -44,361 +55,286 @@ interface LeafItemProps {
 }
 
 const LeafItem = ({ href, icon: Icon, label, active, onClick, indent }: LeafItemProps) => {
-  // ── Child item (inside a NavGroup) ──────────────────────────────────────────
   if (indent) {
     return (
       <Link
         href={href}
         onClick={onClick}
         className={cn(
-          "flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 group text-sm",
+          "flex items-center gap-2.5 px-3 py-[7px] rounded-lg transition-all duration-200 group text-[13px] border border-transparent",
           active
-            ? "text-white font-bold"
-            : "text-slate-500 hover:text-slate-200 font-medium"
+            ? "bg-[#006633]/8 text-[#006633] font-bold border-[#006633]/10"
+            : "text-slate-600 hover:bg-slate-50 hover:text-[#006633] font-medium"
         )}
       >
-        {/* Gold dot indicator — visible only when active */}
-        <span
+        <Icon
+          size={14}
           className={cn(
-            "w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-150",
-            active ? "bg-[#D4AF37] shadow-[0_0_6px_#D4AF3780]" : "bg-slate-700 group-hover:bg-slate-500"
+            "shrink-0 transition-colors",
+            active ? "text-[#006633]" : "text-slate-400 group-hover:text-[#006633]"
           )}
         />
         <span className="flex-1 leading-snug truncate">{label}</span>
+        {active && (
+          <span className="w-1 h-1 bg-[#D4AF37] rounded-full shadow-sm shadow-[#D4AF37]/50 animate-pulse" />
+        )}
       </Link>
     );
   }
 
-  // ── Top-level item ───────────────────────────────────────────────────────────
   return (
     <Link
       href={href}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-150 group relative font-medium text-sm border-l-4",
+        "flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group relative font-semibold text-[13px] border border-transparent",
         active
-          ? "text-white bg-slate-800/80 border-[#D4AF37] font-semibold"
-          : "text-slate-400 hover:bg-white/5 hover:text-white border-transparent"
+          ? "bg-gradient-to-r from-[#006633] to-[#12824A] text-white shadow-sm border-[#006633]/10"
+          : "text-slate-600 hover:bg-slate-50 hover:text-[#006633]"
       )}
     >
       <Icon
-        size={18}
+        size={17}
         className={cn(
-          active ? "text-[#D4AF37]" : "text-slate-400 group-hover:text-white transition-colors"
+          "shrink-0 transition-all duration-200 group-hover:scale-105",
+          active ? "text-white" : "text-slate-400 group-hover:text-[#006633]"
         )}
       />
       <span className="flex-1 leading-tight">{label}</span>
       {active && (
-        <ChevronRight size={12} className="text-[#D4AF37] opacity-80 shrink-0" />
+        <span className="absolute right-3.5 w-1.5 h-1.5 bg-[#D4AF37] rounded-full shadow-sm shadow-[#D4AF37]/50" />
       )}
     </Link>
   );
 };
 
+/* ─── Section Header ──────────────────────────────────────────────── */
+const SectionHeader = ({ label }: { label: string }) => (
+  <div className="text-[10px] uppercase tracking-[0.15em] text-[#006633]/50 font-bold mt-5 mb-1.5 px-3.5 flex items-center gap-2">
+    <span className="w-3.5 h-[1.5px] bg-[#D4AF37]/40 rounded-full" />
+    {label}
+  </div>
+);
 
-// ── Collapsible parent group ─────────────────────────────────────────────────
+/* ─── Static Nav Section (always open) ────────────────────────────── */
 interface NavGroupProps {
-  icon: React.ElementType;
   label: string;
   children: React.ReactNode;
-  defaultOpen?: boolean;
-  active?: boolean;   // true if any child route is active
+  active?: boolean;
 }
 
-const NavGroup = ({ icon: Icon, label, children, defaultOpen = false, active }: NavGroupProps) => {
-  const [open, setOpen] = useState(defaultOpen);
-
-  // Auto-expand if a child is active
-  useEffect(() => {
-    if (active) setOpen(true);
-  }, [active]);
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-150 group border-l-4 text-sm font-semibold",
-          active
-            ? "text-white border-[#D4AF37]/60 bg-slate-800/40"
-            : "text-slate-400 hover:bg-white/5 hover:text-white border-transparent"
-        )}
-      >
-        <Icon
-          size={18}
-          className={cn(
-            active ? "text-[#D4AF37]" : "text-slate-400 group-hover:text-white transition-colors"
-          )}
-        />
-        <span className="flex-1 text-left leading-tight">{label}</span>
-        {open
-          ? <ChevronDown size={14} className={cn("shrink-0 transition-transform", active ? "text-[#D4AF37]" : "text-slate-500")} />
-          : <ChevronRight size={14} className={cn("shrink-0 transition-transform", active ? "text-[#D4AF37]" : "text-slate-500")} />
-        }
-      </button>
-
-      {/* Child items with animated height */}
-      <div
-        className={cn(
-          "overflow-hidden transition-all duration-200",
-          open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-        )}
-      >
-        <div className="mt-0.5 ml-3 border-l border-slate-700/60 pl-1 flex flex-col gap-0.5">
-          {children}
-        </div>
-      </div>
+const NavGroup = ({ label, children, active }: NavGroupProps) => (
+  <div className="mt-4">
+    <div className="flex items-center gap-2 px-3.5 py-1">
+      <span className="w-1 h-3 bg-[#D4AF37] rounded-full shrink-0" />
+      <span className={cn(
+        "text-[10px] uppercase tracking-[0.15em] font-extrabold",
+        active ? "text-[#006633]" : "text-slate-400"
+      )}>{label}</span>
     </div>
-  );
-};
+    <div className="mt-1 ml-[19px] border-l border-slate-100 pl-3 flex flex-col gap-1 pb-1">
+      {children}
+    </div>
+  </div>
+);
 
-// ── Sidebar ──────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════════════════════════ */
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const pathname = usePathname();
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
 
-  const isAdmin = user && ["SUPER_ADMIN", "ORG_ADMIN"].includes(user.role);
-
-  // Helper: is any of the given hrefs currently active?
   const anyActive = (...hrefs: string[]) =>
     hrefs.some((h) => pathname === h || pathname.startsWith(h + "/"));
 
   return (
     <>
-      {/* Sidebar Panel */}
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 h-screen w-72 bg-[#0B1325] border-r border-slate-800 flex flex-col p-5 transition-transform duration-300 ease-in-out select-none",
-          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full",
+          "fixed top-0 left-0 z-50 h-screen w-[260px] bg-white border-r border-slate-100 flex flex-col transition-all duration-300 ease-in-out select-none",
+          isOpen ? "translate-x-0 shadow-2xl shadow-black/5" : "-translate-x-full",
           "lg:sticky lg:translate-x-0 lg:z-10 lg:shadow-none"
         )}
       >
-        {/* Logo + Mobile Close */}
-        <div className="flex items-center gap-3 mb-8 px-2 py-1">
-          <div className="w-10 h-10 rounded-lg flex-shrink-0 p-0.5 bg-[#1E293B] border border-[#D4AF37]/30 flex items-center justify-center shadow-md">
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
-              <path d="M24 4L38 12V28L24 36L10 28V12L24 4Z" stroke="#D4AF37" strokeWidth="1.8" fill="none" />
-              <circle cx="10" cy="20" r="1.5" fill="#D4AF37" />
-              <circle cx="38" cy="20" r="1.5" fill="#D4AF37" />
-              <circle cx="24" cy="4" r="1.5" fill="#D4AF37" />
-              <path d="M10 20H6M38 20H42" stroke="#D4AF37" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M24 4V1" stroke="#D4AF37" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M24 13L28 22H24H20L24 13Z" fill="#D4AF37" />
-              <path d="M24 22V32" stroke="#D4AF37" strokeWidth="2.2" strokeLinecap="round" />
-              <path d="M21 26H27" stroke="#D4AF37" strokeWidth="1" strokeLinecap="round" />
-            </svg>
+        {/* ── Logo Area ─────────────────────────────────────── */}
+        <div className="px-4.5 pt-4.5 pb-3.5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#006633] flex items-center justify-center shadow-md shadow-[#006633]/15 shrink-0 overflow-hidden p-1">
+              <Image
+                src="/images/logo-dsn.png"
+                alt="Logo DSN-MUI"
+                width={32}
+                height={32}
+                className="object-contain brightness-0 invert"
+                style={{ width: 'auto', height: 'auto' }}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="font-extrabold text-[#006633] text-[15px] leading-none tracking-tight">
+                AMANAH
+              </h1>
+              <span className="text-[9px] font-bold tracking-wider text-[#D4AF37] block mt-1.5 uppercase">
+                DSN-MUI Digital
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all flex-shrink-0"
+              aria-label="Tutup menu"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-extrabold text-white text-base leading-none tracking-tight">
-              AMANAH
-            </h1>
-            <span className="text-[9px] font-bold tracking-wider text-[#D4AF37] block mt-1 uppercase">
-              Manajemen Dokumen
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all flex-shrink-0"
-            aria-label="Tutup menu"
-          >
-            <X size={18} />
-          </button>
         </div>
 
-        {/* Nav Menu */}
-        <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
+        {/* ── Navigation ────────────────────────────────────── */}
+        <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto px-3 pt-3.5 pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
 
-          {/* ── Menu Utama ─────────────────────────────────────── */}
-          <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-2 ml-4">
-            Menu Utama
-          </div>
-
-          {/* Dashboard */}
+          {/* Beranda */}
           <LeafItem
             href="/dashboard"
-            icon={LayoutDashboard}
-            label="Dashboard Ringkasan"
+            icon={Home}
+            label="Beranda"
             active={pathname === "/dashboard"}
             onClick={onClose}
           />
 
-          {/* ── PERSURATAN (parent group) ─────────── */}
+
           <NavGroup
-            icon={Send}
             label="Persuratan"
-            active={anyActive("/surat-keluar", "/daftar-surat", "/arsip-surat", "/surat-disposisi")}
+            active={anyActive("/surat-masuk", "/surat-keluar", "/surat-disposisi", "/arsip-surat", "/memo-internal")}
           >
-            <LeafItem
-              href="/surat-keluar/new"
-              icon={FileText}
-              label="Membuat Surat"
-              active={pathname === "/surat-keluar/new" || pathname.startsWith("/surat-keluar/new")}
-              onClick={onClose}
-              indent
-            />
-            <LeafItem
-              href="/surat-keluar"
-              icon={List}
-              label="Daftar Surat"
-              active={pathname === "/surat-keluar"}
-              onClick={onClose}
-              indent
-            />
-            <LeafItem
-              href="/arsip-surat"
-              icon={FolderArchive}
-              label="Arsip"
-              active={pathname === "/arsip-surat" || pathname.startsWith("/arsip-surat/")}
-              onClick={onClose}
-              indent
-            />
-            <LeafItem
-              href="/surat-disposisi"
-              icon={FileSignature}
-              label="Surat Disposisi"
-              active={pathname === "/surat-disposisi" || pathname.startsWith("/surat-disposisi/")}
-              onClick={onClose}
-              indent
-            />
+            <LeafItem href="/surat-masuk" icon={Mail} label="Surat Masuk" active={anyActive("/surat-masuk")} onClick={onClose} indent />
+            <LeafItem href="/surat-keluar" icon={Send} label="Surat Keluar" active={anyActive("/surat-keluar")} onClick={onClose} indent />
+            <LeafItem href="/surat-disposisi" icon={GitPullRequest} label="Disposisi" active={anyActive("/surat-disposisi")} onClick={onClose} indent />
+            <LeafItem href="/arsip-surat" icon={Archive} label="Arsip" active={anyActive("/arsip-surat")} onClick={onClose} indent />
+            <LeafItem href="/template-surat" icon={StickyNote} label="Template Surat" active={pathname === "/template-surat"} onClick={onClose} indent />
           </NavGroup>
 
-          {/* ── SURAT MASUK (parent group) ─────────── */}
           <NavGroup
-            icon={Inbox}
-            label="Surat Masuk"
-            active={anyActive("/surat-masuk", "/permohonan", "/log-respon")}
+            label="Agenda dan Rapat"
+            active={anyActive("/agenda", "/notula", "/tindak-lanjut")}
           >
-            <LeafItem
-              href="/surat-masuk"
-              icon={Inbox}
-              label="Semua Surat Masuk"
-              active={pathname === "/surat-masuk" || pathname.startsWith("/surat-masuk/")}
-              onClick={onClose}
-              indent
-            />
-            <LeafItem
-              href="/permohonan"
-              icon={BookOpen}
-              label="Permohonan"
-              active={pathname === "/permohonan" || pathname.startsWith("/permohonan/")}
-              onClick={onClose}
-              indent
-            />
-            <LeafItem
-              href="/log-respon"
-              icon={MessageSquare}
-              label="Log Respon"
-              active={pathname === "/log-respon" || pathname.startsWith("/log-respon/")}
-              onClick={onClose}
-              indent
-            />
+            <LeafItem href="/agenda" icon={Calendar} label="Agenda" active={anyActive("/agenda")} onClick={onClose} indent />
+            <LeafItem href="/notula" icon={ClipboardList} label="Notula Rapat" active={anyActive("/notula")} onClick={onClose} indent />
+            <LeafItem href="/tindak-lanjut" icon={CheckSquare} label="Tindak Lanjut" active={anyActive("/tindak-lanjut")} onClick={onClose} indent />
           </NavGroup>
 
-          {/* Master Surat */}
-          <LeafItem
-            href="/master-surat"
-            icon={LayoutTemplate}
-            label="Master Surat"
-            active={pathname === "/master-surat" || pathname.startsWith("/master-surat/")}
-            onClick={onClose}
-          />
+          <NavGroup
+            label="Fatwa"
+            active={anyActive("/fatwa-workflow", "/fatwa-draft", "/fatwa-database", "/fatwa-publikasi")}
+          >
+            <LeafItem href="/fatwa-workflow" icon={Workflow} label="Dashboard Fatwa" active={anyActive("/fatwa-workflow")} onClick={onClose} indent />
+            <LeafItem href="/fatwa-draft" icon={FilePen} label="Draft Fatwa" active={anyActive("/fatwa-draft")} onClick={onClose} indent />
+            <LeafItem href="/fatwa-database" icon={Database} label="Database Fatwa" active={anyActive("/fatwa-database")} onClick={onClose} indent />
+            <LeafItem href="/fatwa-publikasi" icon={Globe} label="Publikasi Fatwa" active={anyActive("/fatwa-publikasi")} onClick={onClose} indent />
+          </NavGroup>
 
-          {/* Persetujuan E-Sign */}
-          <LeafItem
-            href="/approvals"
-            icon={FileCheck}
-            label="Persetujuan E-Sign"
-            active={pathname === "/approvals" || pathname.startsWith("/approvals/")}
-            onClick={onClose}
-          />
+          <NavGroup
+            label="Keuangan"
+            active={anyActive("/invoice", "/kontribusi-dps", "/tagihan-lks")}
+          >
+            <LeafItem href="/invoice" icon={Receipt} label="Invoice" active={anyActive("/invoice")} onClick={onClose} indent />
+            <LeafItem href="/kontribusi-dps" icon={Coins} label="Kontribusi DPS" active={anyActive("/kontribusi-dps")} onClick={onClose} indent />
+            <LeafItem href="/tagihan-lks" icon={Wallet} label="Tagihan LKS/LBS/LPS" active={anyActive("/tagihan-lks")} onClick={onClose} indent />
+          </NavGroup>
 
-          {/* ── Admin / Restricted ─────────────────────────────── */}
-          {(isAdmin || user?.permissions?.includes("USER_EDIT")) && (
-            <>
-              <div className="mt-5 text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-2 ml-4">
-                Administrasi
-              </div>
-              {(isAdmin || user?.permissions?.includes("USER_EDIT")) && (
-                <LeafItem
-                  href="/users"
-                  icon={Users}
-                  label="Manajemen Pengguna"
-                  active={pathname === "/users" || pathname.startsWith("/users/")}
-                  onClick={onClose}
-                />
-              )}
-              {(isAdmin || user?.permissions?.includes("ROLE_MANAGE")) && (
-                <LeafItem
-                  href="/roles"
-                  icon={ShieldCheck}
-                  label="Hak Akses & Otoritas"
-                  active={pathname === "/roles" || pathname.startsWith("/roles/")}
-                  onClick={onClose}
-                />
-              )}
-              {isAdmin && (
-                <LeafItem
-                  href="/audit-log"
-                  icon={Activity}
-                  label="Log Audit Kriptografi"
-                  active={pathname === "/audit-log" || pathname.startsWith("/audit-log/")}
-                  onClick={onClose}
-                />
-              )}
-            </>
-          )}
+          <NavGroup
+            label="DPS"
+            active={anyActive("/dps-dashboard", "/dps-data", "/dps-laporan")}
+          >
+            <LeafItem href="/dps-dashboard" icon={LayoutDashboard} label="Dashboard DPS" active={anyActive("/dps-dashboard")} onClick={onClose} indent />
+            <LeafItem href="/dps-data" icon={UsersIcon} label="Data DPS" active={anyActive("/dps-data")} onClick={onClose} indent />
+            <LeafItem href="/dps-laporan" icon={FileBarChart} label="Laporan DPS" active={anyActive("/dps-laporan")} onClick={onClose} indent />
+          </NavGroup>
 
-          {/* ── Konfigurasi ─────────────────────────────────────── */}
-          <div className="mt-5 text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-2 ml-4">
-            Konfigurasi
+
+          <NavGroup
+            label="Pelatihan dan Sertifikasi"
+            active={anyActive("/pdps", "/pdmmf", "/workshop", "/ijtima-sanawi", "/magang")}
+          >
+            <LeafItem href="/pdps" icon={Award} label="PDPS" active={anyActive("/pdps")} onClick={onClose} indent />
+            <LeafItem href="/pdmmf" icon={Award} label="PDMMF" active={anyActive("/pdmmf")} onClick={onClose} indent />
+            <LeafItem href="/workshop" icon={Presentation} label="Workshop" active={anyActive("/workshop")} onClick={onClose} indent />
+            <LeafItem href="/ijtima-sanawi" icon={UsersIcon} label="Ijtima' Sanawi" active={anyActive("/ijtima-sanawi")} onClick={onClose} indent />
+            <LeafItem href="/magang" icon={Briefcase} label="Magang" active={anyActive("/magang")} onClick={onClose} indent />
+          </NavGroup>
+
+
+          <div className="px-3.5 my-1">
+            <LeafItem
+              href="/arsip-digital"
+              icon={FolderOpen}
+              label="Arsip Digital"
+              active={pathname === "/arsip-digital" || pathname.startsWith("/arsip-digital/")}
+              onClick={onClose}
+            />
           </div>
+
+
+          <NavGroup
+            label="Master Data"
+            active={anyActive("/master-lembaga", "/master-wilayah", "/users")}
+          >
+            <LeafItem href="/master-lembaga" icon={Building2} label="Lembaga" active={anyActive("/master-lembaga")} onClick={onClose} indent />
+            <LeafItem href="/master-wilayah" icon={MapPin} label="Wilayah" active={anyActive("/master-wilayah")} onClick={onClose} indent />
+            <LeafItem href="/users" icon={UserCog} label="Pengguna" active={anyActive("/users")} onClick={onClose} indent />
+          </NavGroup>
+
+          {/* ── PENGATURAN ─────────────────────── */}
+
           <LeafItem
             href="/settings"
             icon={Settings}
-            label="Pengaturan Sistem"
+            label="Pengaturan"
             active={pathname === "/settings"}
             onClick={onClose}
           />
         </nav>
 
-        {/* User Info + Logout */}
-        <div className="mt-5 pt-5 border-t border-slate-800">
+        {/* ── User Card + Logout ────────────────────────────── */}
+        <div className="px-3 pb-3.5 pt-2 border-t border-slate-100">
           {user && (
-            <div className="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl mb-4 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-[#D4AF37]/5 rounded-full blur-md -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="p-3 bg-gradient-to-br from-[#E8F5EE] to-[#F7F5EC] border border-slate-100 rounded-xl mb-2 relative overflow-hidden shadow-sm">
+              {/* Decorative circle */}
+              <div className="absolute -top-3 -right-3 w-12 h-12 bg-[#D4AF37]/10 rounded-full blur-md pointer-events-none" />
+
               <div className="flex items-center gap-2.5 relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-[#1E293B] border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] font-bold text-xs flex-shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-[#006633] flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
                   {user.fullName?.charAt(0) ?? "U"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-white truncate leading-tight">
+                  <p className="text-xs font-bold text-slate-800 truncate leading-tight">
                     {user.fullName}
                   </p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Shield size={10} className="text-emerald-400 shrink-0" />
-                    <span className="text-[8px] font-extrabold text-emerald-400 uppercase tracking-wider">
-                      Secured Signer
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                    <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wide">
+                      {user.role}
                     </span>
                   </div>
                 </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-slate-800/60 flex justify-between items-center text-[9px] font-mono text-slate-500">
-                <span>Otoritas: {user.role}</span>
-                <span className="text-emerald-500/80 flex items-center gap-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" /> Active CA
-                </span>
               </div>
             </div>
           )}
 
           <button
             onClick={() => logout()}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all font-semibold text-xs group cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-all font-semibold text-xs group cursor-pointer"
           >
             <LogOut
-              size={16}
-              className="group-hover:-translate-x-1 transition-transform"
+              size={15}
+              className="group-hover:-translate-x-0.5 transition-transform"
             />
             <span>Keluar Sesi</span>
           </button>

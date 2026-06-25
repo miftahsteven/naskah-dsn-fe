@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   Plus,
@@ -23,21 +24,384 @@ import {
   Clock,
   AlertTriangle,
   FileUp,
+  Play,
+  Send,
+  User as UserIcon,
+  ExternalLink,
+  ShieldCheck,
+  History,
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import Can from "@/components/auth/Can";
+import DocumentReader from "@/components/documents/DocumentReader";
 
 const statusClass = (status: string) => {
   const map: Record<string, string> = {
-    SIGNED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    PENDING_APPROVAL: "bg-amber-50 text-amber-600 border-amber-100",
-    REJECTED: "bg-red-50 text-red-600 border-red-100",
+    SIGNED: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/50",
+    PENDING_APPROVAL: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/50",
+    REJECTED: "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:border-red-900/50",
   };
-  return map[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
+  return map[status] ?? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
 };
 
+// ── Approval Submit Modal ──────────────────────────────────────────────────
+const ApprovalSubmitModal = ({
+  documentId,
+  onClose,
+  onSuccess,
+}: {
+  documentId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [steps, setSteps] = useState<{ userId: string }[]>([{ userId: "" }]);
+  const [loading, setLoading] = useState(false);
+  const [fetchingUsers, setFetchingUsers] = useState(true);
+
+  useEffect(() => {
+    api.get("/users")
+      .then((res) => setUsers(res.data.data))
+      .catch((err) => console.error("Failed to fetch users", err))
+      .finally(() => setFetchingUsers(false));
+  }, []);
+
+  const handleAddStep = () => setSteps([...steps, { userId: "" }]);
+  const handleRemoveStep = (index: number) => setSteps(steps.filter((_, i) => i !== index));
+  const handleUserChange = (index: number, val: string) => {
+    const newSteps = [...steps];
+    newSteps[index].userId = val;
+    setSteps(newSteps);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (steps.some((s) => !s.userId)) {
+      alert("Harap pilih penandatangan untuk semua urutan.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/workflow/submit", {
+        documentId,
+        stepConfig: steps.map((s, i) => ({ stepNumber: i + 1, userId: s.userId })),
+      });
+      onSuccess();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Gagal mengajukan persetujuan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 rounded-[24px] shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Alur Persetujuan</h2>
+            <p className="text-xs text-slate-500 font-medium mt-1">Tentukan siapa saja yang harus menandatangani dokumen ini secara berurutan.</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+            <X size={18} />
+          </button>
+        </div>
+
+        {fetchingUsers ? (
+          <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+              {steps.map((step, idx) => (
+                <div key={idx} className="flex gap-3 items-center group">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                    {idx + 1}
+                  </div>
+                  <select
+                    required
+                    value={step.userId}
+                    onChange={(e) => handleUserChange(idx, e.target.value)}
+                    className="flex-1 px-4 py-3 bg-[#F7F5EC] border border-[#DDDBC9] rounded-xl outline-none focus:border-[#006633]/50 focus:bg-white text-sm appearance-none"
+                  >
+                    <option value="">— Pilih Penandatangan —</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>{u.fullName} ({u.role.name})</option>
+                    ))}
+                  </select>
+                  {steps.length > 1 && (
+                    <button type="button" onClick={() => handleRemoveStep(idx)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button type="button" onClick={handleAddStep} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-all">
+              <Plus size={16} /> Tambah Penandatangan
+            </button>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 border border-slate-200 transition-all">
+                Batal
+              </button>
+              <button type="submit" disabled={loading} className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)' }}>
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <><Send size={16} /> Mulai Workflow</>}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Workflow Edit Modal ────────────────────────────────────────────────────
+const WorkflowEditModal = ({
+  documentId,
+  onClose,
+  onSuccess,
+}: {
+  documentId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [steps, setSteps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    api.get("/users")
+      .then((res) => setUsers(res.data.data))
+      .catch((err) => console.error("Failed to fetch users", err));
+
+    api.get(`/workflow/document/${documentId}`)
+      .then((res) => {
+        if (res.data.status === "success" && res.data.data.length > 0) {
+          setSteps(res.data.data);
+        } else {
+          setSteps([{ userId: "" }]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch current steps", err);
+        setSteps([{ userId: "" }]);
+      })
+      .finally(() => setFetching(false));
+  }, [documentId]);
+
+  const handleAddStep = () => setSteps([...steps, { userId: "", status: "WAITING" }]);
+  const handleRemoveStep = (index: number) => {
+    if (steps[index].status === "APPROVED") return;
+    setSteps(steps.filter((_, i) => i !== index));
+  };
+  const handleUserChange = (index: number, val: string) => {
+    if (steps[index].status === "APPROVED") return;
+    const newSteps = [...steps];
+    newSteps[index].userId = val;
+    setSteps(newSteps);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (steps.some((s) => !s.userId)) {
+      alert("Harap pilih penandatangan untuk semua urutan.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.put(`/workflow/document/${documentId}`, {
+        stepConfig: steps.map((s, i) => ({ stepNumber: i + 1, userId: s.userId })),
+      });
+      onSuccess();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Gagal mengubah alur persetujuan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 rounded-[24px] shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Ubah Alur Persetujuan</h2>
+            <p className="text-xs text-slate-500 font-medium mt-1">Langkah yang sudah disetujui terkunci dan tidak dapat diubah.</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+            <X size={18} />
+          </button>
+        </div>
+
+        {fetching ? (
+          <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2">
+              {steps.map((step, idx) => {
+                const isApproved = step.status === "APPROVED";
+                return isApproved ? (
+                  <div key={idx} className="flex gap-3 items-start group">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-2">
+                      <CheckCircle2 size={12} />
+                    </div>
+                    <div className="flex-1 p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-800 dark:text-white">{step.approver || "Approver " + (idx + 1)}</p>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                          APPROVED
+                        </span>
+                      </div>
+                      {step.actionedAt && (
+                        <p className="text-[9px] text-slate-400 font-mono">
+                          {new Date(step.actionedAt).toLocaleString('id-ID')}
+                        </p>
+                      )}
+                      {step.comment && (
+                        <p className="text-[10px] text-slate-600 dark:text-slate-400 italic mt-1 leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                          &ldquo;{step.comment}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={idx} className="flex gap-3 items-center group">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                      {idx + 1}
+                    </div>
+                    <select
+                      required
+                      value={step.userId || ""}
+                      onChange={(e) => handleUserChange(idx, e.target.value)}
+                      className="flex-1 px-4 py-3 bg-[#F7F5EC] border border-[#DDDBC9] rounded-xl outline-none focus:border-[#006633]/50 focus:bg-white text-sm appearance-none"
+                    >
+                      <option value="">— Pilih Penandatangan —</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.fullName} ({u.role.name})</option>
+                      ))}
+                    </select>
+                    {steps.length > 1 && (
+                      <button type="button" onClick={() => handleRemoveStep(idx)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button type="button" onClick={handleAddStep} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-all">
+              <Plus size={16} /> Tambah Penandatangan
+            </button>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 border border-slate-200 transition-all">
+                Batal
+              </button>
+              <button type="submit" disabled={loading} className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)' }}>
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <><Send size={16} /> Simpan Perubahan</>}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Revision Modal ──────────────────────────────────────────────────
+const RevisionModal = ({
+  documentId,
+  onClose,
+  onSuccess
+}: {
+  documentId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return alert("Pilih file revisi terlebih dahulu");
+
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("changeNotes", notes || "Revisi Dokumen");
+
+      await api.put(`/documents/${documentId}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      onSuccess();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Gagal mengunggah revisi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 p-8 animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500">
+              <Plus size={20} />
+            </div>
+            Upload Revisi Baru
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 ml-1">File Dokumen Baru</label>
+            <div className="relative group">
+              <input required type="file" onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+              <div className="w-full px-4 py-8 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center gap-2 group-hover:border-blue-500/50 group-hover:bg-blue-50/10 transition-all">
+                <Download size={24} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-500 truncate max-w-[200px]">
+                  {file ? file.name : "Klik atau seret file revisi (PDF/Word)"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 ml-1">Catatan Perubahan (Opsional)</label>
+            <textarea
+              value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Jelaskan apa saja yang diperbaiki..."
+              className="w-full h-24 px-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm outline-none ring-2 ring-transparent focus:ring-blue-500/20 transition-all resize-none"
+            />
+          </div>
+
+          <button type="submit" disabled={loading}
+            className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+            {loading ? <Loader2 size={20} className="animate-spin" /> : <><Send size={18} /> Kirim Revisi</>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+
 const DocumentsPage = () => {
+  const router = useRouter();
   const [documents, setDocuments] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [classifications, setClassifications] = useState<any[]>([]);
@@ -56,6 +420,58 @@ const DocumentsPage = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
+
+  // Right Sidebar States
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [sidebarDoc, setSidebarDoc] = useState<any>(null);
+  const [fetchingSidebar, setFetchingSidebar] = useState(false);
+  const [readerDoc, setReaderDoc] = useState<{ title: string, fileUrl: string } | null>(null);
+
+  // Sidebar Modals
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [isWorkflowEditModalOpen, setIsWorkflowEditModalOpen] = useState(false);
+  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+
+  // Pagination & Header Column Filters
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [colFilters, setColFilters] = useState({
+    title: "",
+    classification: "",
+    status: "",
+    creator: "",
+  });
+
+  const fetchSidebarDetail = async (id: string) => {
+    try {
+      setFetchingSidebar(true);
+      const res = await api.get(`/documents/${id}`);
+      setSidebarDoc(res.data.data);
+    } catch (err) {
+      console.error("Gagal memuat detail sidebar", err);
+    } finally {
+      setFetchingSidebar(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDocId) {
+      fetchSidebarDetail(selectedDocId);
+    } else {
+      setSidebarDoc(null);
+    }
+  }, [selectedDocId]);
+
+  const handleViewDocument = (doc: any) => {
+    const currentVersion = doc.versions?.[doc.versions.length - 1];
+    const isTemplate = currentVersion?.fileName?.endsWith('.html') || currentVersion?.mimeType === 'text/html';
+
+    if (isTemplate) {
+      router.push(`/${doc.documentType === 'INCOMING' ? 'surat-masuk' : 'surat-keluar'}/${doc.id}`);
+    } else {
+      setSelectedDocId(doc.id);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -210,7 +626,7 @@ const DocumentsPage = () => {
                 <input required type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-sm outline-none ring-2 ring-transparent focus:ring-primary/20 transition-all" />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 ml-1">Kategori</label>
@@ -297,12 +713,12 @@ const DocumentsPage = () => {
                         <div className={cn(
                           "w-10 h-10 rounded-xl border-4 border-white dark:border-slate-900 z-10 flex items-center justify-center shadow-sm shrink-0",
                           step.status === 'APPROVED' ? "bg-emerald-500 text-white" :
-                          step.status === 'REJECTED' ? "bg-red-500 text-white" :
-                          step.status === 'PENDING' ? "bg-amber-500 text-white animate-pulse" : "bg-slate-100 text-slate-400"
+                            step.status === 'REJECTED' ? "bg-red-500 text-white" :
+                              step.status === 'PENDING' ? "bg-amber-500 text-white animate-pulse" : "bg-slate-100 text-slate-400"
                         )}>
                           {step.status === 'APPROVED' ? <CheckCircle2 size={16} /> :
-                           step.status === 'REJECTED' ? <X size={16} /> :
-                           step.status === 'PENDING' ? <Clock size={16} /> : <span className="text-[10px] font-bold">{step.stepNumber}</span>}
+                            step.status === 'REJECTED' ? <X size={16} /> :
+                              step.status === 'PENDING' ? <Clock size={16} /> : <span className="text-[10px] font-bold">{step.stepNumber}</span>}
                         </div>
                         <div className="flex-1 pt-0.5 pb-2 border-b border-slate-50 dark:border-slate-800/50">
                           <div className="flex items-center justify-between mb-1">
@@ -310,9 +726,9 @@ const DocumentsPage = () => {
                             <span className={cn(
                               "text-[9px] font-bold px-2 py-0.5 rounded-full border",
                               step.status === 'APPROVED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                              step.status === 'REJECTED' ? "bg-red-50 text-red-600 border-red-100" :
-                              step.status === 'PENDING' && step.actionedAt ? "bg-blue-50 text-blue-600 border-blue-100" :
-                              step.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-slate-50 text-slate-400 border-slate-200"
+                                step.status === 'REJECTED' ? "bg-red-50 text-red-600 border-red-100" :
+                                  step.status === 'PENDING' && step.actionedAt ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                    step.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-slate-50 text-slate-400 border-slate-200"
                             )}>
                               {step.status === 'PENDING' && step.actionedAt ? 'PENDING - REVISI MASUK' : step.status}
                             </span>
@@ -375,6 +791,47 @@ const DocumentsPage = () => {
     </div>
   );
 
+  // Client-side filtering logic
+  const filteredDocuments = documents.filter((doc) => {
+    // 1. Title & Number keyword filter
+    if (colFilters.title) {
+      const query = colFilters.title.toLowerCase();
+      const titleMatch = doc.title?.toLowerCase().includes(query);
+      const numberMatch = doc.documentNumber?.toLowerCase().includes(query);
+      const categoryMatch = doc.category?.name?.toLowerCase().includes(query);
+      if (!titleMatch && !numberMatch && !categoryMatch) return false;
+    }
+    // 2. Classification filter
+    if (colFilters.classification) {
+      const query = colFilters.classification.toLowerCase();
+      const classMatch = doc.classification?.name?.toLowerCase().includes(query);
+      if (!classMatch) return false;
+    }
+    // 3. Status select filter
+    if (colFilters.status) {
+      if (doc.status !== colFilters.status) return false;
+    }
+    // 4. Creator filter
+    if (colFilters.creator) {
+      const query = colFilters.creator.toLowerCase();
+      const creatorMatch = doc.creator?.fullName?.toLowerCase().includes(query);
+      if (!creatorMatch) return false;
+    }
+    return true;
+  });
+
+  // Client-side pagination logic
+  const totalItems = filteredDocuments.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+
+  // Reset page when search/filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [colFilters, statusFilter, categoryFilter, classFilter, search]);
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
@@ -387,7 +844,7 @@ const DocumentsPage = () => {
           <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">Manajemen surat pengajuan dan penerbitan sertifikat syariah secara terintegrasi.</p>
         </div>
         <Can perform="DOC_UPLOAD">
-          <Link href="/surat-masuk/new" className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all text-sm w-full sm:w-auto justify-center">
+          <Link href="/surat-masuk/new" className="flex items-center gap-2 px-5 py-3 bg-[#006633] hover:bg-[#00552b] text-white font-bold rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all text-sm w-full sm:w-auto justify-center">
             <Plus size={18} />
             <span>Input Surat Masuk</span>
           </Link>
@@ -405,7 +862,7 @@ const DocumentsPage = () => {
         {/* Filter button — always visible, opens modal */}
         <button onClick={() => setFilterOpen(true)}
           className={`flex items-center gap-2 px-4 py-3 border rounded-2xl font-bold shadow-sm transition-all flex-shrink-0 text-sm
-            ${ (statusFilter || categoryFilter || classFilter)
+            ${(statusFilter || categoryFilter || classFilter)
               ? 'bg-primary text-white border-primary hover:bg-primary/90'
               : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}>
@@ -443,304 +900,712 @@ const DocumentsPage = () => {
 
       <div className="w-full">
         {/* Document List — full width */}
-        <div>
-          <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm relative z-10 w-full pb-2">
-            {loading ? (
-              <div className="py-24 sm:py-32 flex flex-col items-center justify-center gap-4 text-slate-400">
-                <Loader2 className="animate-spin text-primary" size={40} />
-                <p className="font-medium animate-pulse">Memuat dokumen...</p>
-              </div>
-            ) : error ? (
-              <div className="py-24 sm:py-32 flex flex-col items-center justify-center gap-4 text-red-500">
-                <AlertCircle size={40} />
-                <p className="font-bold">{error}</p>
-                <button onClick={fetchData} className="text-sm font-bold underline">Coba Lagi</button>
-              </div>
-            ) : documents.length === 0 ? (
-              <div className="py-24 sm:py-32 flex flex-col items-center justify-center gap-4 text-slate-300">
-                <FileBadge size={64} className="opacity-20" />
-                <p className="font-medium">Tidak ada dokumen yang ditemukan.</p>
-              </div>
-            ) : (
-              <>
-                {/* Desktop Table */}
-                <div className="hidden md:block relative overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/50">
-                        <th className="rounded-tl-[24px] sm:rounded-tl-[32px] text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800 w-[30%]">Judul & Metadata</th>
-                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Klasifikasi & Versi</th>
-                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Progress Alur</th>
-                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Status</th>
-                        <th className="text-left py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Pembuat & Tanggal</th>
-                        <th className="rounded-tr-[24px] sm:rounded-tr-[32px] text-right py-4 px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">Aksi</th>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm relative z-10 w-full overflow-hidden">
+          {loading ? (
+            <div className="py-24 sm:py-32 flex flex-col items-center justify-center gap-4 text-slate-400">
+              <Loader2 className="animate-spin text-primary" size={40} />
+              <p className="font-medium animate-pulse">Memuat dokumen...</p>
+            </div>
+          ) : error ? (
+            <div className="py-24 sm:py-32 flex flex-col items-center justify-center gap-4 text-red-500">
+              <AlertCircle size={40} />
+              <p className="font-bold">{error}</p>
+              <button onClick={fetchData} className="text-sm font-bold underline">Coba Lagi</button>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table - ERP SAP B1 Style */}
+              <div className="hidden md:block relative overflow-x-auto w-full">
+                <table className="w-full min-w-[900px] text-xs border-collapse">
+                  <thead className="bg-[#006633]/8 text-[#006633] dark:bg-[#006633]/15 dark:text-emerald-400">
+                    <tr className="border-b border-slate-300 dark:border-slate-700">
+                      <th className="text-center py-2.5 px-3 font-extrabold w-12">No.</th>
+                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[30%]">Judul & Metadata</th>
+                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Klasifikasi & Versi</th>
+                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Progress Alur</th>
+                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Status</th>
+                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Pembuat & Tanggal</th>
+                      <th className="text-center py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[140px]">Aksi</th>
+                    </tr>
+                    {/* Column Header Filters */}
+                    <tr className="bg-slate-100/80 dark:bg-slate-800/40 border-b border-slate-300 dark:border-slate-700">
+                      <th className="py-1.5 px-2"></th>
+                      <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Cari judul/nomor..."
+                            value={colFilters.title}
+                            onChange={(e) => setColFilters(prev => ({ ...prev, title: e.target.value }))}
+                            className="w-full px-2 py-1 text-[11px] font-normal bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20"
+                          />
+                          {colFilters.title && (
+                            <button onClick={() => setColFilters(prev => ({ ...prev, title: "" }))} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-440 hover:text-slate-660">
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                      <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Cari klasifikasi..."
+                            value={colFilters.classification}
+                            onChange={(e) => setColFilters(prev => ({ ...prev, classification: e.target.value }))}
+                            className="w-full px-2 py-1 text-[11px] font-normal bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20"
+                          />
+                          {colFilters.classification && (
+                            <button onClick={() => setColFilters(prev => ({ ...prev, classification: "" }))} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-440 hover:text-slate-660">
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                      <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
+                        {/* Progress: spacer */}
+                        <div className="h-6"></div>
+                      </th>
+                      <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
+                        <select
+                          value={colFilters.status}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, status: e.target.value }))}
+                          className="w-full px-1 py-1 text-[11px] font-normal bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20"
+                        >
+                          <option value="">Semua</option>
+                          <option value="DRAFT">DRAFT</option>
+                          <option value="PENDING_APPROVAL">PENDING</option>
+                          <option value="SIGNED">SIGNED</option>
+                          <option value="REJECTED">REJECTED</option>
+                        </select>
+                      </th>
+                      <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Cari pembuat..."
+                            value={colFilters.creator}
+                            onChange={(e) => setColFilters(prev => ({ ...prev, creator: e.target.value }))}
+                            className="w-full px-2 py-1 text-[11px] font-normal bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20"
+                          />
+                          {colFilters.creator && (
+                            <button onClick={() => setColFilters(prev => ({ ...prev, creator: "" }))} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-440 hover:text-slate-660">
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                      <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700 text-center">
+                        {(colFilters.title || colFilters.classification || colFilters.status || colFilters.creator) && (
+                          <button
+                            onClick={() => setColFilters({ title: "", classification: "", status: "", creator: "" })}
+                            className="text-[10px] text-red-650 hover:text-red-850 font-bold transition-colors w-full flex items-center justify-center gap-0.5"
+                          >
+                            <X size={10} /> Clear
+                          </button>
+                        )}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {paginatedDocuments.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400 font-medium bg-white dark:bg-slate-900">
+                          Tidak ada dokumen yang cocok dengan filter kolom.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {documents.map((doc) => {
+                    ) : (
+                      paginatedDocuments.map((doc, index) => {
                         const wf = doc.workflowInstances?.[0];
-                        const steps = wf?.steps ?? [];
+                        const steps = wf?.steps ? [...wf.steps].sort((a: any, b: any) => a.stepNumber - b.stepNumber) : [];
                         const totalSteps = steps.length;
                         const doneSteps = steps.filter((s: any) => s.status === 'APPROVED').length;
                         const currentVersion = doc.versions?.[doc.versions.length - 1]?.versionNum ?? doc.currentVersion ?? 1;
+                        const rowNumber = (currentPage - 1) * pageSize + index + 1;
 
                         return (
-                        <tr key={doc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
-                          {/* ── Judul & Metadata ── */}
-                          <td className="py-4 px-5">
-                            <div className="flex flex-col gap-0.5">
-                              <Link href={`/surat-masuk/${doc.id}`} className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors text-sm line-clamp-2 leading-snug">
-                                {doc.title}
-                              </Link>
-                              <div className="flex items-center gap-2 flex-wrap mt-1">
-                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{doc.documentNumber || "No Nomor"}</span>
-                                <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{doc.category?.name ?? "—"}</span>
-                              </div>
-                              {doc.status === 'REVISION' && wf?.steps?.find((s: any) => s.status === 'REVISION') && (
-                                <div className="mt-2 px-2.5 py-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-                                  <p className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
-                                    <AlertCircle size={11} /> Revisi dari: {wf.steps.findLast((s: any) => s.status === 'REVISION')?.user?.fullName}
-                                  </p>
-                                </div>
-                              )}
-                              {doc.status === 'REJECTED' && (
-                                <div className="mt-2 px-2.5 py-2 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl">
-                                  <p className="text-[10px] font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5">
-                                    <X size={11} /> Ditolak: {wf?.steps?.findLast((s: any) => s.status === 'REJECTED')?.user?.fullName || "Approver"}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </td>
+                          <tr key={doc.id} className="hover:bg-amber-50/60 even:bg-slate-50/50 dark:hover:bg-slate-800/40 dark:even:bg-slate-800/20 transition-colors group">
+                            {/* ── No. ── */}
+                            <td className="py-2.5 px-3 border-b border-slate-200 dark:border-slate-800 align-top text-center font-mono font-bold text-slate-400 dark:text-slate-500">
+                              {rowNumber}
+                            </td>
 
-                          {/* ── Klasifikasi & Versi ── */}
-                          <td className="py-4 px-5">
-                            <div className="flex flex-col gap-2">
-                              {doc.classification?.name ? (
-                                <span className="inline-flex items-center text-[10px] font-bold text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/40 px-2 py-0.5 rounded-full w-fit">
-                                  {doc.classification.name}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">—</span>
-                              )}
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full w-fit">
-                                v{currentVersion}
-                                {currentVersion > 1 && <span className="text-emerald-500">↑</span>}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* ── Progress Alur ── */}
-                          <td className="py-4 px-5">
-                            {totalSteps === 0 ? (
-                              <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">Belum ada alur</span>
-                            ) : (
-                              <div className="flex flex-col gap-1.5 min-w-[80px]">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{doneSteps}/{totalSteps} Step</span>
-                                  {doneSteps === totalSteps && totalSteps > 0 && (
-                                    <CheckCircle2 size={12} className="text-emerald-500" />
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  {steps.map((s: any, i: number) => (
-                                    <div key={i} className={cn(
-                                      "h-1.5 flex-1 rounded-full transition-all",
-                                      s.status === 'APPROVED' ? "bg-emerald-500" :
-                                      s.status === 'REJECTED' ? "bg-red-400" :
-                                      s.status === 'PENDING'  ? "bg-amber-400 animate-pulse" :
-                                      "bg-slate-200 dark:bg-slate-700"
-                                    )} />
-                                  ))}
-                                </div>
-                                {steps.find((s: any) => s.status === 'PENDING') && (
-                                  <p className="text-[9px] text-slate-400 truncate max-w-[110px]">
-                                    ⏳ {steps.find((s: any) => s.status === 'PENDING')?.user?.fullName}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* ── Status ── */}
-                          <td className="py-4 px-5">
-                            <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm whitespace-nowrap", statusClass(doc.status))}>
-                              {doc.status}
-                            </span>
-                          </td>
-
-                          {/* ── Pembuat & Tanggal ── */}
-                          <td className="py-4 px-5">
-                            <div className="flex flex-col gap-0.5">
-                              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">{doc.creator?.fullName}</p>
-                              {doc.creator?.jobTitle && (
-                                <p className="text-[9px] text-slate-400 truncate max-w-[130px]">{doc.creator.jobTitle}</p>
-                              )}
-                              <p className="text-[9px] text-slate-400 mt-0.5">📅 {new Date(doc.createdAt).toLocaleString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</p>
-                              {doc.updatedAt && doc.updatedAt !== doc.createdAt && (
-                                <p className="text-[9px] text-slate-300 dark:text-slate-600">🔄 {new Date(doc.updatedAt).toLocaleString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</p>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* ── Aksi ── */}
-                          <td className="py-4 px-5 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Link href={`/surat-masuk/${doc.id}`} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all inline-flex items-center" title="Lihat Detail">
-                                <Eye size={17} />
-                              </Link>
-                              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all" title="Unduh">
-                                <Download size={17} />
-                              </button>
-                              <div className="relative inline-block">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveDropdown(activeDropdown === doc.id ? null : doc.id);
-                                    setSelectedDoc(doc);
-                                  }}
-                                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all">
-                                  <MoreVertical size={17} />
+                            {/* ── Judul & Metadata ── */}
+                            <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
+                              <div className="flex flex-col gap-1">
+                                <button onClick={() => handleViewDocument(doc)} className="font-bold text-[#006633] hover:underline transition-colors text-[13px] line-clamp-2 leading-snug text-left">
+                                  {doc.title}
                                 </button>
-                                {activeDropdown === doc.id && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 py-2 z-[50] animate-in fade-in slide-in-from-top-2 duration-200">
-                                    <Can perform="DOC_EDIT">
-                                      <button onClick={() => { setIsEditModalOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                        {doc.status === 'REVISION' ? (
-                                          <><FileUp size={14} className="text-blue-500" /> Upload Revisi Baru</>
-                                        ) : (
-                                          <><Pencil size={14} className="text-primary" /> Edit Dokumen</>
-                                        )}
-                                      </button>
-                                    </Can>
-                                    <button onClick={() => { setIsFlowModalOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                      <Activity size={14} className="text-amber-500" /> Cek Flow
-                                    </button>
-                                    <button onClick={() => { handleArchive(doc.id); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                      <Archive size={14} className="text-slate-400" /> Arsipkan
-                                    </button>
-                                    <div className="h-px bg-slate-50 dark:bg-slate-800 my-1" />
-                                    <Can perform="DOC_DELETE">
-                                      <button onClick={() => { setIsDeleteConfirmOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                                        <Trash2 size={14} /> Hapus Permanen
-                                      </button>
-                                    </Can>
+                                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                  <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{doc.documentNumber || "No Nomor"}</span>
+                                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{doc.category?.name ?? "—"}</span>
+                                </div>
+                                {doc.status === 'REVISION' && wf?.steps?.find((s: any) => s.status === 'REVISION') && (
+                                  <div className="mt-1 px-2 py-1.5 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                                    <p className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                                      <AlertCircle size={12} /> Revisi: {wf.steps.findLast((s: any) => s.status === 'REVISION')?.user?.fullName}
+                                    </p>
+                                  </div>
+                                )}
+                                {doc.status === 'REJECTED' && (
+                                  <div className="mt-1 px-2 py-1.5 bg-red-50/80 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                                    <p className="text-[10px] font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                                      <X size={12} /> Ditolak: {wf?.steps?.findLast((s: any) => s.status === 'REJECTED')?.user?.fullName || "Approver"}
+                                    </p>
                                   </div>
                                 )}
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </td>
 
-                {/* Mobile Card List */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
+                            {/* ── Klasifikasi & Versi ── */}
+                            <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
+                              <div className="flex flex-col gap-1.5">
+                                {doc.classification?.name ? (
+                                  <span className="inline-flex items-center text-[10px] font-bold text-violet-700 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-1.5 py-0.5 rounded w-fit">
+                                    {doc.classification.name}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 italic">—</span>
+                                )}
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 w-fit">
+                                  v{currentVersion}
+                                  {currentVersion > 1 && <span className="text-[#006633] font-black">↑</span>}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* ── Progress Alur ── */}
+                            <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
+                              {totalSteps === 0 ? (
+                                <span className="text-[10px] text-slate-400 italic">Belum ada alur</span>
+                              ) : (
+                                <div className="flex flex-col gap-1 min-w-[85px]">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{doneSteps}/{totalSteps} Step</span>
+                                    {doneSteps === totalSteps && totalSteps > 0 && (
+                                      <CheckCircle2 size={12} className="text-[#006633]" />
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-0.5 mt-0.5">
+                                    {steps.map((s: any, i: number) => (
+                                      <div key={i} className={cn(
+                                        "h-1.5 flex-1 rounded-sm border transition-all",
+                                        s.status === 'APPROVED' ? "bg-[#006633] border-[#006633]" :
+                                          s.status === 'REJECTED' ? "bg-red-500 border-red-500" :
+                                            s.status === 'PENDING' ? "bg-amber-400 border-amber-500 animate-pulse" :
+                                              "bg-slate-200 border-slate-300 dark:bg-slate-700 dark:border-slate-600"
+                                      )} />
+                                    ))}
+                                  </div>
+                                  {steps.find((s: any) => s.status === 'PENDING') && (
+                                    <p className="text-[9px] text-slate-500 truncate max-w-[110px] mt-0.5">
+                                      ⏳ {steps.find((s: any) => s.status === 'PENDING')?.user?.fullName}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* ── Status ── */}
+                            <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
+                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded border whitespace-nowrap", statusClass(doc.status))}>
+                                {doc.status}
+                              </span>
+                            </td>
+
+                            {/* ── Pembuat & Tanggal ── */}
+                            <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
+                              <div className="flex flex-col gap-0.5">
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-[130px]">{doc.creator?.fullName}</p>
+                                {doc.creator?.jobTitle && (
+                                  <p className="text-[9px] text-slate-500 truncate max-w-[130px]">{doc.creator.jobTitle}</p>
+                                )}
+                                <p className="text-[9px] text-slate-500 mt-1">📅 {new Date(doc.createdAt).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                              </div>
+                            </td>
+
+                            {/* ── Aksi ── */}
+                            <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top text-center">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap max-w-[110px] mx-auto">
+                                <button onClick={() => handleViewDocument(doc)} className="p-1.5 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors" title="Lihat Detail">
+                                  <Eye size={14} />
+                                </button>
+                                <button className="p-1.5 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-405 dark:hover:bg-indigo-900/30 transition-colors" title="Unduh">
+                                  <Download size={14} />
+                                </button>
+                                <Can perform="DOC_EDIT">
+                                  <button onClick={() => { setSelectedDoc(doc); setIsEditModalOpen(true); }} className="p-1.5 rounded-lg text-[#006633] bg-[#006633]/10 hover:bg-[#006633]/20 dark:bg-[#006633]/20 dark:hover:bg-[#006633]/30 transition-colors" title={doc.status === 'REVISION' ? "Upload Revisi Baru" : "Edit Dokumen"}>
+                                    {doc.status === 'REVISION' ? <FileUp size={14} /> : <Pencil size={14} />}
+                                  </button>
+                                </Can>
+                                <button onClick={() => { setSelectedDoc(doc); setIsFlowModalOpen(true); }} className="p-1.5 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-405 dark:hover:bg-amber-900/30 transition-colors" title="Cek Flow Persetujuan">
+                                  <Activity size={14} />
+                                </button>
+                                <button onClick={() => { handleArchive(doc.id); }} className="p-1.5 rounded-lg text-slate-650 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors" title="Arsipkan">
+                                  <Archive size={14} />
+                                </button>
+                                <Can perform="DOC_DELETE">
+                                  <button onClick={() => { setSelectedDoc(doc); setIsDeleteConfirmOpen(true); }} className="p-1.5 rounded-lg text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:text-rose-450 dark:hover:bg-rose-900/30 transition-colors" title="Hapus Permanen">
+                                    <Trash2 size={14} />
+                                  </button>
+                                </Can>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List */}
+              <div className="md:hidden border-t border-slate-200 dark:border-slate-800">
+                {paginatedDocuments.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 font-medium bg-white dark:bg-slate-900">
+                    Tidak ada dokumen yang cocok dengan filter kolom.
+                  </div>
+                ) : (
+                  paginatedDocuments.map((doc) => (
+                    <div key={doc.id} className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <Link href={`/surat-masuk/${doc.id}`} className="font-bold text-slate-900 dark:text-white text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
+                        <button onClick={() => handleViewDocument(doc)} className="font-bold text-[#006633] text-sm leading-tight line-clamp-2 hover:underline transition-colors text-left">
                           {doc.title}
-                        </Link>
+                        </button>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", statusClass(doc.status))}>
+                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded border", statusClass(doc.status))}>
                             {doc.status}
                           </span>
-                          <div className="relative inline-block">
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveDropdown(activeDropdown === doc.id ? null : doc.id);
-                                setSelectedDoc(doc);
-                              }}
-                              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all">
-                              <MoreVertical size={17} />
-                            </button>
-
-                            {activeDropdown === doc.id && (
-                              <div className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 py-2 z-[50] animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                <button onClick={() => { setIsEditModalOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                  {doc.status === 'REVISION' ? (
-                                    <><FileUp size={14} className="text-blue-500" /> Upload Revisi Baru</>
-                                  ) : (
-                                    <><Pencil size={14} className="text-primary" /> Edit Dokumen</>
-                                  )}
-                                </button>
-                                <button onClick={() => { setIsFlowModalOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                  <Activity size={14} className="text-amber-500" /> Cek Flow
-                                </button>
-                                <button onClick={() => { handleArchive(doc.id); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                  <Archive size={14} className="text-slate-400" /> Arsipkan
-                                </button>
-                                <div className="h-px bg-slate-50 dark:bg-slate-800 my-1" />
-                                <button onClick={() => { setIsDeleteConfirmOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                                  <Trash2 size={14} /> Hapus Permanen
-                                </button>
-                              </div>
-                            )}
-                          </div>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 mb-2 mt-2">
-                        <span className="font-mono">{doc.documentNumber || "No Number"}</span>
-                        <span>{doc.creator.fullName} · {new Date(doc.createdAt).toLocaleString('id-ID', {day: 'numeric', month: 'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 mb-2 mt-2">
+                        <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{doc.documentNumber || "No Number"}</span>
+                        <span>{doc.creator.fullName} · {new Date(doc.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                       </div>
 
                       {doc.status === 'REVISION' && doc.workflowInstances?.[0]?.steps?.find((s: any) => s.status === 'REVISION') && (
-                        <div className="mb-3 p-3 bg-blue-50/80 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-                           <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-1">
-                             <AlertCircle size={14} /> Diminta Revisi oleh: {doc.workflowInstances[0].steps.findLast((s: any) => s.status === 'REVISION')?.user?.fullName}
-                           </p>
-                           <p className="text-[10px] text-blue-600/80 dark:text-blue-300/80 italic leading-snug pl-5">
-                             &ldquo;{doc.workflowInstances[0].steps.findLast((s: any) => s.status === 'REVISION')?.comment || "Revisi diperlukan."}&rdquo;
-                           </p>
+                        <div className="mb-3 p-3 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-1">
+                            <AlertCircle size={14} /> Revisi: {doc.workflowInstances[0].steps.findLast((s: any) => s.status === 'REVISION')?.user?.fullName}
+                          </p>
+                          <p className="text-[10px] text-blue-700 dark:text-blue-400 italic leading-snug pl-5">
+                            &ldquo;{doc.workflowInstances[0].steps.findLast((s: any) => s.status === 'REVISION')?.comment || "Revisi diperlukan."}&rdquo;
+                          </p>
                         </div>
                       )}
-                      
+
                       {doc.status === 'REJECTED' && (
-                        <div className="mb-3 p-3 bg-red-50/80 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl">
-                           <p className="text-[11px] font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5 mb-1">
-                             <X size={14} /> Ditolak oleh: {doc.workflowInstances?.[0]?.steps?.findLast((s: any) => s.status === 'REJECTED')?.user?.fullName || "Approver"}
-                           </p>
-                           <p className="text-[10px] text-red-600/80 dark:text-red-300/80 italic leading-snug pl-5">
-                             &ldquo;{doc.workflowInstances?.[0]?.steps?.findLast((s: any) => s.status === 'REJECTED')?.comment || "Dokumen tidak disetujui."}&rdquo;
-                           </p>
+                        <div className="mb-3 p-3 bg-red-50/80 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                          <p className="text-[11px] font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5 mb-1">
+                            <X size={14} /> Ditolak oleh: {doc.workflowInstances?.[0]?.steps?.findLast((s: any) => s.status === 'REJECTED')?.user?.fullName || "Approver"}
+                          </p>
+                          <p className="text-[10px] text-red-700 dark:text-red-400 italic leading-snug pl-5">
+                            &ldquo;{doc.workflowInstances?.[0]?.steps?.findLast((s: any) => s.status === 'REJECTED')?.comment || "Dokumen tidak disetujui."}&rdquo;
+                          </p>
                         </div>
                       )}
 
                       {doc.status === 'SIGNED' && (
-                        <div className="mb-3 p-3 bg-emerald-50/80 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
-                           <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                             <CheckCircle2 size={14} /> Dokumen Selesai & Ditandatangani
-                           </p>
+                        <div className="mb-3 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                          <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1.5">
+                            <CheckCircle2 size={14} /> Dokumen Selesai & Ditandatangani
+                          </p>
                         </div>
                       )}
-                      
-                      <div className="flex items-center gap-2 mt-3">
-                        <Link href={`/surat-masuk/${doc.id}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all">
+
+                      <div className="flex items-center gap-1 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 overflow-x-auto pb-1">
+                        <button onClick={() => handleViewDocument(doc)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-[#006633] hover:text-white transition-all whitespace-nowrap">
                           <Eye size={14} /> Detail
-                        </Link>
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                        </button>
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all whitespace-nowrap">
                           <Download size={14} /> Unduh
                         </button>
+                        <Can perform="DOC_EDIT">
+                          <button onClick={() => { setSelectedDoc(doc); setIsEditModalOpen(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-[#006633] hover:bg-slate-200 transition-all whitespace-nowrap">
+                            {doc.status === 'REVISION' ? <><FileUp size={14} /> Upload Revisi</> : <><Pencil size={14} /> Edit</>}
+                          </button>
+                        </Can>
+                        <button onClick={() => { setSelectedDoc(doc); setIsFlowModalOpen(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-amber-600 hover:bg-slate-200 transition-all whitespace-nowrap">
+                          <Activity size={14} /> Flow
+                        </button>
+                        <Can perform="DOC_DELETE">
+                          <button onClick={() => { setSelectedDoc(doc); setIsDeleteConfirmOpen(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-xs font-bold text-red-600 hover:bg-red-100 transition-all whitespace-nowrap">
+                            <Trash2 size={14} /> Hapus
+                          </button>
+                        </Can>
                       </div>
                     </div>
-                  ))}
+                  ))
+                )}
+              </div>
+
+              {/* Pagination Footer */}
+              <div className="bg-slate-50 dark:bg-slate-800/40 px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400 font-medium">
+                {/* Left: Range Info */}
+                <div>
+                  {totalItems > 0 ? (
+                    <span>
+                      Menampilkan <strong className="text-slate-800 dark:text-white">{startIndex + 1}</strong> - <strong className="text-slate-800 dark:text-white">{endIndex}</strong> dari <strong className="text-slate-800 dark:text-white">{totalItems}</strong> data
+                    </span>
+                  ) : (
+                    <span>Tidak ada data untuk ditampilkan</span>
+                  )}
                 </div>
-              </>
-            )}
-          </div>
+
+                {/* Center: Page Size Selector */}
+                <div className="flex items-center gap-2">
+                  <span>Tampilkan:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span>per halaman</span>
+                </div>
+
+                {/* Right: Page Buttons */}
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1 select-none">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      &laquo;
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      Sebelumnya
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                      .map((page, idx, arr) => {
+                        const showEllipsisBefore = page > 1 && arr[idx - 1] !== page - 1;
+                        return (
+                          <React.Fragment key={page}>
+                            {showEllipsisBefore && <span className="px-1 text-slate-400">...</span>}
+                            <button
+                              onClick={() => setCurrentPage(page)}
+                              className={cn(
+                                "px-2.5 py-1 rounded text-xs font-bold transition-all border",
+                                currentPage === page
+                                  ? "bg-[#006633] border-[#006633] text-white"
+                                  : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                              )}
+                            >
+                              {page}
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      Selanjutnya
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      &raquo;
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Backdrop for Sidebar drawer */}
+      {selectedDocId && sidebarDoc && (
+        <div
+          onClick={() => setSelectedDocId(null)}
+          className="fixed inset-0 bg-slate-900/30 dark:bg-slate-950/60 backdrop-blur-[2px] z-[90] animate-in fade-in duration-200"
+        />
+      )}
+
+      {/* Right Sidebar Details Panel */}
+      {selectedDocId && sidebarDoc && (
+        <div className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 shadow-2xl flex flex-col z-[100] animate-in slide-in-from-right duration-300">
+          {/* Header */}
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/20 shrink-0">
+            <div className="min-w-0">
+              <span className={cn("text-[9px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-wide", statusClass(sidebarDoc.status))}>
+                {sidebarDoc.status}
+              </span>
+              <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-2 font-mono">{sidebarDoc.documentNumber || "No Nomor"}</h4>
+            </div>
+            <button
+              onClick={() => setSelectedDocId(null)}
+              className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all shrink-0"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin">
+            {/* Title & Category */}
+            <div>
+              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded">{sidebarDoc.category?.name}</span>
+              <h3 className="text-[15px] font-extrabold text-slate-900 dark:text-white leading-snug mt-2.5">{sidebarDoc.title}</h3>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2.5">
+              {sidebarDoc.versions?.[sidebarDoc.versions.length - 1] && (
+                <button
+                  onClick={() => setReaderDoc({
+                    title: sidebarDoc.versions[sidebarDoc.versions.length - 1].fileName,
+                    fileUrl: sidebarDoc.versions[sidebarDoc.versions.length - 1].fileUrl
+                  })}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#006633] text-white font-bold rounded-xl text-xs hover:bg-[#006633]/90 active:scale-[0.97] transition-all shadow-sm shadow-[#006633]/10 cursor-pointer"
+                >
+                  <Eye size={13} />
+                  <span>Lihat Surat</span>
+                </button>
+              )}
+              {sidebarDoc.status === 'REVISION' && (
+                <button
+                  onClick={() => setIsRevisionModalOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 active:scale-[0.97] transition-all shadow-sm cursor-pointer"
+                >
+                  <FileUp size={13} />
+                  <span>Kirim Revisi</span>
+                </button>
+              )}
+              {sidebarDoc.status === 'DRAFT' && (
+                <button
+                  onClick={() => setIsApprovalModalOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 active:scale-[0.97] transition-all shadow-sm cursor-pointer"
+                >
+                  <Play size={13} />
+                  <span>Mulai Workflow</span>
+                </button>
+              )}
+            </div>
+
+            {/* Workflow Stepper Timeline */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={13} className="text-[#006633]" /> Alur Persetujuan
+                </h4>
+                {sidebarDoc.workflowInstances && sidebarDoc.workflowInstances.length > 0 &&
+                  !['COMPLETED', 'REJECTED'].includes(sidebarDoc.workflowInstances[sidebarDoc.workflowInstances.length - 1].status) && (
+                    <button
+                      onClick={() => setIsWorkflowEditModalOpen(true)}
+                      className="text-[9.5px] font-bold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                    >
+                      Ubah Alur
+                    </button>
+                  )}
+              </div>
+
+              {sidebarDoc.workflowInstances && sidebarDoc.workflowInstances.length > 0 ? (
+                <div className="relative pl-4.5 space-y-5 before:absolute before:left-[8px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-slate-800/80">
+                  {sidebarDoc.workflowInstances[sidebarDoc.workflowInstances.length - 1].steps
+                    .sort((a: any, b: any) => a.stepNumber - b.stepNumber)
+                    .map((step: any) => {
+                      const isApproved = step.status === 'APPROVED';
+                      const isPending = step.status === 'PENDING';
+                      const isRejected = step.status === 'REJECTED';
+                      return (
+                        <div key={step.id} className="relative">
+                          {/* Stepper Dot/Icon */}
+                          <div className={cn(
+                            "absolute -left-[22px] top-0.5 w-4.5 h-4.5 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center z-10 shadow-sm transition-all",
+                            isApproved ? "bg-emerald-500 text-white" :
+                              isPending ? "bg-amber-400 text-white animate-pulse" :
+                                isRejected ? "bg-red-500 text-white" :
+                                  "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600"
+                          )}>
+                            {isApproved ? <CheckCircle2 size={10} /> :
+                              isPending ? <Clock size={10} /> :
+                                isRejected ? <X size={10} /> :
+                                  <span className="text-[7px] font-bold">{step.stepNumber}</span>}
+                          </div>
+
+                          <div className="text-[11px] leading-relaxed">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-bold text-slate-800 dark:text-slate-200">{step.user?.fullName || "User"}</p>
+                              <span className={cn(
+                                "text-[8px] font-extrabold uppercase px-1.5 py-0.2 rounded border",
+                                isApproved ? "text-emerald-600 bg-emerald-50/50 border-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/10 dark:border-emerald-900/50" :
+                                  isPending ? "text-amber-600 bg-amber-50/50 border-amber-100 dark:text-amber-400 dark:bg-amber-950/10 dark:border-amber-900/50" :
+                                    isRejected ? "text-red-600 bg-red-50/50 border-red-100 dark:text-red-400 dark:bg-red-950/10 dark:border-red-900/50" :
+                                      "text-slate-400 bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700/60"
+                              )}>
+                                {step.status}
+                              </span>
+                            </div>
+                            <p className="text-[9.5px] text-slate-400 font-medium">{step.user?.jobTitle || "Penandatangan"}</p>
+                            {step.comment && (
+                              <div className="mt-1.5 p-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/50 text-[10px] text-slate-600 dark:text-slate-400 leading-normal">
+                                <span className="text-[#D4AF37] font-serif font-black text-sm mr-1 leading-none">&ldquo;</span>
+                                <span className="italic">{step.comment}</span>
+                                <span className="text-[#D4AF37] font-serif font-black text-sm ml-1 leading-none">&rdquo;</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 italic py-2">Belum ada alur workflow yang disubmit.</p>
+              )}
+            </div>
+
+            {/* Riwayat Versi (File Upload List) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <History size={13} className="text-[#006633]" /> Riwayat Versi Berkas
+                </h4>
+                {sidebarDoc.status !== 'SIGNED' && (
+                  <button
+                    onClick={() => setIsRevisionModalOpen(true)}
+                    className="text-[9.5px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    Unggah Versi Baru
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                {sidebarDoc.versions?.map((v: any) => (
+                  <div key={v.id} className="p-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-3 group hover:border-[#006633]/20 dark:hover:border-[#006633]/30 transition-all">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[8px] font-extrabold text-[#006633] bg-[#006633]/8 px-1.5 py-0.2 rounded">v{v.versionNum}</span>
+                        <p className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 truncate" title={v.fileName}>{v.fileName}</p>
+                      </div>
+                      <p className="text-[8.5px] text-slate-400 mt-1 font-mono">{(v.fileSize / 1024 / 1024).toFixed(2)} MB · {new Date(v.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setReaderDoc({ title: v.fileName, fileUrl: v.fileUrl })}
+                        className="p-1.5 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-500 dark:text-slate-400 rounded-lg transition-colors cursor-pointer"
+                        title="Lihat"
+                      >
+                        <Eye size={13} />
+                      </button>
+                      <a
+                        href={`http://localhost:4002/${v.fileUrl}`}
+                        download={v.fileName}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-500 dark:text-slate-400 rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+                        title="Unduh"
+                      >
+                        <Download size={13} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Informasi Surat */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">
+                Informasi Dokumen
+              </h4>
+              <div className="space-y-2 text-[10.5px] text-slate-600 dark:text-slate-400 font-medium">
+                <div className="flex justify-between border-b border-slate-50 dark:border-slate-800 pb-1.5">
+                  <span className="text-slate-400">Nomor</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-bold font-mono">{sidebarDoc.documentNumber || "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-50 dark:border-slate-800 pb-1.5">
+                  <span className="text-slate-400">Tanggal Masuk</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-bold">{new Date(sidebarDoc.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-50 dark:border-slate-800 pb-1.5">
+                  <span className="text-slate-400">Sifat/Klasifikasi</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-bold">{sidebarDoc.classification?.name || "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-50 dark:border-slate-800 pb-1.5">
+                  <span className="text-slate-400">Pembuat</span>
+                  <span className="text-slate-900 dark:text-slate-100 font-bold truncate max-w-[150px]">{sidebarDoc.creator?.fullName}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-slate-400">Keterangan Catatan</span>
+                  <span className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed bg-slate-50 dark:bg-slate-800/10 p-2.5 rounded-xl border border-slate-100/50 dark:border-slate-800/50 mt-1">{sidebarDoc.versions?.[0]?.changeNotes || "Tidak ada keterangan tambahan."}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals placed optimally outside layout flows */}
       {isEditModalOpen && selectedDoc && <EditDocumentModal doc={selectedDoc} />}
       {isFlowModalOpen && selectedDoc && <DocumentFlowModal doc={selectedDoc} />}
       {isDeleteConfirmOpen && selectedDoc && <DeleteConfirmationModal doc={selectedDoc} />}
+
+      {isApprovalModalOpen && selectedDocId && (
+        <ApprovalSubmitModal
+          documentId={selectedDocId}
+          onClose={() => setIsApprovalModalOpen(false)}
+          onSuccess={() => {
+            setIsApprovalModalOpen(false);
+            fetchData();
+            fetchSidebarDetail(selectedDocId);
+          }}
+        />
+      )}
+
+      {isWorkflowEditModalOpen && selectedDocId && (
+        <WorkflowEditModal
+          documentId={selectedDocId}
+          onClose={() => setIsWorkflowEditModalOpen(false)}
+          onSuccess={() => {
+            setIsWorkflowEditModalOpen(false);
+            fetchData();
+            fetchSidebarDetail(selectedDocId);
+          }}
+        />
+      )}
+
+      {isRevisionModalOpen && selectedDocId && (
+        <RevisionModal
+          documentId={selectedDocId}
+          onClose={() => setIsRevisionModalOpen(false)}
+          onSuccess={() => {
+            setIsRevisionModalOpen(false);
+            fetchData();
+            fetchSidebarDetail(selectedDocId);
+          }}
+        />
+      )}
+
+      {readerDoc && (
+        <DocumentReader
+          isOpen={!!readerDoc}
+          onClose={() => setReaderDoc(null)}
+          title={readerDoc.title}
+          fileUrl={readerDoc.fileUrl}
+        />
+      )}
     </div>
   );
 };

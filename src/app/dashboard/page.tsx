@@ -156,10 +156,10 @@ const DashboardPage = () => {
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">AKTIF / ROOT-MUI</span>
             </div>
           </div>
-          <Link href="/surat-keluar/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-[#0B1325] dark:bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg border border-slate-700 hover:border-slate-650 transition-all text-xs uppercase tracking-wider">
+          <Link href="/surat-keluar/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-[#006633] hover:bg-[#00552b] text-white font-bold rounded-lg transition-all text-xs uppercase tracking-wider">
             <Plus size={16} /> Buat Surat Keluar
           </Link>
-          <Link href="/surat-masuk/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 dark:bg-emerald-800 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all text-xs uppercase tracking-wider">
+          <Link href="/surat-masuk/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-[#006633] hover:bg-[#00552b] text-white font-bold rounded-lg transition-all text-xs uppercase tracking-wider">
             <Plus size={16} /> Input Surat Masuk
           </Link>
         </div>
