@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMeetingStore, Meeting, Attendee, MinimalUser } from "@/stores/meeting.store";
+import api from "@/lib/api";
 
 // Helper to format meeting time range
 const formatMeetingTimeRange = (meeting: Meeting, isShortMonth = false) => {
@@ -127,12 +128,19 @@ export default function MeetingAgendaPage() {
   const [untilFinished, setUntilFinished] = useState(false);
   const [formLocation, setFormLocation] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formTargetType, setFormTargetType] = useState<Meeting['targetType']>("ALL");
+  const [formTargetType, setFormTargetType] = useState<Meeting['targetType']>("CROSS_INTERNAL");
   const [formDepartmentId, setFormDepartmentId] = useState("");
   const [formCustomAttendeeIds, setFormCustomAttendeeIds] = useState<string[]>([]);
   const [formExternalEmailsText, setFormExternalEmailsText] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
+
+  // Discussed Surat Masuk states
+  const [incomingDocs, setIncomingDocs] = useState<any[]>([]);
+  const [discussIncomingDocs, setDiscussIncomingDocs] = useState(false);
+  const [selectedDiscussedDocIds, setSelectedDiscussedDocIds] = useState<string[]>([]);
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -140,6 +148,21 @@ export default function MeetingAgendaPage() {
     fetchMeetingList();
     fetchUsersList();
   }, [fetchMeetingList, fetchUsersList]);
+
+  // Load incoming documents for search
+  useEffect(() => {
+    const fetchIncomingDocs = async () => {
+      try {
+        const res = await api.get("/documents", { params: { documentType: "INCOMING" } });
+        setIncomingDocs(res.data.data || []);
+      } catch (err: any) {
+        console.error("Gagal mengambil data surat masuk:", err.message);
+      }
+    };
+    if (mounted) {
+      fetchIncomingDocs();
+    }
+  }, [mounted]);
 
   // Load departments once users are loaded
   useEffect(() => {
@@ -190,12 +213,16 @@ export default function MeetingAgendaPage() {
     setUntilFinished(false);
     setFormLocation("");
     setFormDescription("");
-    setFormTargetType("ALL");
+    setFormTargetType("CROSS_INTERNAL");
     setFormDepartmentId("");
-    // Pre-select all internal users for 'ALL'
-    setFormCustomAttendeeIds(usersList.map((u) => u.id));
+    // Pre-select no internal users by default
+    setFormCustomAttendeeIds([]);
     setFormExternalEmailsText("");
     setCandidateSearchQuery("");
+    setDiscussIncomingDocs(false);
+    setSelectedDiscussedDocIds([]);
+    setDocSearchQuery("");
+    setIsDropdownOpen(false);
     setFormError(null);
   };
 
@@ -227,6 +254,16 @@ export default function MeetingAgendaPage() {
       .filter((a) => a.isExternal)
       .map((a) => a.email);
     setFormExternalEmailsText(externalEmails.join(", "));
+
+    if (meeting.discussedDocs && meeting.discussedDocs.length > 0) {
+      setDiscussIncomingDocs(true);
+      setSelectedDiscussedDocIds(meeting.discussedDocs.map((doc: any) => doc.id));
+    } else {
+      setDiscussIncomingDocs(false);
+      setSelectedDiscussedDocIds([]);
+    }
+    setDocSearchQuery("");
+    setIsDropdownOpen(false);
     setFormError(null);
   };
 
@@ -300,34 +337,41 @@ export default function MeetingAgendaPage() {
   // Candidates computed list
   const candidates = useMemo(() => {
     if (!mounted) return [];
-    return getCandidatesFor(formTargetType, formDepartmentId);
-  }, [formTargetType, formDepartmentId, usersList, mounted]);
+    return usersList;
+  }, [usersList, mounted]);
 
   // Candidates filtered by search input inside the modal
   const filteredCandidates = useMemo(() => {
     if (!mounted) return [];
-    return candidates.filter((u) =>
-      u.fullName.toLowerCase().includes(candidateSearchQuery.toLowerCase()) ||
-      (u.jabatan?.name && u.jabatan.name.toLowerCase().includes(candidateSearchQuery.toLowerCase())) ||
-      (u.department?.name && u.department.name.toLowerCase().includes(candidateSearchQuery.toLowerCase()))
+    if (!candidateSearchQuery.trim()) {
+      // Show selected users + first 10 unselected users
+      const selected = usersList.filter((u) => formCustomAttendeeIds.includes(u.id));
+      const unselected = usersList.filter((u) => !formCustomAttendeeIds.includes(u.id)).slice(0, 10);
+      return [...selected, ...unselected];
+    }
+    const query = candidateSearchQuery.toLowerCase();
+    return usersList.filter((u) =>
+      u.fullName.toLowerCase().includes(query) ||
+      (u.jabatan?.name && u.jabatan.name.toLowerCase().includes(query)) ||
+      (u.department?.name && u.department.name.toLowerCase().includes(query))
     );
-  }, [candidates, candidateSearchQuery, mounted]);
+  }, [usersList, formCustomAttendeeIds, candidateSearchQuery, mounted]);
 
   // Select all checkbox state
   const isAllSelected = useMemo(() => {
-    if (candidates.length === 0) return false;
-    return candidates.every((c) => formCustomAttendeeIds.includes(c.id));
-  }, [candidates, formCustomAttendeeIds]);
+    if (filteredCandidates.length === 0) return false;
+    return filteredCandidates.every((c) => formCustomAttendeeIds.includes(c.id));
+  }, [filteredCandidates, formCustomAttendeeIds]);
 
   const handleSelectAllToggle = () => {
-    const candidateIds = candidates.map((c) => c.id);
+    const visibleIds = filteredCandidates.map((c) => c.id);
     if (isAllSelected) {
-      // Remove all candidates of the current filter from custom attendees list
-      setFormCustomAttendeeIds((prev) => prev.filter((id) => !candidateIds.includes(id)));
+      // Remove visible candidates from selection
+      setFormCustomAttendeeIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
     } else {
-      // Add all candidates of the current filter to custom attendees list
+      // Add all visible candidates to selection
       setFormCustomAttendeeIds((prev) => {
-        const union = new Set([...prev, ...candidateIds]);
+        const union = new Set([...prev, ...visibleIds]);
         return Array.from(union);
       });
     }
@@ -392,7 +436,8 @@ export default function MeetingAgendaPage() {
       customAttendeeIds: formCustomAttendeeIds,
       externalEmails: formTargetType === "CROSS_AGENCY"
         ? formExternalEmailsText.split(",").map((e) => e.trim()).filter(Boolean)
-        : undefined
+        : undefined,
+      discussedDocIds: discussIncomingDocs ? selectedDiscussedDocIds : []
     };
 
     let success = false;
@@ -1040,76 +1085,146 @@ export default function MeetingAgendaPage() {
                   />
                 </div>
 
-                {/* Target Type Selector */}
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-extrabold uppercase tracking-wide text-slate-450">
-                    Target Peserta Rapat <span className="text-rose-500">*</span>
+
+
+                {/* Checkbox Membahas Surat Masuk */}
+                <div className="space-y-2 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={discussIncomingDocs}
+                      onChange={(e) => {
+                        setDiscussIncomingDocs(e.target.checked);
+                        if (!e.target.checked) {
+                          setSelectedDiscussedDocIds([]);
+                        }
+                      }}
+                      className="rounded border-slate-350 text-[#006633] focus:ring-[#006633] w-4 h-4 cursor-pointer accent-[#006633]"
+                    />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Rapat ini membahas Surat Masuk
+                    </span>
                   </label>
-                  <select
-                    value={formTargetType}
-                    onChange={(e) => {
-                      const val = e.target.value as Meeting['targetType'];
-                      setFormTargetType(val);
-                      setFormDepartmentId("");
-                      setFormExternalEmailsText("");
-                      const nextCandidates = getCandidatesFor(val, "");
-                      setFormCustomAttendeeIds(nextCandidates.map((u) => u.id));
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-lg outline-none focus:border-[#006633] transition-all font-medium text-slate-900 dark:text-white"
-                    required
-                  >
-                    <option value="ALL">Semua Anggota</option>
-                    <option value="EXECUTIVE">Pengurus Lembaga (Ketua, Bendahara, dll.)</option>
-                    <option value="ALL_BOARD">Seluruh Pengurus DSN-MUI</option>
-                    <option value="SECRETARIAT">Kesekretariatan</option>
-                    <option value="FINANCE">Keuangan</option>
-                    <option value="DEPARTMENT">Bidang Tertentu (Memilih Bidang)</option>
-                    <option value="CROSS_AGENCY">Lintas Badan & Eksternal</option>
-                    <option value="CROSS_INTERNAL">Lintas Internal (Pilih Nama Bebas)</option>
-                  </select>
                 </div>
 
-                {/* Sub-inputs dependent on TargetType */}
-                {formTargetType === "DEPARTMENT" && (
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
-                    <label className="block text-[10px] font-extrabold uppercase tracking-wide text-[#006633]">
-                      Pilih Bidang / Departemen
+                {discussIncomingDocs && (
+                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 rounded-xl relative animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wide text-slate-450">
+                      Pilih Surat Masuk yang Dibahas
                     </label>
-                    <select
-                      value={formDepartmentId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFormDepartmentId(val);
-                        const nextCandidates = getCandidatesFor("DEPARTMENT", val);
-                        setFormCustomAttendeeIds(nextCandidates.map((u) => u.id));
-                      }}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800 rounded-lg outline-none focus:border-[#006633] transition-all font-medium text-slate-900 dark:text-white"
-                      required
-                    >
-                      <option value="">-- Pilih Bidang --</option>
-                      {departmentsList.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                    <div className="relative">
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Cari surat masuk berdasarkan judul atau nomor dokumen..."
+                          value={docSearchQuery}
+                          onChange={(e) => {
+                            setDocSearchQuery(e.target.value);
+                            setIsDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsDropdownOpen(true)}
+                          className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg outline-none focus:border-[#006633] transition-all font-medium text-slate-800 dark:text-white"
+                        />
+                        {docSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setDocSearchQuery("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
 
-                {formTargetType === "CROSS_AGENCY" && (
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 space-y-2.5 animate-in slide-in-from-top-2 duration-200">
-                    <div className="space-y-1">
-                      <label className="block text-[10px] font-extrabold uppercase tracking-wide text-[#006633]">
-                        Daftar Email Undangan Eksternal
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: ojk@ojk.go.id, kemenkeu@go.id (pisahkan dengan koma)"
-                        value={formExternalEmailsText}
-                        onChange={(e) => setFormExternalEmailsText(e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800 rounded-lg outline-none focus:border-[#006633] transition-all font-medium text-slate-900 dark:text-white"
-                      />
+                      {/* Dropdown List */}
+                      {isDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                          <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-50 py-1">
+                            {incomingDocs.filter((d: any) => {
+                              const titleMatch = d.title?.toLowerCase().includes(docSearchQuery.toLowerCase());
+                              const numMatch = d.documentNumber?.toLowerCase().includes(docSearchQuery.toLowerCase());
+                              return titleMatch || numMatch;
+                            }).length === 0 ? (
+                              <div className="px-3 py-2 text-[10px] text-slate-400 text-center font-bold">
+                                Tidak ada surat masuk ditemukan
+                              </div>
+                            ) : (
+                              incomingDocs
+                                .filter((d: any) => {
+                                  const titleMatch = d.title?.toLowerCase().includes(docSearchQuery.toLowerCase());
+                                  const numMatch = d.documentNumber?.toLowerCase().includes(docSearchQuery.toLowerCase());
+                                  return titleMatch || numMatch;
+                                })
+                                .map((docItem: any) => {
+                                  const isSelected = selectedDiscussedDocIds.includes(docItem.id);
+                                  return (
+                                    <div
+                                      key={docItem.id}
+                                      onClick={() => {
+                                        if (isSelected) {
+                                          setSelectedDiscussedDocIds(prev => prev.filter(id => id !== docItem.id));
+                                        } else {
+                                          setSelectedDiscussedDocIds(prev => [...prev, docItem.id]);
+                                        }
+                                      }}
+                                      className={`px-3 py-2 text-[11px] font-medium flex items-center justify-between cursor-pointer transition-colors ${
+                                        isSelected
+                                          ? "bg-emerald-50 dark:bg-[#006633]/25 text-[#006633] dark:text-emerald-400"
+                                          : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                                      }`}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-bold truncate" title={docItem.title}>{docItem.title}</p>
+                                        <p className="text-[9px] text-slate-450 dark:text-slate-500 font-mono truncate">{docItem.documentNumber || "No Nomor"}</p>
+                                      </div>
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        readOnly
+                                        className="rounded border-slate-350 text-[#006633] focus:ring-[#006633] size-3.5 pointer-events-none accent-[#006633]"
+                                      />
+                                    </div>
+                                  );
+                                })
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
+
+                    {/* Selected List */}
+                    {selectedDiscussedDocIds.length > 0 && (
+                      <div className="flex flex-col gap-1.5 pt-2">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
+                          Daftar Surat Masuk Terpilih ({selectedDiscussedDocIds.length})
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedDiscussedDocIds.map((id) => {
+                            const d = incomingDocs.find(item => item.id === id);
+                            if (!d) return null;
+                            return (
+                              <div
+                                key={id}
+                                className="inline-flex items-center gap-1.5 bg-[#006633]/8 dark:bg-[#006633]/15 text-[#006633] dark:text-emerald-400 border border-[#006633]/20 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                              >
+                                <span className="max-w-[180px] truncate" title={d.title}>
+                                  {d.title}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDiscussedDocIds(prev => prev.filter(x => x !== id))}
+                                  className="text-[#006633] dark:text-emerald-400 hover:text-rose-500 dark:hover:text-rose-450 transition-colors"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1135,7 +1250,7 @@ export default function MeetingAgendaPage() {
                       Pilih Anggota Terundang
                     </h4>
                     <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-[#006633]/15 text-[#006633] rounded-full font-mono">
-                      {formCustomAttendeeIds.length} / {candidates.length} Selected
+                      {formCustomAttendeeIds.length} Terpilih
                     </span>
                   </div>
 
@@ -1154,7 +1269,7 @@ export default function MeetingAgendaPage() {
                   )}
 
                   {/* Select All Checkbox */}
-                  {candidates.length > 0 && (
+                  {filteredCandidates.length > 0 && (
                     <div className="flex items-center gap-2 px-1 pt-1">
                       <input
                         type="checkbox"
@@ -1164,7 +1279,7 @@ export default function MeetingAgendaPage() {
                         className="rounded border-slate-350 text-[#006633] focus:ring-[#006633] size-3.5 cursor-pointer"
                       />
                       <label htmlFor="select-all-candidates" className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 cursor-pointer uppercase tracking-wider">
-                        Pilih Semua ({candidates.length} Anggota)
+                        Pilih Semua yang Tampil ({filteredCandidates.length})
                       </label>
                     </div>
                   )}
@@ -1173,7 +1288,7 @@ export default function MeetingAgendaPage() {
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1 pt-1">
                   {candidates.length === 0 ? (
                     <div className="py-16 text-center text-slate-400 text-[10px] font-bold">
-                      {formTargetType === "DEPARTMENT" ? "Silakan pilih bidang terlebih dahulu" : "Belum ada anggota terpilih"}
+                      Belum ada anggota terdaftar
                     </div>
                   ) : filteredCandidates.length === 0 ? (
                     <div className="py-16 text-center text-slate-400 text-[10px] font-bold">
@@ -1208,19 +1323,6 @@ export default function MeetingAgendaPage() {
                         </label>
                       );
                     })
-                  )}
-
-                  {/* External Guests preview at the bottom if CROSS_AGENCY */}
-                  {formTargetType === "CROSS_AGENCY" && formExternalEmailsText && (
-                    <div className="border-t border-slate-200/50 dark:border-slate-850 pt-2 mt-2 space-y-1.5">
-                      <h5 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Tamu Eksternal</h5>
-                      {formExternalEmailsText.split(",").map((e) => e.trim()).filter(Boolean).map((email, idx) => (
-                        <div key={idx} className="p-2 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 rounded-lg flex items-center justify-between">
-                          <span className="text-[10px] text-slate-600 dark:text-slate-350 font-mono truncate">{email}</span>
-                          <span className="text-[8px] font-bold bg-slate-200/50 text-slate-600 px-1 py-0.5 rounded uppercase">Eksternal</span>
-                        </div>
-                      ))}
-                    </div>
                   )}
                 </div>
               </div>
@@ -1336,6 +1438,36 @@ export default function MeetingAgendaPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Discussed Documents */}
+              {selectedMeeting.discussedDocs && selectedMeeting.discussedDocs.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-extrabold uppercase tracking-widest text-[#006633] dark:text-[#D4AF37] border-b border-slate-100 dark:border-slate-850 pb-1.5 flex justify-between items-center">
+                    <span>Dokumen Surat Masuk Yang Dibahas</span>
+                    <span className="font-mono text-[10px] text-slate-400">{selectedMeeting.discussedDocs.length} dokumen</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedMeeting.discussedDocs.map((doc: any) => (
+                      <div key={doc.id} className="p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between shadow-2xs gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-bold text-slate-800 dark:text-white truncate animate-in" title={doc.title}>
+                            {doc.title}
+                          </p>
+                          <p className="text-[9px] text-slate-450 dark:text-slate-500 font-mono mt-0.5 truncate">
+                            {doc.documentNumber || "No Nomor"}
+                          </p>
+                        </div>
+                        <a
+                          href={`/surat-masuk?id=${doc.id}`}
+                          className="text-[9px] font-bold bg-[#006633]/10 text-[#006633] dark:bg-emerald-950/30 dark:text-emerald-400 border border-[#006633]/20 px-2 py-1 rounded hover:bg-[#006633]/20 transition-all shrink-0"
+                        >
+                          Buka Surat
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Attendance Registry Section */}
               <div className="space-y-3">

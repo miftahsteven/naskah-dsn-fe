@@ -9,7 +9,7 @@ export interface Attendee {
   department: string;
   jabatan: string;
   isExternal: boolean;
-  status: 'UNDANGAN' | 'HADIR' | 'TIDAK_HADIR' | 'IZIN';
+  status: 'UNDANGAN' | 'HADIR' | 'TIDAK_HADIR' | 'IZIN' | 'HADIR_OFFLINE' | 'HADIR_ONLINE';
   invitationSent?: boolean;
 }
 
@@ -26,6 +26,7 @@ export interface Meeting {
   status: 'DRAFT' | 'AKTIF' | 'SELESAI' | 'BATAL' | 'ARSIP';
   attendees: Attendee[];
   invitationSent: boolean;
+  discussedDocs?: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -65,10 +66,12 @@ interface MeetingState {
     departmentId?: string;
     customAttendeeIds?: string[];
     externalEmails?: string[];
+    discussedDocIds?: string[];
   }) => Promise<boolean>;
   updateMeeting: (id: string, meeting: Partial<Meeting> & {
     customAttendeeIds?: string[];
     externalEmails?: string[];
+    discussedDocIds?: string[];
   }) => Promise<boolean>;
   deleteMeeting: (id: string) => Promise<boolean>;
   sendInvitations: (id: string) => Promise<boolean>;

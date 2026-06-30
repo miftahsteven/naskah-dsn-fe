@@ -29,7 +29,9 @@ const CreateDocumentPage = () => {
   const [docNumber, setDocNumber] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [classificationId, setClassificationId] = useState("");
-  const [approvalFlowType, setApprovalFlowType] = useState("SEQUENTIAL");
+  const [requiresSignature, setRequiresSignature] = useState(false);
+  const [signers, setSigners] = useState<{ userId: string }[]>([{ userId: "" }]);
+  const [users, setUsers] = useState<any[]>([]);
   const [file, setFile] = useState<File | null>(null);
 
   const [progress, setProgress] = useState(0);
@@ -40,9 +42,16 @@ const CreateDocumentPage = () => {
   useEffect(() => {
     const fetchMeta = async () => {
       try {
-        const res = await api.get("/documents/meta");
-        setCategories(res.data.data.categories);
-        setClassifications(res.data.data.classifications);
+        const [metaRes, usersRes] = await Promise.all([
+          api.get("/documents/meta"),
+          api.get("/users").catch(err => {
+            console.error("Gagal memuat daftar user", err);
+            return { data: { data: [] } };
+          })
+        ]);
+        setCategories(metaRes.data.data.categories);
+        setClassifications(metaRes.data.data.classifications);
+        setUsers(usersRes.data.data || []);
       } catch (err) {
         setError("Gagal memuat metadata dokumen");
       } finally {
@@ -51,6 +60,22 @@ const CreateDocumentPage = () => {
     };
     fetchMeta();
   }, []);
+
+  const handleAddSigner = () => {
+    setSigners([...signers, { userId: "" }]);
+  };
+
+  const handleRemoveSigner = (index: number) => {
+    if (signers.length > 1) {
+      setSigners(signers.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleSignerChange = (index: number, value: string) => {
+    const newSigners = [...signers];
+    newSigners[index].userId = value;
+    setSigners(newSigners);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -65,6 +90,11 @@ const CreateDocumentPage = () => {
       return;
     }
 
+    if (requiresSignature && signers.some(s => !s.userId)) {
+      setError("Harap pilih penandatangan untuk semua urutan.");
+      return;
+    }
+
     setUploading(true);
     setError("");
 
@@ -75,16 +105,26 @@ const CreateDocumentPage = () => {
     formData.append("categoryId", categoryId);
     formData.append("classificationId", classificationId);
     formData.append("documentType", "INCOMING");
-    formData.append("approvalFlowType", approvalFlowType);
+    formData.append("approvalFlowType", "SEQUENTIAL");
+    formData.append("status", requiresSignature ? "DRAFT" : "SIGNED");
 
     try {
-      await api.post("/documents", formData, {
+      const docRes = await api.post("/documents", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 100));
           setProgress(percentCompleted);
         },
       });
+
+      const createdDoc = docRes.data.data;
+
+      if (requiresSignature) {
+        await api.post("/workflow/submit", {
+          documentId: createdDoc.id,
+          stepConfig: signers.map((s, i) => ({ stepNumber: i + 1, userId: s.userId })),
+        });
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -280,39 +320,83 @@ const CreateDocumentPage = () => {
               </div>
             </div>
 
-            {/* Approval Flow Type */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider ml-1">Tipe Alur Persetujuan</label>
-              <div className="relative">
-                <select
-                  required
-                  className="w-full px-4 py-3 bg-[#F7F5EC] border border-[#DDDBC9] rounded-2xl outline-none focus:border-[#006633]/50 focus:bg-white text-xs font-medium transition-all appearance-none"
-                  value={approvalFlowType}
-                  onChange={(e) => setApprovalFlowType(e.target.value)}
-                >
-                  <option value="SEQUENTIAL">Bertingkat (Waterfall)</option>
-                  <option value="PARALLEL">Paralel (Bersamaan)</option>
-                  <option value="NOTIF_ONLY">Tanda Persetujuan (Hanya Pemberitahuan)</option>
-                </select>
-                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
+            {/* Checkbox Membutuhkan Tanda Tangan */}
+            <div className="flex items-center gap-3 px-1.5 py-1">
+              <input
+                type="checkbox"
+                id="requiresSignature"
+                className="w-4.5 h-4.5 rounded border-[#DDDBC9] text-[#006633] focus:ring-[#006633]/20 focus:ring-2 cursor-pointer accent-[#006633]"
+                checked={requiresSignature}
+                onChange={(e) => setRequiresSignature(e.target.checked)}
+              />
+              <label htmlFor="requiresSignature" className="text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                Membutuhkan Tanda Tangan (Alur Persetujuan)
+              </label>
             </div>
 
-            {/* Explanatory Info Card */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/80 rounded-2xl space-y-1.5">
-              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                <Info size={13} className="text-[#006633]" />
-                <span>Penjelasan Alur</span>
-              </p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal font-medium">
-                {approvalFlowType === 'SEQUENTIAL'
-                  ? "Persetujuan bertahap di mana penandatangan kedua baru dapat bertanda tangan setelah penandatangan pertama menyetujui dokumen."
-                  : approvalFlowType === 'PARALLEL'
-                  ? "Semua penandatangan dapat memberikan persetujuan atau tanda tangan secara bersamaan tanpa perlu menunggu antrean."
-                  : "Tanda persetujuan berupa pemberitahuan tanpa alur antrean sekuensial (bisa ditandatangani bersamaan)."
-                }
-              </p>
-            </div>
+            {requiresSignature && (
+              <div className="space-y-4 p-4 bg-[#F7F5EC] dark:bg-slate-900/30 border border-[#DDDBC9] dark:border-slate-800 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider ml-1">
+                    Daftar Penandatangan (Urutan Alur)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddSigner}
+                    className="text-[10.5px] font-extrabold text-[#006633] hover:underline"
+                  >
+                    + Tambah Urutan
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {signers.map((signer, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-550 w-5 text-center shrink-0">
+                        {index + 1}.
+                      </span>
+                      <div className="relative flex-1">
+                        <select
+                          required
+                          className="w-full pl-4 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-[#DDDBC9] dark:border-slate-700 rounded-xl outline-none focus:border-[#006633]/50 text-xs font-semibold appearance-none"
+                          value={signer.userId}
+                          onChange={(e) => handleSignerChange(index, e.target.value)}
+                        >
+                          <option value="">— Pilih Penandatangan —</option>
+                          {users.map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.fullName} {u.jabatan?.name ? `(${u.jabatan.name})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                      {signers.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSigner(index)}
+                          className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors shrink-0"
+                          title="Hapus Urutan"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Explanatory Info Card */}
+                <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl space-y-1">
+                  <p className="text-[10px] font-bold text-[#006633] dark:text-emerald-400 flex items-center gap-1.5">
+                    <Info size={12} />
+                    <span>Penjelasan Alur</span>
+                  </p>
+                  <p className="text-[9.5px] text-slate-500 dark:text-slate-400 leading-normal font-medium">
+                    Surat masuk ini akan diproses menggunakan alur persetujuan bertingkat (waterfall) oleh para penandatangan yang ditunjuk di atas secara berurutan.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Actions */}

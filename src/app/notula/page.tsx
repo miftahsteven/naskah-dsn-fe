@@ -21,8 +21,11 @@ import {
   Info,
   CornerDownRight,
   UserCheck,
-  UserPlus
+  UserPlus,
+  UploadCloud,
+  Download
 } from "lucide-react";
+import api from "@/lib/api";
 import { useNotulaStore, Notula } from "@/stores/notula.store";
 import { useMeetingStore, Meeting, Attendee, MinimalUser } from "@/stores/meeting.store";
 import { useAuthStore } from "@/stores/auth.store";
@@ -75,6 +78,7 @@ function NotulaPageContent() {
   const [formDateTime, setFormDateTime] = useState("");
   const [formLocation, setFormLocation] = useState("");
   const [formContent, setFormContent] = useState("");
+  const [formFile, setFormFile] = useState<File | null>(null);
   const [formDecisions, setFormDecisions] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [formAttendees, setFormAttendees] = useState<Attendee[]>([]);
@@ -88,6 +92,13 @@ function NotulaPageContent() {
   const [shareSelectedUserIds, setShareSelectedUserIds] = useState<string[]>([]);
   const [shareSearchQuery, setShareSearchQuery] = useState("");
 
+  const [processedMeetingId, setProcessedMeetingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ msg, type });
+  };
+
   useEffect(() => {
     setMounted(true);
     fetchNotulaList();
@@ -97,13 +108,14 @@ function NotulaPageContent() {
 
   // Handle automatic form population if directed from Agenda page
   useEffect(() => {
-    if (mounted && createFromMeetingId && meetingList.length > 0) {
+    if (mounted && createFromMeetingId && meetingList.length > 0 && processedMeetingId !== createFromMeetingId) {
+      setProcessedMeetingId(createFromMeetingId);
       const meeting = meetingList.find((m) => m.id === createFromMeetingId);
       if (meeting) {
         // Check if Notula already exists for this meeting
         const existingNotula = notulaList.find((n) => n.meetingId === createFromMeetingId);
         if (existingNotula) {
-          alert(`Notula untuk agenda "${meeting.title}" sudah dibuat.`);
+          showToast(`Notula untuk agenda "${meeting.title}" sudah dibuat.`, "info");
           router.replace("/notula");
           setSelectedNotula(existingNotula);
           setIsDetailDrawerOpen(true);
@@ -114,7 +126,7 @@ function NotulaPageContent() {
         }
       }
     }
-  }, [mounted, createFromMeetingId, meetingList, notulaList]);
+  }, [mounted, createFromMeetingId, meetingList, notulaList, processedMeetingId]);
 
   // Pre-fill form from selected meeting
   const handleInitFromMeeting = (meeting: Meeting) => {
@@ -124,13 +136,14 @@ function NotulaPageContent() {
     setFormDateTime(meeting.dateTime ? new Date(meeting.dateTime).toISOString().slice(0, 16) : "");
     setFormLocation(meeting.location);
     setFormContent("");
+    setFormFile(null);
     setFormDecisions("");
     setFormNotes("");
-    
-    // Default attendance status matches the meeting attendee list, but we allow modification
+
+    // Default attendance status matches the meeting attendee list, but we default to HADIR_OFFLINE for cost convenience
     const initialAttendees = meeting.attendees.map((att) => ({
       ...att,
-      status: att.status || "UNDANGAN"
+      status: (att.status === "HADIR" ? "HADIR_OFFLINE" : att.status) || "HADIR_OFFLINE"
     }));
     setFormAttendees(initialAttendees);
     setSelectedNotula(null);
@@ -146,6 +159,7 @@ function NotulaPageContent() {
     setFormDateTime("");
     setFormLocation("");
     setFormContent("");
+    setFormFile(null);
     setFormDecisions("");
     setFormNotes("");
     setFormAttendees([]);
@@ -160,7 +174,8 @@ function NotulaPageContent() {
     setFormAgendaNumber(notula.agendaNumber || "");
     setFormDateTime(notula.dateTime ? new Date(notula.dateTime).toISOString().slice(0, 16) : "");
     setFormLocation(notula.location);
-    setFormContent(notula.content);
+    setFormContent(notula.content || "");
+    setFormFile(null);
     setFormDecisions(notula.decisions || "");
     setFormNotes(notula.notes || "");
     setFormAttendees(notula.attendees || []);
@@ -171,6 +186,13 @@ function NotulaPageContent() {
   const handleUpdateAttendeeStatus = (email: string, status: Attendee["status"]) => {
     setFormAttendees((prev) =>
       prev.map((att) => (att.email === email ? { ...att, status } : att))
+    );
+  };
+
+  // Bulk status update for attendees
+  const handleBulkUpdateStatus = (status: Attendee["status"]) => {
+    setFormAttendees((prev) =>
+      prev.map((att) => ({ ...att, status }))
     );
   };
 
@@ -227,8 +249,8 @@ function NotulaPageContent() {
     e.preventDefault();
     setFormError(null);
 
-    if (!formTitle || !formDateTime || !formLocation || !formContent) {
-      setFormError("Judul Rapat, Waktu, Lokasi, dan Pembahasan wajib diisi.");
+    if (!formTitle || !formDateTime || !formLocation || (!formFile && (!selectedNotula || !selectedNotula.fileUrl))) {
+      setFormError("Judul Rapat, Waktu, Lokasi, dan File Hasil Rapat wajib diisi.");
       return;
     }
 
@@ -237,23 +259,23 @@ function NotulaPageContent() {
       return;
     }
 
-    const payload = {
-      meetingId: formMeetingId || null,
-      title: formTitle,
-      agendaNumber: formAgendaNumber || null,
-      dateTime: new Date(formDateTime).toISOString(),
-      location: formLocation,
-      content: formContent,
-      decisions: formDecisions || null,
-      notes: formNotes || null,
-      attendees: formAttendees
-    };
+    const formData = new FormData();
+    if (formMeetingId) formData.append("meetingId", formMeetingId);
+    formData.append("title", formTitle);
+    if (formAgendaNumber) formData.append("agendaNumber", formAgendaNumber);
+    formData.append("dateTime", new Date(formDateTime).toISOString());
+    formData.append("location", formLocation);
+    formData.append("content", formFile ? formFile.name : (selectedNotula?.content || ""));
+    if (formDecisions) formData.append("decisions", formDecisions);
+    if (formNotes) formData.append("notes", formNotes);
+    formData.append("attendees", JSON.stringify(formAttendees));
+    if (formFile) formData.append("file", formFile);
 
     let success = false;
     if (selectedNotula) {
-      success = await updateNotula(selectedNotula.id, payload);
+      success = await updateNotula(selectedNotula.id, formData);
     } else {
-      success = await addNotula(payload);
+      success = await addNotula(formData);
     }
 
     if (success) {
@@ -270,11 +292,12 @@ function NotulaPageContent() {
     if (!selectedNotula) return;
     const success = await deleteNotula(selectedNotula.id);
     if (success) {
+      showToast("Notula rapat berhasil dihapus.");
       setIsDeleteModalOpen(false);
       setSelectedNotula(null);
       fetchMeetingList(); // Refresh meeting list statuses
     } else {
-      alert("Gagal menghapus notula rapat.");
+      showToast("Gagal menghapus notula rapat.", "error");
     }
   };
 
@@ -283,11 +306,11 @@ function NotulaPageContent() {
     if (!shareTargetNotula) return;
     const success = await shareNotula(shareTargetNotula.id, shareSelectedUserIds);
     if (success) {
-      alert("Notula rapat berhasil dibagikan ke pengguna terpilih!");
+      showToast("Notula rapat berhasil dibagikan ke pengguna terpilih!");
       setIsShareModalOpen(false);
       setShareTargetNotula(null);
     } else {
-      alert("Gagal membagikan notula.");
+      showToast("Gagal membagikan notula.", "error");
     }
   };
 
@@ -297,7 +320,7 @@ function NotulaPageContent() {
       const matchesSearch =
         n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (n.agendaNumber && n.agendaNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        n.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (n.content && n.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
         n.location.toLowerCase().includes(searchQuery.toLowerCase());
 
       let matchesDate = true;
@@ -368,7 +391,7 @@ function NotulaPageContent() {
 
   return (
     <div className="space-y-6 select-none animate-in fade-in duration-300">
-      
+
       {/* ── BREADCRUMBS & HEADER ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -400,7 +423,7 @@ function NotulaPageContent() {
 
       {/* ── MAIN CONTENT CONTAINER (DATATABLE FILTER & TABLE) ── */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-850 p-5 shadow-xs space-y-4">
-        
+
         {/* Title and Search Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-50 dark:border-slate-850/40">
           <div>
@@ -549,7 +572,7 @@ function NotulaPageContent() {
                     accessText = "Peserta Rapat";
                   }
 
-                  const presentCount = notula.attendees.filter((att: any) => att.status === "HADIR").length;
+                  const presentCount = notula.attendees.filter((att: any) => ["HADIR", "HADIR_OFFLINE", "HADIR_ONLINE"].includes(att.status)).length;
                   const rowNumber = (currentPage - 1) * itemsPerPage + index + 1;
 
                   return (
@@ -742,7 +765,7 @@ function NotulaPageContent() {
       {isFormModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-            
+
             {/* Header */}
             <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-850">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-800 dark:text-white flex items-center gap-2">
@@ -851,164 +874,172 @@ function NotulaPageContent() {
                   </div>
                 </div>
 
-                <div className="space-y-4 flex flex-col h-full justify-between">
+                <div className="space-y-4 flex flex-col h-full">
                   {/* content */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase font-mono">Isi Risalah / Pembahasan Rapat</label>
-                    <textarea
-                      rows={5}
-                      placeholder="Tuliskan jalannya rapat dan pembahasan materi di sini secara lengkap..."
-                      value={formContent}
-                      onChange={(e) => setFormContent(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20 transition-all font-medium min-h-[120px]"
-                    />
-                  </div>
-
-                  {/* decisions */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase font-mono">Keputusan Rapat (Poin Utama)</label>
-                    <textarea
-                      rows={3}
-                      placeholder="- Keputusan A...&#10;- Keputusan B..."
-                      value={formDecisions}
-                      onChange={(e) => setFormDecisions(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20 transition-all font-medium"
-                    />
-                  </div>
-
-                  {/* notes */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase font-mono">Catatan Lainnya (Opsional)</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Instruksi tambahan, tenggat waktu, dll..."
-                      value={formNotes}
-                      onChange={(e) => setFormNotes(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20 transition-all font-medium"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Attendance Management section */}
-              <div className="border-t border-slate-100 dark:border-slate-850 pt-5 space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-white flex items-center gap-1.5 font-mono">
-                      <Users className="size-4 text-[#006633] dark:text-[#D4AF37]" />
-                      Daftar Hadir & Kehadiran Peserta ({formAttendees.length} Orang)
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 leading-normal">
-                      Harap tandai kehadiran masing-masing peserta rapat yang diundang.
-                    </p>
-                  </div>
-
-                  {/* Manual attendee search input (Only visible when manual entry mode) */}
-                  {!formMeetingId && (
-                    <div className="relative w-full sm:w-60">
-                      <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
+                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase font-mono">
+                      File Hasil Rapat / Risalah (Word/PDF/dll) <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative group">
                       <input
-                        type="text"
-                        placeholder="Undang peserta internal..."
-                        value={attendeeSearchQuery}
-                        onChange={(e) => setAttendeeSearchQuery(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1 bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-lg text-xs outline-none font-medium"
+                        type="file"
+                        onChange={(e) => setFormFile(e.target.files?.[0] || null)}
+                        accept=".doc,.docx,.pdf,.xls,.xlsx,.ppt,.pptx"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        required={!selectedNotula || !selectedNotula.fileUrl}
                       />
+                      <div className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 group-hover:border-[#006633]/50 group-hover:bg-[#006633]/5 transition-all cursor-pointer">
+                        <UploadCloud size={20} className="text-slate-400 group-hover:text-[#006633] transition-colors" />
+                        <span className="text-[11px] font-bold text-slate-500 group-hover:text-[#006633] truncate max-w-[280px]">
+                          {formFile ? formFile.name : (selectedNotula?.fileName ? `File Aktif: ${selectedNotula.fileName}` : "Pilih atau seret file Word/PDF risalah rapat...")}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Grid for selecting attendees (Manual Mode) */}
-                {!formMeetingId && attendeeSearchQuery && (
-                  <div className="p-3 border border-slate-200 dark:border-slate-800 rounded-lg max-h-40 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950/40">
-                    {filteredUsers.length === 0 ? (
-                      <p className="text-[10px] text-slate-400 font-bold text-center col-span-2 py-4">User tidak ditemukan.</p>
-                    ) : (
-                      filteredUsers.map((u) => {
-                        const isChecked = formAttendees.some((att) => att.userId === u.id);
-                        return (
-                          <div
-                            key={u.id}
-                            onClick={() => handleToggleManualAttendee(u)}
-                            className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer select-none transition-all ${
-                              isChecked
-                                ? "bg-emerald-50/50 border-emerald-500 text-[#006633] dark:bg-[#006633]/10 dark:text-emerald-400 dark:border-emerald-700"
-                                : "bg-white border-slate-100 hover:border-slate-250 dark:bg-slate-900 dark:border-slate-850"
-                            }`}
-                          >
-                            <div className="w-6 h-6 rounded-md bg-[#006633] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
-                              {u.fullName.charAt(0)}
-                            </div>
-                            <div className="truncate flex-1 min-w-0">
-                              <p className="font-extrabold truncate leading-tight">{u.fullName}</p>
-                              <p className="text-[9px] text-slate-450 dark:text-slate-500 truncate mt-0.5">{u.email}</p>
-                            </div>
-                          </div>
-                        );
-                      })
+                    {selectedNotula?.fileUrl && !formFile && (
+                      <p className="text-[9px] text-slate-400 italic font-medium ml-1">
+                        Biarkan kosong jika tidak ingin mengganti file risalah rapat yang sudah ada.
+                      </p>
                     )}
                   </div>
-                )}
 
-                {/* Attendees list table */}
-                {formAttendees.length === 0 ? (
-                  <div className="py-8 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                    <UserPlus size={24} className="mx-auto text-slate-300 mb-1.5" />
-                    <p className="text-[10px] font-bold uppercase tracking-wide">Belum ada peserta terpilih</p>
-                    <p className="text-[9px] text-slate-450 mt-0.5">
-                      {formMeetingId ? "Tunggu sebentar..." : "Silakan cari dan tambahkan peserta internal di atas."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border border-slate-100 dark:border-slate-850 rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-[#006633]/8 dark:bg-[#006633]/15 text-[#006633] dark:text-emerald-400 text-[10px] uppercase font-bold tracking-wider font-mono border-b border-slate-100 dark:border-slate-850">
-                          <th className="py-2.5 px-3">Nama</th>
-                          <th className="py-2.5 px-3">Jabatan & Departemen</th>
-                          <th className="py-2.5 px-3">Status Kehadiran</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-850 font-medium">
-                        {formAttendees.map((att) => (
-                          <tr key={att.email} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10">
-                            <td className="py-2.5 px-3">
-                              <div className="font-extrabold text-slate-850 dark:text-white">{att.name}</div>
-                              <div className="text-[9px] text-slate-450 dark:text-slate-500">{att.email}</div>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <div className="font-bold text-slate-700 dark:text-slate-300">{att.jabatan}</div>
-                              <div className="text-[9px] text-[#006633] dark:text-[#D4AF37] font-bold uppercase font-mono">{att.department}</div>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <div className="flex items-center gap-1.5">
-                                {(["HADIR", "IZIN", "TIDAK_HADIR", "UNDANGAN"] as Attendee["status"][]).map((status) => {
-                                  let btnClass = "border-slate-200 text-slate-650 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-400";
-                                  if (att.status === status) {
-                                    if (status === "HADIR") btnClass = "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-700";
-                                    if (status === "IZIN") btnClass = "bg-amber-50 border-amber-400 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-700";
-                                    if (status === "TIDAK_HADIR") btnClass = "bg-rose-50 border-rose-450 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-700";
-                                    if (status === "UNDANGAN") btnClass = "bg-slate-100 border-slate-350 text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600";
-                                  }
-                                  return (
-                                    <button
-                                      key={status}
-                                      type="button"
-                                      onClick={() => handleUpdateAttendeeStatus(att.email, status)}
-                                      className={`px-2 py-0.5 border text-[9px] font-extrabold uppercase rounded-lg tracking-wider transition-all cursor-pointer ${btnClass}`}
-                                    >
-                                      {status === "TIDAK_HADIR" ? "Alpa / Absen" : status}
-                                    </button>
-                                  );
-                                })}
+                  {/* Attendance Management section */}
+                  <div className="border-t border-slate-100 dark:border-slate-850 pt-3.5 space-y-3.5 flex-1 flex flex-col">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <div>
+                        <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-800 dark:text-white flex items-center gap-1 font-mono">
+                          <Users className="size-3.5 text-[#006633] dark:text-[#D4AF37]" />
+                          Peserta Rapat ({formAttendees.length})
+                        </h4>
+                      </div>
+
+                      {/* Manual attendee search input (Only visible when manual entry mode) */}
+                      {!formMeetingId && (
+                        <div className="relative w-full sm:w-44">
+                          <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-450" />
+                          <input
+                            type="text"
+                            placeholder="Cari internal..."
+                            value={attendeeSearchQuery}
+                            onChange={(e) => setAttendeeSearchQuery(e.target.value)}
+                            className="w-full pl-7 pr-2 py-0.5 bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-lg text-[10px] outline-none font-medium"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bulk Actions Automation */}
+                    {formAttendees.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-850 rounded-xl w-full">
+                        <span className="text-[8px] font-extrabold text-slate-550 uppercase tracking-wider ml-1">
+                          ⚡ Auto:
+                        </span>
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleBulkUpdateStatus("HADIR_OFFLINE")}
+                            className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900/50 text-[8px] font-extrabold uppercase rounded-lg hover:bg-emerald-100/50 transition-colors cursor-pointer"
+                          >
+                            Offline 🏢
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBulkUpdateStatus("HADIR_ONLINE")}
+                            className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-250 dark:border-blue-900/50 text-[8px] font-extrabold uppercase rounded-lg hover:bg-blue-100/50 transition-colors cursor-pointer"
+                          >
+                            Online 💻
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBulkUpdateStatus("TIDAK_HADIR")}
+                            className="px-1.5 py-0.5 bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-455 border border-rose-250 dark:border-rose-900/50 text-[8px] font-extrabold uppercase rounded-lg hover:bg-rose-100/50 transition-colors cursor-pointer"
+                          >
+                            Alpa ❌
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Grid for selecting attendees (Manual Mode) */}
+                    {!formMeetingId && attendeeSearchQuery && (
+                      <div className="p-2 border border-slate-200 dark:border-slate-800 rounded-lg max-h-24 overflow-y-auto grid grid-cols-1 gap-1 bg-slate-50 dark:bg-slate-950/40">
+                        {filteredUsers.length === 0 ? (
+                          <p className="text-[9px] text-slate-400 font-bold text-center py-2">User tidak ditemukan.</p>
+                        ) : (
+                          filteredUsers.map((u) => {
+                            const isChecked = formAttendees.some((att) => att.userId === u.id);
+                            return (
+                              <div
+                                key={u.id}
+                                onClick={() => handleToggleManualAttendee(u)}
+                                className={`flex items-center gap-2 p-1.5 rounded-lg border text-[10px] cursor-pointer select-none transition-all ${isChecked
+                                    ? "bg-emerald-50/50 border-emerald-500 text-[#006633] dark:bg-[#006633]/10 dark:text-emerald-400 dark:border-emerald-700"
+                                    : "bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-850"
+                                  }`}
+                              >
+                                <div className="truncate flex-1 min-w-0">
+                                  <p className="font-extrabold truncate leading-tight">{u.fullName}</p>
+                                </div>
                               </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+
+                    {/* Attendees list table */}
+                    {formAttendees.length === 0 ? (
+                      <div className="py-6 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                        <p className="text-[10px] font-bold uppercase tracking-wide">Belum ada peserta terpilih</p>
+                      </div>
+                    ) : (
+                      <div className="border border-slate-100 dark:border-slate-850 rounded-lg overflow-hidden max-h-[220px] overflow-y-auto">
+                        <table className="w-full text-left border-collapse text-[11px]">
+                          <thead>
+                            <tr className="bg-[#006633]/8 dark:bg-[#006633]/15 text-[#006633] dark:text-emerald-400 text-[9px] uppercase font-bold tracking-wider font-mono border-b border-slate-100 dark:border-slate-850">
+                              <th className="py-2 px-2.5">Nama</th>
+                              <th className="py-2 px-2.5 text-right">Kehadiran</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-850 font-medium">
+                            {formAttendees.map((att) => (
+                              <tr key={att.email} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10">
+                                <td className="py-1.5 px-2.5">
+                                  <div className="font-extrabold text-slate-850 dark:text-white leading-tight">{att.name}</div>
+                                  <div className="text-[9px] text-slate-400 truncate max-w-[140px] mt-0.5">{att.department} • {att.jabatan}</div>
+                                </td>
+                                <td className="py-1.5 px-2.5 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {([
+                                      { val: "HADIR_OFFLINE", label: "Off 🏢", active: "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-700" },
+                                      { val: "HADIR_ONLINE", label: "On 💻", active: "bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-700" },
+                                      { val: "TIDAK_HADIR", label: "Alpa ❌", active: "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-700" },
+                                      { val: "IZIN", label: "Izin ✉️", active: "bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-700" }
+                                    ] as { val: Attendee["status"], label: string, active: string }[]).map((opt) => {
+                                      const isSelected = att.status === opt.val || (opt.val === "HADIR_OFFLINE" && att.status === "HADIR");
+                                      const btnClass = isSelected 
+                                        ? opt.active 
+                                        : "border-slate-200 text-slate-650 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-400";
+                                      return (
+                                        <button
+                                          key={opt.val}
+                                          type="button"
+                                          onClick={() => handleUpdateAttendeeStatus(att.email, opt.val)}
+                                          className={`px-1.5 py-0.5 border text-[8.5px] font-extrabold uppercase rounded-md tracking-wider transition-all cursor-pointer ${btnClass}`}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </form>
 
@@ -1041,7 +1072,7 @@ function NotulaPageContent() {
       {isDetailDrawerOpen && selectedNotula && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs select-none animate-in fade-in duration-200">
           <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-850 h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-350">
-            
+
             {/* Drawer Header */}
             <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-850">
               <div>
@@ -1063,11 +1094,11 @@ function NotulaPageContent() {
 
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
+
               {/* Meeting Info */}
               <div className="space-y-4 p-4.5 bg-gradient-to-br from-[#E8F5EE]/60 to-[#F7F5EC]/60 border border-[#006633]/5 dark:from-slate-950/40 dark:to-slate-950/20 dark:border-slate-850 rounded-xl relative overflow-hidden">
                 <div className="absolute -top-3 -right-3 w-16 h-16 bg-[#D4AF37]/5 rounded-full blur-md pointer-events-none" />
-                
+
                 <div>
                   <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-[#006633]/20 text-[#006633] dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 uppercase tracking-widest font-mono">
                     No. Agenda: {selectedNotula.agendaNumber || "-"}
@@ -1095,7 +1126,7 @@ function NotulaPageContent() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Users size={12} className="text-slate-450" />
-                    <span>Daftar Hadir: {selectedNotula.attendees.filter((a: any) => a.status === "HADIR").length} / {selectedNotula.attendees.length} orang</span>
+                    <span>Daftar Hadir: {selectedNotula.attendees.filter((a: any) => ["HADIR", "HADIR_OFFLINE", "HADIR_ONLINE"].includes(a.status)).length} / {selectedNotula.attendees.length} orang</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <UserCheck size={12} className="text-slate-450" />
@@ -1108,11 +1139,37 @@ function NotulaPageContent() {
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider font-mono">
                   <FileText size={12} className="text-[#006633] dark:text-[#D4AF37]" />
-                  <span>Pembahasan & Jalannya Rapat</span>
+                  <span>Risalah / Dokumen Hasil Rapat</span>
                 </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850/60 rounded-xl text-xs text-slate-700 dark:text-slate-350 font-medium whitespace-pre-line leading-relaxed min-h-[120px]">
-                  {selectedNotula.content}
-                </div>
+                {selectedNotula.fileUrl ? (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850/60 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950/30 text-[#006633] rounded-lg flex items-center justify-center font-bold">
+                        <FileText size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-805 dark:text-white truncate max-w-[280px]">
+                          {selectedNotula.fileName || "dokumen-hasil-rapat"}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                          Hasil Rapat Terunggah
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href={`${api.defaults.baseURL?.replace('/api', '')}/${selectedNotula.fileUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-[#006633] hover:bg-[#00552b] text-white text-[10px] font-bold uppercase tracking-wider rounded-lg flex items-center gap-1 transition-all"
+                    >
+                      <Download size={12} /> Unduh
+                    </a>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850/60 rounded-xl text-xs text-slate-700 dark:text-slate-350 font-medium whitespace-pre-line leading-relaxed min-h-[120px]">
+                    {selectedNotula.content}
+                  </div>
+                )}
               </div>
 
               {/* Decisions (Key Decisions) */}
@@ -1140,33 +1197,85 @@ function NotulaPageContent() {
               )}
 
               {/* Attendees breakdown */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider font-mono">
-                  <span>Status Kehadiran Peserta</span>
-                  <span>Total: {selectedNotula.attendees.length} orang</span>
-                </div>
-
-                <div className="border border-slate-100 dark:border-slate-850 rounded-xl divide-y divide-slate-100 dark:divide-slate-850 overflow-hidden text-xs">
-                  {selectedNotula.attendees.map((att: any) => {
-                    let badgeColor = "bg-slate-100 text-slate-700";
-                    if (att.status === "HADIR") badgeColor = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-450";
-                    if (att.status === "IZIN") badgeColor = "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-450";
-                    if (att.status === "TIDAK_HADIR") badgeColor = "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-450";
-
-                    return (
-                      <div key={att.email} className="p-3 flex justify-between items-center hover:bg-slate-50/50 dark:hover:bg-slate-950/10">
-                        <div>
-                          <div className="font-extrabold text-slate-800 dark:text-white">{att.name}</div>
-                          <div className="text-[9px] text-[#006633] dark:text-[#D4AF37] font-bold uppercase font-mono mt-0.5">{att.department} • {att.jabatan}</div>
+              {(() => {
+                const offlineCount = selectedNotula.attendees.filter((a: any) => a.status === "HADIR_OFFLINE").length;
+                const onlineCount = selectedNotula.attendees.filter((a: any) => a.status === "HADIR_ONLINE").length;
+                const legacyCount = selectedNotula.attendees.filter((a: any) => a.status === "HADIR").length;
+                const totalPresent = offlineCount + onlineCount + legacyCount;
+                const absentCount = selectedNotula.attendees.filter((a: any) => a.status === "TIDAK_HADIR").length;
+                const izinCount = selectedNotula.attendees.filter((a: any) => a.status === "IZIN").length;
+                
+                return (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider font-mono">
+                        Rekap Kehadiran Peserta
+                      </label>
+                      <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-extrabold font-mono">
+                        <div className="p-2 bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
+                          <div className="text-emerald-700 dark:text-emerald-455">{offlineCount} Orang</div>
+                          <div className="text-[8px] text-slate-400 uppercase mt-0.5">Offline 🏢</div>
                         </div>
-                        <span className={`text-[8px] font-extrabold tracking-wider px-2 py-0.5 rounded-lg border uppercase ${badgeColor}`}>
-                          {att.status === "TIDAK_HADIR" ? "TIDAK HADIR" : att.status}
-                        </span>
+                        <div className="p-2 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                          <div className="text-blue-700 dark:text-blue-455">{onlineCount} Orang</div>
+                          <div className="text-[8px] text-slate-400 uppercase mt-0.5">Online 💻</div>
+                        </div>
+                        <div className="p-2 bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900/30 rounded-xl">
+                          <div className="text-rose-700 dark:text-rose-455">{absentCount} Orang</div>
+                          <div className="text-[8px] text-slate-400 uppercase mt-0.5">Tidak Hadir ❌</div>
+                        </div>
+                        <div className="p-2 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-xl">
+                          <div className="text-amber-700 dark:text-amber-455">{izinCount} Orang</div>
+                          <div className="text-[8px] text-slate-400 uppercase mt-0.5">Izin ✉️</div>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider font-mono">
+                        <span>Daftar Nama & Kehadiran</span>
+                        <span>Total: {selectedNotula.attendees.length} orang</span>
+                      </div>
+
+                      <div className="border border-slate-100 dark:border-slate-850 rounded-xl divide-y divide-slate-100 dark:divide-slate-850 overflow-hidden text-xs">
+                        {selectedNotula.attendees.map((att: any) => {
+                          let badgeColor = "bg-slate-100 text-slate-700 border-slate-200";
+                          let labelText = att.status;
+                          
+                          if (att.status === "HADIR_OFFLINE") {
+                            badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-250 dark:bg-emerald-950/30 dark:text-emerald-450 dark:border-emerald-900/30";
+                            labelText = "Offline 🏢";
+                          } else if (att.status === "HADIR_ONLINE") {
+                            badgeColor = "bg-blue-50 text-blue-700 border-blue-250 dark:bg-blue-950/30 dark:text-blue-450 dark:border-blue-900/30";
+                            labelText = "Online 💻";
+                          } else if (att.status === "HADIR") {
+                            badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-250 dark:bg-emerald-950/30 dark:text-emerald-450 dark:border-emerald-900/30";
+                            labelText = "Hadir";
+                          } else if (att.status === "IZIN") {
+                            badgeColor = "bg-amber-50 text-amber-700 border-amber-250 dark:bg-amber-950/30 dark:text-amber-455 dark:border-amber-900/30";
+                            labelText = "Izin ✉️";
+                          } else if (att.status === "TIDAK_HADIR") {
+                            badgeColor = "bg-rose-50 text-rose-700 border-rose-250 dark:bg-rose-950/30 dark:text-rose-450 dark:border-rose-900/30";
+                            labelText = "Tidak Hadir ❌";
+                          }
+
+                          return (
+                            <div key={att.email} className="p-3 flex justify-between items-center hover:bg-slate-50/50 dark:hover:bg-slate-950/10">
+                              <div>
+                                <div className="font-extrabold text-slate-800 dark:text-white">{att.name}</div>
+                                <div className="text-[9px] text-[#006633] dark:text-[#D4AF37] font-bold uppercase font-mono mt-0.5">{att.department} • {att.jabatan}</div>
+                              </div>
+                              <span className={`text-[8px] font-extrabold tracking-wider px-2 py-0.5 rounded-lg border uppercase ${badgeColor}`}>
+                                {labelText}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Drawer Footer */}
@@ -1189,7 +1298,7 @@ function NotulaPageContent() {
       {isShareModalOpen && shareTargetNotula && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
-            
+
             {/* Header */}
             <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-850">
               <div>
@@ -1213,7 +1322,7 @@ function NotulaPageContent() {
 
             {/* Body */}
             <div className="p-5 flex-1 overflow-y-auto space-y-4">
-              
+
               <div className="p-3 bg-blue-50 border border-blue-150 rounded-lg dark:bg-blue-950/20 dark:border-blue-900/40 text-[10px] text-blue-700 dark:text-blue-400 font-bold leading-normal uppercase font-mono flex items-center gap-2">
                 <Info size={14} className="shrink-0" />
                 <span>Risalah rapat ini hanya terlihat oleh pembuat, peserta rapat, dan pengguna yang dibagikan akses secara manual di bawah ini.</span>
@@ -1267,11 +1376,10 @@ function NotulaPageContent() {
                             setShareSelectedUserIds((prev) => [...prev, u.id]);
                           }
                         }}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer select-none transition-all ${
-                          isChecked
+                        className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer select-none transition-all ${isChecked
                             ? "bg-emerald-50/50 border-emerald-500 text-[#006633] dark:bg-[#006633]/10 dark:text-emerald-400 dark:border-emerald-700"
                             : "bg-white border-slate-100 hover:border-slate-200 dark:bg-slate-900 dark:border-slate-850 text-slate-700 dark:text-slate-300"
-                        }`}
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -1352,6 +1460,49 @@ function NotulaPageContent() {
         </div>
       )}
 
+      {toast && (
+        <Toast
+          msg={toast.msg}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+    </div>
+  );
+}
+
+interface ToastProps {
+  msg: string;
+  type: "success" | "error" | "info";
+  onClose: () => void;
+}
+
+function Toast({ msg, type, onClose }: ToastProps) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 5000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  let icon = <CheckCircle2 size={17} />;
+  let colorClasses = "bg-emerald-600 text-white";
+  if (type === "error") {
+    icon = <AlertTriangle size={17} />;
+    colorClasses = "bg-red-650 text-white";
+  } else if (type === "info") {
+    icon = <Info size={17} />;
+    colorClasses = "bg-[#006633] border border-[#D4AF37] text-white dark:bg-slate-900";
+  }
+
+  return (
+    <div
+      className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-xs font-bold uppercase tracking-wide transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${colorClasses}`}
+    >
+      {icon}
+      <span>{msg}</span>
+      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 transition-opacity">
+        <X size={15} />
+      </button>
     </div>
   );
 }

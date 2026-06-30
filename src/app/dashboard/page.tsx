@@ -125,10 +125,10 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-6 sm:space-y-8 select-none">
-      
+
       {/* ── HEADER BANNER: PLATFORM OTORITAS DOKUMEN (BUMN STYLE) ── */}
       <div className="relative overflow-hidden p-6 sm:p-7 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        
+
         {/* Banner Details */}
         <div className="relative z-10 flex-1 space-y-1.5">
           <div className="flex items-center gap-2">
@@ -140,7 +140,11 @@ const DashboardPage = () => {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">
-            Sistem Dokumen & Tanda Tangan Digital <span className="text-[#D4AF37]">{user?.fullName || "Pimpinan"}</span>
+            Sistem Dokumen & Tanda Tangan Digital <span className="text-[#D4AF37]">
+              {
+                //user?.fullName || "Pimpinan"
+              }
+            </span>
           </h1>
           <p className="text-slate-500 dark:text-slate-405 text-xs font-semibold max-w-xl">
             Selamat Datang di Portal Otoritas Amanah. Sesi penandatanganan elektronik tersertifikasi dilindungi oleh modul kriptografi perangkat keras (HSM).
@@ -156,12 +160,12 @@ const DashboardPage = () => {
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">AKTIF / ROOT-MUI</span>
             </div>
           </div>
-          <Link href="/surat-keluar/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-[#006633] hover:bg-[#00552b] text-white font-bold rounded-lg transition-all text-xs uppercase tracking-wider">
+          {/* <Link href="/surat-keluar/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-[#006633] hover:bg-[#00552b] text-white font-bold rounded-lg transition-all text-xs uppercase tracking-wider">
             <Plus size={16} /> Buat Surat Keluar
           </Link>
           <Link href="/surat-masuk/new" className="flex items-center justify-center gap-2 px-5 py-3 bg-[#006633] hover:bg-[#00552b] text-white font-bold rounded-lg transition-all text-xs uppercase tracking-wider">
             <Plus size={16} /> Input Surat Masuk
-          </Link>
+          </Link> */}
         </div>
 
       </div>
@@ -175,7 +179,7 @@ const DashboardPage = () => {
 
       {/* ── MAIN CONTENT GRID: TABULAR DATABASE & SECURITY PANEL ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7">
-        
+
         {/* Left Side: Recent Documents Table (8 Cols) */}
         <div className="lg:col-span-8 space-y-4">
           <div className="flex justify-between items-center px-1">
@@ -280,12 +284,12 @@ const DashboardPage = () => {
 
         {/* Right Side: Security Modules & Widgets (4 Cols) */}
         <div className="lg:col-span-4 space-y-5">
-          
+
           {/* ── WIDGET 1: SERTIFIKAT ELEKTRONIK SAYA (ADMIN CERT CARD) ── */}
           <div className="space-y-3">
             <h2 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider px-1">Sertifikat Elektronik</h2>
             <div className="bg-[#0B1325] text-white rounded-lg border border-slate-800 p-5 relative overflow-hidden shadow-md">
-              
+
               {/* Card Holographic BG Grid */}
               <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:16px_16px] opacity-20 pointer-events-none" />
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#D4AF37]/10 rounded-full blur-xl pointer-events-none" />

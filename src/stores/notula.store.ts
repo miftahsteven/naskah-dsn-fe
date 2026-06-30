@@ -8,7 +8,9 @@ export interface Notula {
   agendaNumber?: string | null;
   dateTime: string;
   location: string;
-  content: string;
+  content?: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
   decisions?: string | null;
   notes?: string | null;
   creatorId: string;
@@ -24,18 +26,8 @@ interface NotulaState {
   loading: boolean;
   error: string | null;
   fetchNotulaList: () => Promise<void>;
-  addNotula: (notula: {
-    meetingId?: string | null;
-    title: string;
-    agendaNumber?: string | null;
-    dateTime: string;
-    location: string;
-    content: string;
-    decisions?: string | null;
-    notes?: string | null;
-    attendees?: any[];
-  }) => Promise<boolean>;
-  updateNotula: (id: string, notula: Partial<Notula>) => Promise<boolean>;
+  addNotula: (formData: FormData) => Promise<boolean>;
+  updateNotula: (id: string, formData: FormData) => Promise<boolean>;
   deleteNotula: (id: string) => Promise<boolean>;
   shareNotula: (id: string, sharedWithIds: string[]) => Promise<boolean>;
 }
@@ -53,10 +45,12 @@ export const useNotulaStore = create<NotulaState>((set, get) => ({
       set({ error: err.response?.data?.message || err.message, loading: false });
     }
   },
-  addNotula: async (notula) => {
+  addNotula: async (formData) => {
     set({ loading: true, error: null });
     try {
-      const res = await api.post('/notula', notula);
+      const res = await api.post('/notula', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       if (res.data.status === 'success') {
         const newList = [res.data.data, ...get().notulaList];
         set({ notulaList: newList, loading: false });
@@ -68,10 +62,12 @@ export const useNotulaStore = create<NotulaState>((set, get) => ({
       return false;
     }
   },
-  updateNotula: async (id, updatedFields) => {
+  updateNotula: async (id, formData) => {
     set({ loading: true, error: null });
     try {
-      const res = await api.patch(`/notula/${id}`, updatedFields);
+      const res = await api.patch(`/notula/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       if (res.data.status === 'success') {
         const updatedList = get().notulaList.map((n) => n.id === id ? { ...n, ...res.data.data } : n);
         set({ notulaList: updatedList, loading: false });
