@@ -1068,7 +1068,7 @@ const CreateDocumentPage = () => {
                               <Upload size={32} />
                             </div>
                             <p className="text-sm font-bold text-slate-800 dark:text-white mb-1">Pilih atau Seret File ke Sini</p>
-                            <p className="text-xs text-slate-400">PDF, DOC, DOCX maksimal 10MB</p>
+                            <p className="text-xs text-slate-400">PDF, DOC, DOCX maksimal 100MB</p>
                           </div>
                         )}
                       </div>

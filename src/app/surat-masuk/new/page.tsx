@@ -145,12 +145,14 @@ const CreateDocumentPage = () => {
           {/* Abstract Grid Background */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none" />
 
-          <input
-            type="file"
-            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-            accept=".pdf,.doc,.docx"
-            onChange={handleFileChange}
-          />
+          {!file && (
+            <input
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+              accept=".pdf,.doc,.docx"
+              onChange={handleFileChange}
+            />
+          )}
 
           {file ? (
             <div className="relative z-10 flex flex-col items-center text-center animate-in zoom-in-95 duration-300 w-full max-w-md">
@@ -205,7 +207,7 @@ const CreateDocumentPage = () => {
               </div>
               <h3 className="text-base font-extrabold text-slate-800 dark:text-white mb-2">Seret File Surat Masuk ke Sini</h3>
               <p className="text-xs text-slate-400 font-medium leading-relaxed mb-6">
-                Atau klik untuk menjelajah file dari komputer Anda. Mendukung PDF, DOC, atau DOCX hingga maksimal 10MB.
+                Atau klik untuk menjelajah file dari komputer Anda. Mendukung PDF, DOC, atau DOCX hingga maksimal 100MB.
               </p>
               <button
                 type="button"
