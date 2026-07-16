@@ -29,6 +29,8 @@ import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
 import Can from "@/components/auth/Can";
 
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+
 // ── Approval Submit Modal ──────────────────────────────────────────────────
 const ApprovalSubmitModal = ({
   documentId,
@@ -586,7 +588,7 @@ const DocumentDetailPage = () => {
                               <Eye size={16} />
                             </button>
                           </Can>
-                          <a href={`http://localhost:4002/${v.fileUrl}`} download={v.fileName} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Unduh">
+                          <a href={`${BASE_URL}/${v.fileUrl}`} download={v.fileName} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Unduh">
                             <Download size={16} />
                           </a>
                           <Can perform="DOC_DELETE">
@@ -627,7 +629,7 @@ const DocumentDetailPage = () => {
                             </button>
                           )}
                         </Can>
-                        <a href={`http://localhost:4002/${v.fileUrl}`} download={v.fileName} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-primary transition-all">
+                        <a href={`${BASE_URL}/${v.fileUrl}`} download={v.fileName} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-primary transition-all">
                           <Download size={14} /> Unduh
                         </a>
                       </div>

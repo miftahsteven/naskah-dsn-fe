@@ -47,6 +47,8 @@ import { cn } from "@/lib/utils";
 import Can from "@/components/auth/Can";
 import DocumentReader from "@/components/documents/DocumentReader";
 
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+
 const getNearestMeeting = (meetings: any[]) => {
   if (!meetings || meetings.length === 0) return null;
   const now = new Date();
@@ -822,7 +824,7 @@ const DocumentDetailModal = ({
                   <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800 flex flex-wrap gap-2.5">
                     {latestVersion && (
                       <a
-                        href={`http://localhost:4002/${latestVersion.fileUrl}`}
+                        href={`${BASE_URL}/${latestVersion.fileUrl}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 px-4 py-2 bg-[#006633] text-white font-bold rounded-xl text-xs hover:bg-[#00552b] transition-all shadow-sm"
@@ -1019,7 +1021,7 @@ const DocumentDetailModal = ({
                             {/* Action overlays */}
                             <div className="absolute right-2 top-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <a 
-                                href={`http://localhost:4002/${file.fileUrl}`}
+                                href={`${BASE_URL}/${file.fileUrl}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1 bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-md shadow-sm flex items-center justify-center"

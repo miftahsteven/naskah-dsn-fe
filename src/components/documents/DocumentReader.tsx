@@ -17,9 +17,11 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const safeFileUrl = fileUrl || "";
   const safeTitle = title || "";
 
+  const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+
   const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
     ? safeFileUrl
-    : `http://localhost:4002/${safeFileUrl.startsWith("/") ? safeFileUrl.slice(1) : safeFileUrl}`;
+    : `${BASE_URL}/${safeFileUrl.startsWith("/") ? safeFileUrl.slice(1) : safeFileUrl}`;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   let fullUrlWithToken = fullUrl;
