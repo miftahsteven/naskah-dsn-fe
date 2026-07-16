@@ -511,6 +511,22 @@ const DocumentDetailPage = () => {
                       {doc.classification?.name}
                     </span>
                   </div>
+                  {doc.documentDate && (
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-tight">Tgl Dokumen:</span>
+                      <span className="text-[10px] sm:text-xs font-mono font-bold bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">
+                        {new Date(doc.documentDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+                  )}
+                  {doc.receivedDate && (
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-tight">Tgl Diterima:</span>
+                      <span className="text-[10px] sm:text-xs font-mono font-bold bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">
+                        {new Date(doc.receivedDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               {/* <Can perform="DOC_UPLOAD">
@@ -626,92 +642,94 @@ const DocumentDetailPage = () => {
         {/* Right: Sidebar Info */}
         <div className="space-y-8">
           {/* Workflow Status Card */}
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck size={20} className="text-primary" />
-                Status Workflow
-              </h3>
-              {doc.workflowInstances && doc.workflowInstances.length > 0 &&
-                !['COMPLETED', 'REJECTED'].includes(doc.workflowInstances[doc.workflowInstances.length - 1].status) &&
-                (doc.creatorId === user?.id || isSuperOrAdmin || (user && user.role === 'ADMIN')) && (
-                  <button
-                    onClick={() => setIsWorkflowEditModalOpen(true)}
-                    className="px-4 py-1.5 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
-                  >
-                    Ubah
-                  </button>
-                )}
-            </div>
+          {doc.documentType !== 'INCOMING' && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldCheck size={20} className="text-primary" />
+                  Status Workflow
+                </h3>
+                {doc.workflowInstances && doc.workflowInstances.length > 0 &&
+                  !['COMPLETED', 'REJECTED'].includes(doc.workflowInstances[doc.workflowInstances.length - 1].status) &&
+                  (doc.creatorId === user?.id || isSuperOrAdmin || (user && user.role === 'ADMIN')) && (
+                    <button
+                      onClick={() => setIsWorkflowEditModalOpen(true)}
+                      className="px-4 py-1.5 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                    >
+                      Ubah
+                    </button>
+                  )}
+              </div>
 
-            {doc.workflowInstances && doc.workflowInstances.length > 0 ? (
-              <div className="relative space-y-6 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-slate-800">
-                {doc.workflowInstances[doc.workflowInstances.length - 1].steps
-                  .sort((a: any, b: any) => a.stepNumber - b.stepNumber)
-                  .map((step: any, idx: number) => (
-                    <div key={step.id} className="relative pl-10">
-                      {/* Step dot */}
-                      <div className={cn(
-                        "absolute left-0 top-1 w-8 h-8 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center text-[10px] font-bold z-10 transition-all shadow-sm",
-                        step.status === 'APPROVED' ? "bg-emerald-500 text-white" :
-                          step.status === 'PENDING' ? "bg-amber-500 text-white animate-pulse" :
-                            step.status === 'REJECTED' ? "bg-red-500 text-white" :
-                              step.status === 'REVISION' ? "bg-amber-100 text-amber-600" :
-                                "bg-slate-100 text-slate-400 dark:bg-slate-800"
-                      )}>
-                        {step.status === 'APPROVED' ? <CheckCircle2 size={12} /> : step.stepNumber}
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={cn(
-                            "text-xs font-bold leading-none",
-                            step.status === 'PENDING' ? "text-amber-600" : "text-slate-900 dark:text-white"
-                          )}>
-                            {step.user?.fullName || "Approver " + step.stepNumber}
-                          </p>
-                          <span className={cn(
-                            "text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-tight",
-                            step.status === 'APPROVED' ? "bg-emerald-50 text-emerald-600" :
-                              step.status === 'PENDING' && step.actionedAt ? "bg-blue-50 text-blue-600" :
-                                step.status === 'PENDING' ? "bg-amber-50 text-amber-600" :
-                                  "bg-slate-50 text-slate-400"
-                          )}>
-                            {step.status === 'PENDING' && step.actionedAt ? 'PENDING - REVISI MASUK' : step.status}
-                          </span>
+              {doc.workflowInstances && doc.workflowInstances.length > 0 ? (
+                <div className="relative space-y-6 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-slate-800">
+                  {doc.workflowInstances[doc.workflowInstances.length - 1].steps
+                    .sort((a: any, b: any) => a.stepNumber - b.stepNumber)
+                    .map((step: any, idx: number) => (
+                      <div key={step.id} className="relative pl-10">
+                        {/* Step dot */}
+                        <div className={cn(
+                          "absolute left-0 top-1 w-8 h-8 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center text-[10px] font-bold z-10 transition-all shadow-sm",
+                          step.status === 'APPROVED' ? "bg-emerald-500 text-white" :
+                            step.status === 'PENDING' ? "bg-amber-500 text-white animate-pulse" :
+                              step.status === 'REJECTED' ? "bg-red-500 text-white" :
+                                step.status === 'REVISION' ? "bg-amber-100 text-amber-600" :
+                                  "bg-slate-100 text-slate-400 dark:bg-slate-800"
+                        )}>
+                          {step.status === 'APPROVED' ? <CheckCircle2 size={12} /> : step.stepNumber}
                         </div>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          {step.user?.jabatan?.name || step.user?.role?.name || "Penandatangan"}
-                        </p>
-                        {step.comment && (
-                          <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <p className="text-[10px] text-slate-600 dark:text-slate-400 italic leading-relaxed">&ldquo;{step.comment}&rdquo;</p>
-                            {step.status === 'PENDING' && step.actionedAt && (
-                              <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-700/50 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400">Telah direvisi oleh Admin (v{doc.versions.length}). Silakan periksa kembali.</p>
-                              </div>
-                            )}
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={cn(
+                              "text-xs font-bold leading-none",
+                              step.status === 'PENDING' ? "text-amber-600" : "text-slate-900 dark:text-white"
+                            )}>
+                              {step.user?.fullName || "Approver " + step.stepNumber}
+                            </p>
+                            <span className={cn(
+                              "text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-tight",
+                              step.status === 'APPROVED' ? "bg-emerald-50 text-emerald-600" :
+                                step.status === 'PENDING' && step.actionedAt ? "bg-blue-50 text-blue-600" :
+                                  step.status === 'PENDING' ? "bg-amber-50 text-amber-600" :
+                                    "bg-slate-50 text-slate-400"
+                            )}>
+                              {step.status === 'PENDING' && step.actionedAt ? 'PENDING - REVISI MASUK' : step.status}
+                            </span>
                           </div>
-                        )}
-                        {step.actionedAt && (
-                          <p className="text-[8px] text-slate-400 mt-1 font-mono">
-                            {new Date(step.actionedAt).toLocaleString()}
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {step.user?.jabatan?.name || step.user?.role?.name || "Penandatangan"}
                           </p>
-                        )}
+                          {step.comment && (
+                            <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <p className="text-[10px] text-slate-600 dark:text-slate-400 italic leading-relaxed">&ldquo;{step.comment}&rdquo;</p>
+                              {step.status === 'PENDING' && step.actionedAt && (
+                                <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-700/50 flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                  <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400">Telah direvisi oleh Admin (v{doc.versions.length}). Silakan periksa kembali.</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {step.actionedAt && (
+                            <p className="text-[8px] text-slate-400 mt-1 font-mono">
+                              {new Date(step.actionedAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="py-10 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-center gap-4 px-4">
-                <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300">
-                  <Clock size={24} />
+                    ))}
                 </div>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">Belum ada workflow aktif untuk dokumen ini.</p>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="py-10 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-center gap-4 px-4">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300">
+                    <Clock size={24} />
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Belum ada workflow aktif untuk dokumen ini.</p>
+                </div>
+              )}
+            </div>
+          )}
 
 
           {/* Creator Info */}

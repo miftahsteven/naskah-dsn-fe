@@ -11,6 +11,7 @@ import {
   AlertCircle,
   FileText,
   ChevronLeft,
+  ChevronDown,
   Info,
   MapPin,
   Calendar,
@@ -70,21 +71,21 @@ function getEstimatedHijriah(gregorianDateString: string): string {
   let yoffset = Math.floor((diff * 30 + 11) / 10631);
   let hy = cyc * 30 + yoffset + 1;
   let dayoffset = Math.floor(diff - Math.floor((yoffset * 10631 + 14) / 30) + 354);
-  
+
   let months = [
-    "Muharram", "Safar", "Rabi'ul Awwal", "Rabi'ul Akhir", 
-    "Jumadil Awwal", "Jumadil Akhir", "Rajab", "Sya'ban", 
+    "Muharram", "Safar", "Rabi'ul Awwal", "Rabi'ul Akhir",
+    "Jumadil Awwal", "Jumadil Akhir", "Rajab", "Sya'ban",
     "Ramadhan", "Syawwal", "Dzulqa'dah", "Dzulhijjah"
   ];
   let hm = 0;
   let hd = 0;
   let sum = 0;
-  
+
   for (let i = 0; i < 12; i++) {
     let isLeap = ((hy * 11 + 14) % 30) < 11;
     let length = (i % 2 === 0) ? 30 : 29;
     if (i === 11 && isLeap) length = 30;
-    
+
     if (dayoffset < sum + length) {
       hm = i;
       hd = Math.floor(dayoffset - sum + 1);
@@ -207,7 +208,7 @@ const getDefaultTemplateBody = (id: string): string => {
   }
 };
 
-const toDataURL = (url: string): Promise<string> => 
+const toDataURL = (url: string): Promise<string> =>
   fetch(url)
     .then(response => response.blob())
     .then(blob => new Promise<string>((resolve, reject) => {
@@ -249,7 +250,7 @@ const CreateDocumentPage = () => {
   const [dbTemplates, setDbTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("SK-RUTIN");
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
-  
+
   const EDITOR_TEMPLATES = ["SK-RUTIN", "SK-PENGANTAR", "SK-KEPUTUSAN", "SK-MANDAT", "SK-TUGAS", "SK-INFORMASI", "rutin", "pengantar", "keputusan", "mandat", "tugas", "informasi"];
 
   const getLegacyId = (val: string) => {
@@ -321,14 +322,14 @@ const CreateDocumentPage = () => {
         setCategories(metaRes.data.data.categories);
         setClassifications(metaRes.data.data.classifications);
         setUsers(usersRes.data.data || []);
-        
+
         const templatesData = templatesRes.data.data || [];
         setDbTemplates(templatesData);
         const defaultTpl = templatesData.find((t: any) => t.code === "SK-RUTIN") || templatesData[0];
         if (defaultTpl) {
           setSelectedTemplate(defaultTpl.code);
         }
-        
+
         // Auto select first Category and Classification in state
         if (metaRes.data.data.categories?.length > 0) {
           setCategoryId(metaRes.data.data.categories[0].id);
@@ -371,8 +372,8 @@ const CreateDocumentPage = () => {
       console.error("Gagal generate nomor surat:", err);
       // Fallback: generate client-side
       const now = new Date();
-      const romanMonths = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-      const codeMap: Record<string,string> = { rutin:'SR', pengantar:'SP', keputusan:'SK', mandat:'SM', tugas:'ST', informasi:'SI', "SK-RUTIN":'SR', "SK-PENGANTAR":'SP', "SK-KEPUTUSAN":'SK', "SK-MANDAT":'SM', "SK-TUGAS":'ST', "SK-INFORMASI":'SI' };
+      const romanMonths = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      const codeMap: Record<string, string> = { rutin: 'SR', pengantar: 'SP', keputusan: 'SK', mandat: 'SM', tugas: 'ST', informasi: 'SI', "SK-RUTIN": 'SR', "SK-PENGANTAR": 'SP', "SK-KEPUTUSAN": 'SK', "SK-MANDAT": 'SM', "SK-TUGAS": 'ST', "SK-INFORMASI": 'SI' };
       const code = codeMap[templateCode] || 'SR';
       setGeneratedDocNumber(`001/${code}/DSN-MUI/${romanMonths[now.getMonth()]}/${now.getFullYear()}`);
     } finally {
@@ -389,7 +390,7 @@ const CreateDocumentPage = () => {
   // Sync template variables when selectedTemplateObj or metadata fields change
   useEffect(() => {
     if (!selectedTemplateObj) return;
-    
+
     const newVars = { ...templateVariables };
     let updated = false;
 
@@ -529,7 +530,7 @@ const CreateDocumentPage = () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    
+
     // Check workflow steps
     if (steps.some(s => !s.userId)) {
       setError("Harap tentukan semua penandatangan alur kerja atau hapus langkah kosong.");
@@ -571,7 +572,7 @@ const CreateDocumentPage = () => {
           resolvedSteps.forEach((s, idx) => {
             const isLastOdd = idx === resolvedSteps.length - 1 && resolvedSteps.length % 2 !== 0;
             const label = idx === resolvedSteps.length - 1 ? "Menyetujui," : "Mengetahui,";
-            
+
             if (isLastOdd) {
               signatureHtml += `
                 <div style="grid-column: span 2; display: flex; justify-content: center;">
@@ -959,7 +960,7 @@ const CreateDocumentPage = () => {
                 <h3 className="text-lg font-extrabold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4">
                   Detail Metadata & Pengunggahan Berkas
                 </h3>
-                
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Left Column: Metadata Inputs */}
                   <div className="space-y-6">
@@ -967,29 +968,35 @@ const CreateDocumentPage = () => {
                       {/* Category */}
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Kategori</label>
-                        <select
-                          required
-                          className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
-                          value={categoryId}
-                          onChange={(e) => setCategoryId(e.target.value)}
-                        >
-                          <option value="">Pilih Kategori</option>
-                          {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                        </select>
+                        <div className="relative">
+                          <select
+                            required
+                            className="w-full pl-5 pr-10 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
+                            value={categoryId}
+                            onChange={(e) => setCategoryId(e.target.value)}
+                          >
+                            <option value="">Pilih Kategori</option>
+                            {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                          </select>
+                          <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
                       </div>
 
                       {/* Classification */}
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Klasifikasi</label>
-                        <select
-                          required
-                          className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
-                          value={classificationId}
-                          onChange={(e) => setClassificationId(e.target.value)}
-                        >
-                          <option value="">Pilih Klasifikasi</option>
-                          {classifications.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
-                        </select>
+                        <div className="relative">
+                          <select
+                            required
+                            className="w-full pl-5 pr-10 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
+                            value={classificationId}
+                            onChange={(e) => setClassificationId(e.target.value)}
+                          >
+                            <option value="">Pilih Klasifikasi</option>
+                            {classifications.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+                          </select>
+                          <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
                       </div>
                     </div>
 
@@ -1050,7 +1057,7 @@ const CreateDocumentPage = () => {
                             <button
                               type="button"
                               onClick={() => setFile(null)}
-                              className="mt-4 text-xs font-bold text-red-500 hover:underline"
+                              className="mt-4 text-xs font-bold text-yellow-500 hover:underline"
                             >
                               Ganti File
                             </button>
@@ -1190,7 +1197,7 @@ const CreateDocumentPage = () => {
 
                         {/* Physical A4 Visual Paper */}
                         <div className="bg-white text-slate-800 p-6 sm:p-10 shadow-2xl rounded-2xl min-h-[900px] border border-slate-100 flex flex-col overflow-hidden" style={{ fontSize: "11pt", fontFamily: "Arial, sans-serif" }}>
-                          
+
                           {/* Kop Surat Header */}
                           <div className="border-b-[3px] border-double border-slate-900 pb-2 mb-3">
                             <div className="flex items-center justify-between gap-3">
@@ -1202,7 +1209,7 @@ const CreateDocumentPage = () => {
                                   className="w-full h-full object-contain"
                                 />
                               </div>
-                              
+
                               {/* Center: Organization info */}
                               <div className="text-left flex-1 min-w-0">
                                 <h2 className="text-slate-900 font-extrabold text-[10.5px] sm:text-[11.5px] uppercase tracking-tight leading-snug whitespace-nowrap">
@@ -1218,7 +1225,7 @@ const CreateDocumentPage = () => {
                                   Telp. (021) 3904146 &nbsp; Email: sekretariat@dsnmui.or.id &nbsp; Web: www.dsnmui.or.id
                                 </p>
                               </div>
-                              
+
                               {/* Right: Certification Box */}
                               <div className="w-[65px] border border-slate-900 p-0.5 flex-shrink-0 text-center font-sans text-[6px] leading-tight font-bold text-slate-800">
                                 <div className="border-b border-slate-900 pb-0.5 mb-0.5 text-[5px]">REGISTERED</div>
@@ -1287,11 +1294,11 @@ const CreateDocumentPage = () => {
                             const renderSigner = (step: { userId: string }, idx: number, total: number) => {
                               const u = users.find(user => user.id === step.userId);
                               if (!u) return null;
-                              
+
                               let label = "Mengetahui,";
                               if (total === 1) label = "Menyetujui,";
                               else if (idx === total - 1) label = "Menyetujui,";
-                              
+
                               return (
                                 <div key={idx} className="min-w-[150px] text-slate-800 animate-in fade-in duration-300 text-center">
                                   <p className="font-bold uppercase tracking-widest mb-16 text-slate-500" style={{ fontSize: "10pt" }}>
@@ -1353,9 +1360,9 @@ const CreateDocumentPage = () => {
                               }
                             </style>
                             ${selectedTemplateObj.htmlContent.replace(
-                              /\{\{(\w+)\}\}/g,
-                              (_: string, key: string) => templateVariables[key] || `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`
-                            )}
+                            /\{\{(\w+)\}\}/g,
+                            (_: string, key: string) => templateVariables[key] || `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`
+                          )}
                           ` : ""}
                           className="w-full min-h-[850px] border-0 rounded-2xl"
                           title="preview"
@@ -1369,7 +1376,7 @@ const CreateDocumentPage = () => {
               {/* BOTTOM SECTION: Form & Tabs */}
               <div>
                 <form onSubmit={handleSaveTemplate} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 shadow-md rounded-[28px] p-6 space-y-6">
-                  
+
                   <div className="border-b border-slate-100 dark:border-slate-800 pb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div>
                       <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Formulir Pembuatan Surat</h3>
@@ -1436,22 +1443,25 @@ const CreateDocumentPage = () => {
 
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Template Surat Keluar</label>
-                            <select
-                              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none font-bold text-primary"
-                              value={selectedTemplate}
-                              onChange={(e) => setSelectedTemplate(e.target.value)}
-                            >
-                              <optgroup label="Template Standar (Rich Text)">
-                                {dbTemplates.filter(t => t.code && EDITOR_TEMPLATES.includes(t.code)).map(t => (
-                                  <option key={t.id} value={t.code}>{t.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Template DSN-MUI (Isian)">
-                                {dbTemplates.filter(t => t.code && !EDITOR_TEMPLATES.includes(t.code)).map(t => (
-                                  <option key={t.id} value={t.code}>{t.name}</option>
-                                ))}
-                              </optgroup>
-                            </select>
+                            <div className="relative">
+                              <select
+                                className="w-full pl-5 pr-10 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none font-bold text-primary"
+                                value={selectedTemplate}
+                                onChange={(e) => setSelectedTemplate(e.target.value)}
+                              >
+                                <optgroup label="Template Standar (Rich Text)">
+                                  {dbTemplates.filter(t => t.code && EDITOR_TEMPLATES.includes(t.code)).map(t => (
+                                    <option key={t.id} value={t.code}>{t.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Template DSN-MUI (Isian)">
+                                  {dbTemplates.filter(t => t.code && !EDITOR_TEMPLATES.includes(t.code)).map(t => (
+                                    <option key={t.id} value={t.code}>{t.name}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
                           </div>
                         </div>
 
@@ -1472,28 +1482,34 @@ const CreateDocumentPage = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Kategori</label>
-                            <select
-                              required
-                              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
-                              value={categoryId}
-                              onChange={(e) => setCategoryId(e.target.value)}
-                            >
-                              <option value="">Pilih Kategori</option>
-                              {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                            </select>
+                            <div className="relative">
+                              <select
+                                required
+                                className="w-full pl-5 pr-10 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
+                                value={categoryId}
+                                onChange={(e) => setCategoryId(e.target.value)}
+                              >
+                                <option value="">Pilih Kategori</option>
+                                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                              </select>
+                              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
                           </div>
 
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Klasifikasi</label>
-                            <select
-                              required
-                              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
-                              value={classificationId}
-                              onChange={(e) => setClassificationId(e.target.value)}
-                            >
-                              <option value="">Pilih Klasifikasi</option>
-                              {classifications.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
-                            </select>
+                            <div className="relative">
+                              <select
+                                required
+                                className="w-full pl-5 pr-10 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm appearance-none"
+                                value={classificationId}
+                                onChange={(e) => setClassificationId(e.target.value)}
+                              >
+                                <option value="">Pilih Klasifikasi</option>
+                                {classifications.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+                              </select>
+                              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1555,7 +1571,7 @@ const CreateDocumentPage = () => {
                                 onChange={(e) => setLampiran(e.target.value)}
                               />
                             </div>
-                            
+
                             <div className="space-y-2">
                               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Catatan Dokumen</label>
                               <textarea
@@ -1683,7 +1699,7 @@ const CreateDocumentPage = () => {
                               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs border border-primary/20 shrink-0">
                                 {idx + 1}
                               </div>
-                              
+
                               <select
                                 required
                                 value={step.userId}

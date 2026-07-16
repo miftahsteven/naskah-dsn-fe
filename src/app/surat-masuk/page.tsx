@@ -39,7 +39,8 @@ import {
   Folder,
   FolderPlus,
   ChevronRight,
-  Home
+  Home,
+  Check
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -1292,6 +1293,9 @@ const DocumentsPage = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+  const [customStatusFilter, setCustomStatusFilter] = useState("");
 
   // Right Sidebar States
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -1404,7 +1408,30 @@ const DocumentsPage = () => {
   }, []);
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchData(); };
-  const resetFilters = () => { setStatusFilter(""); setCategoryFilter(""); setClassFilter(""); };
+  const resetFilters = () => {
+    setStatusFilter("");
+    setCategoryFilter("");
+    setClassFilter("");
+    setStartDateFilter("");
+    setEndDateFilter("");
+    setCustomStatusFilter("");
+  };
+
+  const handleCloseDiscussion = async (id: string) => {
+    if (!confirm("Tutup pembahasan untuk surat masuk ini? Status akan diubah menjadi 'Selesai'.")) return;
+    try {
+      setActionLoading(true);
+      await api.put(`/documents/${id}`, { status: 'COMPLETED' });
+      fetchData();
+      if (selectedDocId === id) {
+        fetchSidebarDetail(id);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Gagal menutup pembahasan");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleArchive = async (id: string) => {
     if (!confirm("Arsip dokumen ini?")) return;
@@ -1477,50 +1504,28 @@ const DocumentsPage = () => {
     </div>
   );
 
-  const EditDocumentModal = ({ doc }: { doc: any }) => {
-    const [title, setTitle] = useState(doc?.title || "");
-    const [catId, setCatId] = useState(doc?.categoryId || "");
-    const [clsId, setClsId] = useState(doc?.classificationId || "");
-    const [docNum, setDocNum] = useState(doc?.documentNumber || "");
-    const [file, setFile] = useState<File | null>(null);
-
-    const [users, setUsers] = useState<any[]>([]);
-    const [requiresSignature, setRequiresSignature] = useState(false);
-    const [signers, setSigners] = useState<{ userId: string }[]>([{ userId: "" }]);
-
-    useEffect(() => {
-      // Fetch users list
-      api.get("/users")
-        .then(res => setUsers(res.data.data || []))
-        .catch(err => console.error("Gagal memuat pengguna:", err));
-
-      // Check if document already has active workflow instance
-      const activeWorkflow = doc?.workflowInstances?.[0];
-      if (activeWorkflow && activeWorkflow.steps && activeWorkflow.steps.length > 0) {
-        setRequiresSignature(true);
-        const mappedSteps = [...activeWorkflow.steps]
-          .sort((a, b) => a.stepNumber - b.stepNumber)
-          .map((s: any) => ({ userId: s.userId }));
-        setSigners(mappedSteps);
-      } else {
-        setRequiresSignature(false);
-        setSigners([{ userId: "" }]);
-      }
-    }, [doc]);
-
-    const handleAddSigner = () => {
-      setSigners(prev => [...prev, { userId: "" }]);
+    const formatDateForInput = (dateStr: any) => {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
     };
 
-    const handleRemoveSigner = (index: number) => {
-      setSigners(prev => prev.filter((_, i) => i !== index));
-    };
+    const EditDocumentModal = ({ doc }: { doc: any }) => {
+      const [title, setTitle] = useState(doc?.title || "");
+      const [catId, setCatId] = useState(doc?.categoryId || "");
+      const [clsId, setClsId] = useState(doc?.classificationId || "");
+      const [docNum, setDocNum] = useState(doc?.documentNumber || "");
+      const [documentDate, setDocumentDate] = useState(formatDateForInput(doc?.documentDate));
+      const [receivedDate, setReceivedDate] = useState(formatDateForInput(doc?.receivedDate));
+      const [file, setFile] = useState<File | null>(null);
 
-    const handleSignerChange = (index: number, val: string) => {
-      const updated = [...signers];
-      updated[index].userId = val;
-      setSigners(updated);
-    };
+      useEffect(() => {
+        // No need to fetch users or check workflow since Surat Masuk has no signatures
+      }, [doc]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -1531,20 +1536,15 @@ const DocumentsPage = () => {
         formData.append("categoryId", catId);
         formData.append("classificationId", clsId);
         formData.append("documentNumber", docNum);
-        formData.append("status", requiresSignature ? "DRAFT" : "SIGNED");
+        formData.append("status", "SIGNED");
+        formData.append("documentDate", documentDate);
+        formData.append("receivedDate", receivedDate);
         
         if (file) formData.append("file", file);
 
         await api.put(`/documents/${doc.id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
-
-        if (requiresSignature) {
-          await api.post("/workflow/submit", {
-            documentId: doc.id,
-            stepConfig: signers.map((s, i) => ({ stepNumber: i + 1, userId: s.userId })),
-          });
-        }
 
         fetchData();
         setIsEditModalOpen(false);
@@ -1602,72 +1602,29 @@ const DocumentsPage = () => {
                 </div>
               </div>
 
-              {/* Checkbox Membutuhkan Tanda Tangan */}
-              <div className="flex items-center gap-3 px-1 py-1">
-                <input
-                  type="checkbox"
-                  id="editRequiresSignature"
-                  className="w-4 h-4 rounded border-slate-350 text-primary focus:ring-primary/20 cursor-pointer accent-primary"
-                  checked={requiresSignature}
-                  onChange={(e) => setRequiresSignature(e.target.checked)}
-                />
-                <label htmlFor="editRequiresSignature" className="text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-                  Membutuhkan Tanda Tangan (Alur Persetujuan)
-                </label>
-              </div>
-
-              {requiresSignature && (
-                <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-2xl animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      Daftar Penandatangan (Urutan Alur)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAddSigner}
-                      className="text-[10.5px] font-extrabold text-[#006633] hover:underline"
-                    >
-                      + Tambah Urutan
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-3 max-h-[140px] overflow-y-auto pr-1">
-                    {signers.map((signer, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 w-5 text-center shrink-0">
-                          {index + 1}.
-                        </span>
-                        <div className="relative flex-1">
-                          <select
-                            required
-                            className="w-full pl-4 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-xl outline-none focus:border-primary/50 text-xs font-semibold appearance-none"
-                            value={signer.userId}
-                            onChange={(e) => handleSignerChange(index, e.target.value)}
-                          >
-                            <option value="">— Pilih Penandatangan —</option>
-                            {users.map(u => (
-                              <option key={u.id} value={u.id}>
-                                {u.fullName} {u.jabatan?.name ? `(${u.jabatan.name})` : ''}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        </div>
-                        {signers.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSigner(index)}
-                            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors shrink-0"
-                            title="Hapus Urutan"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              {/* Tanggal Dokumen & Tanggal Diterima Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider ml-1">Tanggal Dokumen</label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none ring-2 ring-transparent focus:ring-primary/20 transition-all font-medium text-slate-800 dark:text-white"
+                    value={documentDate}
+                    onChange={(e) => setDocumentDate(e.target.value)}
+                  />
                 </div>
-              )}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider ml-1">Tanggal Diterima</label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none ring-2 ring-transparent focus:ring-primary/20 transition-all font-medium text-slate-800 dark:text-white"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                  />
+                </div>
+              </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider ml-1">Ganti File (Opsional)</label>
@@ -1816,6 +1773,29 @@ const DocumentsPage = () => {
     </div>
   );
 
+  const getComputedStatus = (doc: any) => {
+    if (doc.status === 'COMPLETED') {
+      return 'Selesai';
+    }
+
+    const hasMeetings = doc.meetings && doc.meetings.length > 0;
+    const hasEvidence = doc.evidenceFiles && doc.evidenceFiles.length > 0;
+
+    if (hasMeetings && hasEvidence) {
+      return 'Dalam Proses Pembahasan';
+    }
+
+    const receivedDate = doc.receivedDate ? new Date(doc.receivedDate) : new Date(doc.createdAt);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    if (receivedDate < oneMonthAgo) {
+      return 'Mohon Perhatian';
+    }
+
+    return 'Belum ada Respon';
+  };
+
   // Client-side filtering logic
   const filteredDocuments = documents.filter((doc) => {
     // 1. Title & Number keyword filter
@@ -1851,6 +1831,25 @@ const DocumentsPage = () => {
       const locationMatch = nearestMeeting.location?.toLowerCase().includes(query);
       if (!titleMatch && !locationMatch) return false;
     }
+    // 6. Custom Status filter
+    if (customStatusFilter) {
+      if (getComputedStatus(doc) !== customStatusFilter) return false;
+    }
+    // 7. Date Range filter
+    if (startDateFilter) {
+      const docDate = doc.receivedDate ? new Date(doc.receivedDate) : new Date(doc.createdAt);
+      docDate.setHours(0,0,0,0);
+      const startDate = new Date(startDateFilter);
+      startDate.setHours(0,0,0,0);
+      if (docDate < startDate) return false;
+    }
+    if (endDateFilter) {
+      const docDate = doc.receivedDate ? new Date(doc.receivedDate) : new Date(doc.createdAt);
+      docDate.setHours(0,0,0,0);
+      const endDate = new Date(endDateFilter);
+      endDate.setHours(23,59,59,999);
+      if (docDate > endDate) return false;
+    }
     return true;
   });
 
@@ -1864,7 +1863,7 @@ const DocumentsPage = () => {
   // Reset page when search/filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [colFilters, statusFilter, categoryFilter, classFilter, search]);
+  }, [colFilters, statusFilter, categoryFilter, classFilter, search, startDateFilter, endDateFilter, customStatusFilter]);
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -1903,6 +1902,45 @@ const DocumentsPage = () => {
           <Filter size={18} />
           <span>Filter{(statusFilter || categoryFilter || classFilter) ? ' ●' : ''}</span>
         </button>
+      </div>
+
+      {/* Date Range and Status Filter Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+        <div className="space-y-1">
+          <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">Tanggal Awal</label>
+          <input
+            type="date"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-slate-800 dark:text-white"
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">Tanggal Akhir</label>
+          <input
+            type="date"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-slate-800 dark:text-white"
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">Status Pembahasan</label>
+          <div className="relative">
+            <select
+              value={customStatusFilter}
+              onChange={(e) => setCustomStatusFilter(e.target.value)}
+              className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none appearance-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-slate-800 dark:text-white font-medium animate-none"
+            >
+              <option value="">Semua Status</option>
+              <option value="Belum ada Respon">Belum ada Respon</option>
+              <option value="Dalam Proses Pembahasan">Dalam Proses Pembahasan</option>
+              <option value="Mohon Perhatian">Mohon Perhatian</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
       </div>
 
       {/* Filter Modal — centered, all screen sizes */}
@@ -1956,7 +1994,7 @@ const DocumentsPage = () => {
                       <th className="text-center py-2.5 px-3 font-extrabold w-12">No.</th>
                       <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[25%]">Judul & Metadata</th>
                       <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Klasifikasi & Versi</th>
-                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[20%]">Progress Alur</th>
+                      <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[15%]">Status Pembahasan</th>
                       <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[18%]">Agenda Rapat Terdekat</th>
                       <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Pembuat & Tanggal</th>
                       <th className="text-center py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[140px]">Aksi</th>
@@ -1997,7 +2035,6 @@ const DocumentsPage = () => {
                         </div>
                       </th>
                       <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
-                        {/* Progress: spacer */}
                         <div className="h-6"></div>
                       </th>
                       <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
@@ -2112,42 +2149,26 @@ const DocumentsPage = () => {
                               </div>
                             </td>
 
-                            {/* ── Progress Alur ── */}
+                            {/* ── Status Pembahasan ── */}
                             <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
-                              {totalSteps === 0 ? (
-                                doc.status === 'SIGNED' ? (
-                                  <span className="inline-flex items-center text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-                                    Tak ada persetujuan
+                              {(() => {
+                                const computedStatus = getComputedStatus(doc);
+                                let badgeClass = "";
+                                if (computedStatus === 'Selesai') {
+                                  badgeClass = "bg-emerald-50 text-[#006633] border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-450 dark:border-emerald-900/50";
+                                } else if (computedStatus === 'Dalam Proses Pembahasan') {
+                                  badgeClass = "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50";
+                                } else if (computedStatus === 'Mohon Perhatian') {
+                                  badgeClass = "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-450 dark:border-rose-900/50 animate-pulse";
+                                } else {
+                                  badgeClass = "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+                                }
+                                return (
+                                  <span className={cn("inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded border whitespace-nowrap", badgeClass)}>
+                                    {computedStatus}
                                   </span>
-                                ) : (
-                                  <span className="text-[10px] text-slate-400 italic">Belum ada alur</span>
-                                )
-                              ) : (
-                                <div className="flex flex-col gap-1 min-w-[85px]">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{doneSteps}/{totalSteps} Step</span>
-                                    {doneSteps === totalSteps && totalSteps > 0 && (
-                                      <CheckCircle2 size={12} className="text-[#006633]" />
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-0.5 mt-0.5">
-                                    {steps.map((s: any, i: number) => (
-                                      <div key={i} className={cn(
-                                        "h-1.5 flex-1 rounded-sm border transition-all",
-                                        s.status === 'APPROVED' ? "bg-[#006633] border-[#006633]" :
-                                          s.status === 'REJECTED' ? "bg-red-500 border-red-500" :
-                                            s.status === 'PENDING' ? "bg-amber-400 border-amber-500 animate-pulse" :
-                                              "bg-slate-200 border-slate-300 dark:bg-slate-700 dark:border-slate-600"
-                                      )} />
-                                    ))}
-                                  </div>
-                                  {steps.find((s: any) => s.status === 'PENDING') && (
-                                    <p className="text-[9px] text-slate-500 truncate max-w-[110px] mt-0.5">
-                                      ⏳ {steps.find((s: any) => s.status === 'PENDING')?.user?.fullName}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                                );
+                              })()}
                             </td>
 
                             {/* ── Agenda Rapat Terdekat ── */}
@@ -2235,6 +2256,11 @@ const DocumentsPage = () => {
                                     {doc.status === 'REVISION' ? <FileUp size={14} /> : <Pencil size={14} />}
                                   </button>
                                 </Can>
+                                {getComputedStatus(doc) !== 'Selesai' && (
+                                  <button onClick={() => handleCloseDiscussion(doc.id)} className="p-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30 transition-colors" title="Tutup Pembahasan">
+                                    <Check size={14} />
+                                  </button>
+                                )}
                                 <button onClick={() => handleAddAgendaFromTable(doc)} className="p-1.5 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:hover:bg-amber-900/30 transition-colors" title="Tambah Agenda Rapat">
                                   <Calendar size={14} />
                                 </button>
@@ -2273,9 +2299,24 @@ const DocumentsPage = () => {
                           {doc.title}
                         </button>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded border", statusClass(doc.status))}>
-                            {doc.status}
-                          </span>
+                          {(() => {
+                            const computedStatus = getComputedStatus(doc);
+                            let badgeClass = "";
+                            if (computedStatus === 'Selesai') {
+                              badgeClass = "bg-emerald-50 text-[#006633] border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50";
+                            } else if (computedStatus === 'Dalam Proses Pembahasan') {
+                              badgeClass = "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50";
+                            } else if (computedStatus === 'Mohon Perhatian') {
+                              badgeClass = "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-450 dark:border-rose-900/50 animate-pulse";
+                            } else {
+                              badgeClass = "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+                            }
+                            return (
+                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded border whitespace-nowrap", badgeClass)}>
+                                {computedStatus}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -2381,6 +2422,11 @@ const DocumentsPage = () => {
                         <button onClick={() => handleAddEvidenceFromTable(doc)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-teal-650 hover:bg-teal-200 transition-all whitespace-nowrap">
                           <Paperclip size={14} /> File
                         </button>
+                        {getComputedStatus(doc) !== 'Selesai' && (
+                          <button onClick={() => handleCloseDiscussion(doc.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/50 rounded text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-all whitespace-nowrap">
+                            <Check size={14} /> Selesai
+                          </button>
+                        )}
                         <Can perform="DOC_DELETE">
                           <button onClick={() => { setSelectedDoc(doc); setIsDeleteConfirmOpen(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-xs font-bold text-red-600 hover:bg-red-100 transition-all whitespace-nowrap">
                             <Trash2 size={14} /> Hapus
