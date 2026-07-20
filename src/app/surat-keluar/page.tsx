@@ -1167,7 +1167,7 @@ const DocumentsPage = () => {
                                 {totalSteps === 0 ? (
                                   <span className="text-[10px] text-slate-400 italic">Belum ada alur</span>
                                 ) : (
-                                  <div className="flex flex-col gap-1 min-w-[85px]">
+                                  <div className="flex flex-col gap-1 min-w-[110px]">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{doneSteps}/{totalSteps} Step</span>
                                       {doneSteps === totalSteps && totalSteps > 0 && (
@@ -1182,14 +1182,65 @@ const DocumentsPage = () => {
                                           s.status === 'REJECTED' ? "bg-red-500 border-red-500" :
                                           s.status === 'PENDING'  ? "bg-amber-400 border-amber-500 animate-pulse" :
                                           "bg-slate-200 border-slate-300 dark:bg-slate-700 dark:border-slate-600"
-                                        )} />
+                                        )} title={`${s.roleId || 'Step ' + (i+1)}: ${s.user?.fullName || '—'} (${s.status})`} />
                                       ))}
                                     </div>
-                                    {steps.find((s: any) => s.status === 'PENDING') && (
-                                      <p className="text-[9px] text-slate-500 truncate max-w-[110px] mt-0.5">
-                                        ⏳ {steps.find((s: any) => s.status === 'PENDING')?.user?.fullName}
-                                      </p>
-                                    )}
+
+                                    {/* Display active step at that moment (Langkah saat itu) */}
+                                    {(() => {
+                                      const pendingSteps = steps.filter((s: any) => s.status === 'PENDING');
+                                      if (pendingSteps.length > 0) {
+                                        const role = pendingSteps[0]?.roleId || 'PENANDATANGAN';
+                                        const stageName = role === 'PEMPARAF' ? 'Pemparaf' : role === 'APPROVER' ? 'Approver' : 'Penandatangan';
+                                        const isParallel = role === 'PEMPARAF' || role === 'APPROVER';
+                                        const names = pendingSteps.map((s: any) => s.user?.fullName).filter(Boolean).join(', ');
+
+                                        return (
+                                          <div className="mt-1 flex flex-col gap-0.5">
+                                            <span className={cn(
+                                              "inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.5 rounded border w-fit uppercase tracking-tight",
+                                              role === 'PEMPARAF' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800" :
+                                              role === 'APPROVER' ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800" :
+                                              "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800"
+                                            )}>
+                                              <span>⏳ {stageName}</span>
+                                              <span className="text-[8px] opacity-75">({isParallel ? 'Paralel' : `#${pendingSteps[0].stepNumber}`})</span>
+                                            </span>
+                                            <p className="text-[9.5px] font-medium text-slate-700 dark:text-slate-300 truncate max-w-[130px]" title={names}>
+                                              {names || "—"}
+                                            </p>
+                                          </div>
+                                        );
+                                      }
+
+                                      if (doneSteps === totalSteps && totalSteps > 0) {
+                                        return (
+                                          <p className="text-[9px] font-bold text-[#006633] mt-0.5 flex items-center gap-1">
+                                            <span>Selesai Ditandatangani</span>
+                                          </p>
+                                        );
+                                      }
+
+                                      const rejectedStep = steps.find((s: any) => s.status === 'REJECTED');
+                                      if (rejectedStep) {
+                                        return (
+                                          <p className="text-[9px] font-bold text-red-600 dark:text-red-400 mt-0.5 truncate max-w-[130px]" title={`Ditolak oleh ${rejectedStep.user?.fullName}`}>
+                                            ❌ Ditolak: {rejectedStep.user?.fullName}
+                                          </p>
+                                        );
+                                      }
+
+                                      const revisionStep = steps.find((s: any) => s.status === 'REVISION');
+                                      if (revisionStep) {
+                                        return (
+                                          <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400 mt-0.5 truncate max-w-[130px]" title={`Revisi oleh ${revisionStep.user?.fullName}`}>
+                                            🔄 Revisi: {revisionStep.user?.fullName}
+                                          </p>
+                                        );
+                                      }
+
+                                      return null;
+                                    })()}
                                   </div>
                                 )}
                               </td>

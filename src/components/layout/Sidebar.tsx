@@ -212,11 +212,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
           <NavGroup
             label="Persuratan"
-            active={anyActive("/surat-masuk", "/surat-keluar", "/surat-disposisi", "/arsip-surat", "/memo-internal")}
+            active={anyActive("/surat-masuk", "/surat-keluar", "/disposisi", "/arsip-surat", "/memo-internal")}
           >
             <LeafItem href="/surat-masuk" icon={Mail} label="Surat Masuk" active={anyActive("/surat-masuk")} onClick={onClose} indent />
             <LeafItem href="/surat-keluar" icon={Send} label="Surat Keluar" active={anyActive("/surat-keluar")} onClick={onClose} indent />
-            <LeafItem href="/surat-disposisi" icon={GitPullRequest} label="Disposisi" active={anyActive("/surat-disposisi")} onClick={onClose} indent />
+            <LeafItem href="/disposisi" icon={GitPullRequest} label="Disposisi" active={anyActive("/disposisi")} onClick={onClose} indent />
             <LeafItem href="/arsip-surat" icon={Archive} label="Arsip" active={anyActive("/arsip-surat")} onClick={onClose} indent />
             <LeafItem href="/template-surat" icon={StickyNote} label="Template Surat" active={pathname === "/template-surat"} onClick={onClose} indent />
           </NavGroup>
