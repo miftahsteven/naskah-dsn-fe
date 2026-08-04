@@ -44,7 +44,10 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
       }
 
       fetch(fullUrl, { headers })
-        .then(res => res.text())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
         .then(text => setHtmlContent(text))
         .catch(err => console.error("Failed to load HTML:", err));
     }

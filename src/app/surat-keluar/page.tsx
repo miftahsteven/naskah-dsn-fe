@@ -401,6 +401,7 @@ const RevisionModal = ({
 
 const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string }) => {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<boolean>(false);
 
   const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
   const safeFileUrl = fileUrl || "";
@@ -421,14 +422,21 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
   useEffect(() => {
     if (isHtml && fullUrl) {
       setHtmlContent(null);
+      setFetchError(false);
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
       fetch(fullUrl, { headers })
-        .then(res => res.text())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
         .then(text => setHtmlContent(text))
-        .catch(err => console.error("Failed to load HTML:", err));
+        .catch(err => {
+          console.error("Failed to load HTML:", err);
+          setFetchError(true);
+        });
     }
   }, [isHtml, fullUrl, token]);
 
@@ -437,6 +445,13 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
     : fullUrlWithToken;
 
   if (isHtml) {
+    if (fetchError) {
+      return (
+        <div className="absolute inset-0 flex items-center justify-center text-red-500 bg-slate-50 dark:bg-slate-900 p-4 text-center">
+          <p className="text-xs font-bold">Gagal memuat pratinjau dokumen. Silakan unduh file secara langsung.</p>
+        </div>
+      );
+    }
     if (htmlContent === null) {
       return (
         <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-slate-50 dark:bg-slate-900">
@@ -532,11 +547,26 @@ const DocumentsPage = () => {
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      const response = await api.get(fileUrl, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+      const safeFileUrl = fileUrl || "";
+      const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
+        ? safeFileUrl
+        : `${BASE_URL}/${safeFileUrl.startsWith("/") ? safeFileUrl.slice(1) : safeFileUrl}`;
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(fullUrl, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', fileName);
+      link.setAttribute('download', fileName || 'dokumen');
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
@@ -553,12 +583,7 @@ const DocumentsPage = () => {
       alert("Tidak ada file untuk diunduh");
       return;
     }
-    const isTemplate = latestVersion.fileName?.endsWith('.html') || latestVersion.mimeType === 'text/html';
-    if (isTemplate) {
-      setReaderDoc({ title: latestVersion.fileName, fileUrl: latestVersion.fileUrl });
-    } else {
-      handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
-    }
+    handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
   };
 
   const fetchData = async () => {
