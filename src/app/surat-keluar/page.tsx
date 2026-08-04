@@ -31,7 +31,7 @@ import {
   ShieldCheck,
   History,
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { getBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import Can from "@/components/auth/Can";
 import DocumentReader from "@/components/documents/DocumentReader";
@@ -403,7 +403,7 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<boolean>(false);
 
-  const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+  const BASE_URL = getBaseUrl();
   const safeFileUrl = fileUrl || "";
   const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
     ? safeFileUrl
@@ -547,7 +547,7 @@ const DocumentsPage = () => {
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+      const BASE_URL = getBaseUrl();
       const safeFileUrl = fileUrl || "";
       const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
         ? safeFileUrl

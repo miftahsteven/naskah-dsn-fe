@@ -1,7 +1,21 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api';
+export const getApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('mscode.id')) {
+    return 'https://mui-api.mscode.id/api';
+  }
+  return 'http://localhost:4002/api';
+};
+
+export const getBaseUrl = () => {
+  return getApiUrl().replace(/\/api\/?$/, '');
+};
+
+const API_URL = getApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,

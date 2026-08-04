@@ -2,6 +2,7 @@
 
 import React from "react";
 import { X, ExternalLink, Download, FileText, Loader2 } from "lucide-react";
+import { getBaseUrl } from "@/lib/api";
 
 interface DocumentReaderProps {
   title: string;
@@ -17,7 +18,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const safeFileUrl = fileUrl || "";
   const safeTitle = title || "";
 
-  const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
+  const BASE_URL = getBaseUrl();
 
   const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
     ? safeFileUrl
