@@ -681,8 +681,11 @@ const EditTemplateLetterPage = () => {
       for (const v of selectedTemplateObj.variables) {
         if (
           v.required &&
-          !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah"].includes(v.key)
+          !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail"].includes(v.key)
         ) {
+          if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {
+            continue;
+          }
           if (!templateVariables[v.key] || !templateVariables[v.key].trim()) {
             errors[`var_${v.key}`] = `${v.label} wajib diisi`;
             if (!firstInvalidTab) firstInvalidTab = "variables";
@@ -1746,12 +1749,47 @@ const EditTemplateLetterPage = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                     {selectedTemplateObj.variables
-                      .filter((v: any) => !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah"].includes(v.key))
+                      .filter((v: any) => {
+                        if (["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail"].includes(v.key)) {
+                          return false;
+                        }
+                        if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {
+                          return false;
+                        }
+                        return true;
+                      })
                       .map((v: any) => {
                         const errKey = `var_${v.key}`;
                         const hasErr = !!formErrors[errKey];
                         return (
-                          <div key={v.key} className="space-y-2">
+                          <div key={v.key} className={cn("space-y-2", v.key === "agendaDetail" && "md:col-span-2")}>
+                            {v.key === "agendaRapat" && (
+                              <div className="flex items-center gap-2 mb-1.5 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 md:col-span-2">
+                                <input
+                                  type="checkbox"
+                                  id="toggle-agenda-terlampir"
+                                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer"
+                                  checked={templateVariables.showAgendaDetail === "block"}
+                                  onChange={(e) => {
+                                    const isChecked = e.target.checked;
+                                    setTemplateVariables({
+                                      ...templateVariables,
+                                      agendaRapat: isChecked ? "Terlampir" : "",
+                                      showAgendaDetail: isChecked ? "block" : "none",
+                                      ...(isChecked ? {} : { agendaDetail: "" })
+                                    });
+                                    // clear errors
+                                    const newErrs = { ...formErrors };
+                                    delete newErrs.var_agendaRapat;
+                                    delete newErrs.var_agendaDetail;
+                                    setFormErrors(newErrs);
+                                  }}
+                                />
+                                <label htmlFor="toggle-agenda-terlampir" className="text-[11px] font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                  Agenda Rapat Terlampir (Detail Agenda di Halaman Ketiga)
+                                </label>
+                              </div>
+                            )}
                             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
                               {v.label}
                               {v.required && <span className="text-red-500 ml-0.5">*</span>}
@@ -1762,7 +1800,8 @@ const EditTemplateLetterPage = () => {
                                 required={v.required}
                                 placeholder={v.placeholder || `Masukkan ${v.label}`}
                                 className={cn(
-                                  "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none h-[80px]",
+                                  "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none",
+                                  v.key === "agendaDetail" || v.key === "daftarUndangan" ? "h-[160px]" : "h-[80px]",
                                   hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
                                 )}
                                 value={templateVariables[v.key] || ""}
@@ -1791,10 +1830,12 @@ const EditTemplateLetterPage = () => {
                               <input
                                 type="text"
                                 required={v.required}
+                                disabled={v.key === "agendaRapat" && templateVariables.showAgendaDetail === "block"}
                                 placeholder={v.placeholder || `Masukkan ${v.label}`}
                                 className={cn(
                                   "w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm",
-                                  hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
+                                  hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20",
+                                  v.key === "agendaRapat" && templateVariables.showAgendaDetail === "block" && "opacity-75 cursor-not-allowed bg-slate-100 dark:bg-slate-850"
                                 )}
                                 value={templateVariables[v.key] || ""}
                                 onChange={(e) => {
