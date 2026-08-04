@@ -1054,7 +1054,7 @@ const CreateDocumentPage = () => {
       // 2. Submit the Workflow config
       await api.post("/workflow/submit", {
         documentId,
-        stepConfig: steps.map((s, i) => ({ stepNumber: i + 1, userId: s.userId })),
+        stepConfig: steps.map((s, i) => ({ stepNumber: i + 1, userId: s.userId, role: s.role })),
       });
 
       setSuccess(true);

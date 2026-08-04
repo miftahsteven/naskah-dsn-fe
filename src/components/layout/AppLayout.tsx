@@ -40,19 +40,19 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   useEffect(() => {
     if (!hasHydrated) return;
 
-    const publicPaths = ["/login", "/register", "/forgot-password"];
-    if (!isAuthenticated && !publicPaths.includes(pathname)) {
+    const isPublic = ["/login", "/register", "/forgot-password"].includes(pathname) || pathname.startsWith("/verify/");
+    if (!isAuthenticated && !isPublic) {
       router.push("/login");
     }
 
-    // Redirect authenticated users away from public paths
-    if (isAuthenticated && publicPaths.includes(pathname)) {
+    // Redirect authenticated users away from public login/register paths
+    if (isAuthenticated && ["/login", "/register", "/forgot-password"].includes(pathname)) {
       router.push("/dashboard");
     }
   }, [isAuthenticated, pathname, router, hasHydrated]);
 
   // Don't show layout for login/public pages
-  const isPublicPage = ["/login", "/register", "/forgot-password"].includes(pathname);
+  const isPublicPage = ["/login", "/register", "/forgot-password"].includes(pathname) || pathname.startsWith("/verify/");
 
   if (isPublicPage) {
     return <>{children}</>;
