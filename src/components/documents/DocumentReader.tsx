@@ -271,35 +271,6 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
       }
     });
 
-    // 2. Append Digital Signature Info block at bottom of body (without page-break-before: always)
-    if (!enhanced.includes('digital-signatures-section')) {
-      const itemsHtml = signatureRows.map((row) => `
-        <div style="display:flex; gap:12px; align-items:center; background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; min-width:240px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-          <div style="width:70px; height:70px; border:1px solid ${HTML_PDF_PRIMARY_COLOR}; border-radius:8px; padding:4px; display:flex; align-items:center; justify-content:center; background:#fff; flex-shrink:0;">
-            <img src="${signatureQrMap[row.id]}" alt="QR Code" style="width:100%; height:100%; object-fit:contain;" />
-          </div>
-          <div>
-            <div style="font-weight:700; font-size:12px; color:#0f172a;">${row.fullName}</div>
-            <div style="font-size:11px; color:#475569;">${row.jobTitle}</div>
-            <div style="font-size:10px; color:#16a34a; font-weight:600; margin-top:3px;">✓ Signed & Verified</div>
-            <div style="font-size:9.5px; color:#64748b; margin-top:2px;">${row.signedAt}</div>
-          </div>
-        </div>`).join('');
-
-      const signatureBlock = `
-      <div class="digital-signatures-section" style="margin-top:24px; padding:16px; border-top:2px dashed ${HTML_PDF_PRIMARY_COLOR}; background:#f8fafc; border-radius:12px; page-break-inside:avoid; font-family:Arial,Helvetica,sans-serif;">
-        <div style="font-size:12px; font-weight:700; color:${HTML_PDF_PRIMARY_COLOR}; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
-          Informasi Verifikasi Tanda Tangan Digital (DSN-MUI Amanah)
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:14px;">
-          ${itemsHtml}
-        </div>
-      </div>`;
-
-      if (/<\/body>/i.test(enhanced)) enhanced = enhanced.replace(/<\/body>/i, `${signatureBlock}</body>`);
-      else enhanced += signatureBlock;
-    }
-
     setHtmlContentWithSignatures(enhanced);
   }, [isHtml, htmlContent, signatureRows, signatureQrMap]);
 
