@@ -238,7 +238,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
       if (tokens.length === 0) return;
 
-      const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s)+');
+      const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s|&nbsp;|&#160;)+');
       const nameRegex = new RegExp(namePattern, 'gi');
 
       const match = nameRegex.exec(enhanced);
@@ -278,6 +278,25 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         }
       }
     });
+
+    // Inject CSS rules to scale down large logo images in the letterhead
+    const imageStyle = `
+      <style id="amanah-kop-styles">
+        .kop-surat img, td img, img[src^="data:image"] {
+          max-width: 75px !important;
+          max-height: 90px !important;
+          height: auto !important;
+          width: auto !important;
+          display: inline-block !important;
+          vertical-align: middle !important;
+        }
+      </style>
+    `;
+    if (enhanced.includes('</head>')) {
+      enhanced = enhanced.replace('</head>', `${imageStyle}\n</head>`);
+    } else {
+      enhanced = imageStyle + enhanced;
+    }
 
     setHtmlContentWithSignatures(enhanced);
   }, [isHtml, htmlContent, signatureRows, signatureQrMap]);
