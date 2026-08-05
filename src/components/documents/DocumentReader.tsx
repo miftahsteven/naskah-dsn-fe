@@ -4,6 +4,8 @@ import React from "react";
 import { X, ExternalLink, Download, FileText, Loader2 } from "lucide-react";
 import { getBaseUrl } from "@/lib/api";
 
+const HTML_PDF_PRIMARY_COLOR = '#2563eb';
+
 interface DocumentReaderProps {
   title: string;
   fileUrl: string;
@@ -13,6 +15,7 @@ interface DocumentReaderProps {
 
 const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen, onClose }) => {
   const [htmlContent, setHtmlContent] = React.useState<string | null>(null);
+  const [htmlContentWithSignatures, setHtmlContentWithSignatures] = React.useState<string | null>(null);
 
   // Safely check properties to avoid errors when closed with empty props
   const safeFileUrl = fileUrl || "";
@@ -94,22 +97,24 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   React.useEffect(() => {
     let cancelled = false;
     async function resolveDocFileUrl() {
-      if (!builtUrl) return;
-      if (builtUrl.includes('/api/documents/') && !builtUrl.endsWith('/download')) {
-        try {
-          const headers: Record<string, string> = {};
-          if (token) headers['Authorization'] = `Bearer ${token}`;
-          const res = await fetch(builtUrl, { headers });
-          if (!res.ok) return;
-          const json = await res.json();
-          if (cancelled) return;
-          const version = json?.data?.versions?.[0];
-          const resolved = version?.fileUrl || json?.data?.fileUrl;
-          if (resolved) setResolvedUrl(resolved);
-          if (version?.mimeType) setResolvedMimeType(version.mimeType);
-        } catch (err) {
-          console.warn('Failed to resolve document detail to version URL:', err);
-        }
+      if (!builtUrl || !builtUrl.includes('/api/documents/')) return;
+
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const detailUrl = builtUrl.replace(/\/download$/, '');
+        const res = await fetch(detailUrl, { headers });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+
+        const version = json?.data?.versions?.[0];
+        const resolved = version?.fileUrl || json?.data?.fileUrl;
+        const mimeType = version?.mimeType || json?.data?.mimeType;
+        if (resolved) setResolvedUrl(resolved);
+        if (mimeType) setResolvedMimeType(mimeType);
+      } catch (err) {
+        console.warn('Failed to resolve document detail to version URL:', err);
       }
     }
     resolveDocFileUrl();
@@ -194,6 +199,43 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     generateSignatureQrs();
     return () => { cancelled = true; };
   }, [signatureRows]);
+
+  React.useEffect(() => {
+    if (!isHtml || !htmlContent) {
+      setHtmlContentWithSignatures(null);
+      return;
+    }
+
+    if (!signatureRows.length || Object.keys(signatureQrMap).length !== signatureRows.length) {
+      setHtmlContentWithSignatures(htmlContent);
+      return;
+    }
+
+    let enhanced = htmlContent;
+    if (!/<!doctype html>/i.test(enhanced)) enhanced = `<!doctype html>\n${enhanced}`;
+
+    const itemsHtml = signatureRows.map((row) => `
+      <div style="display:flex; gap:16px; align-items:center; margin-bottom:24px;">
+        <div style="width:100px; height:100px; border:2px solid ${HTML_PDF_PRIMARY_COLOR}; border-radius:12px; padding:8px; display:flex; align-items:center; justify-content:center; background:#fff;">
+          <img src="${signatureQrMap[row.id]}" alt="QR Code" style="width:100%; height:100%; object-fit:contain;" />
+        </div>
+        <div>
+          <div style="font-weight:700;">${row.fullName}</div>
+          <div style="font-size:12px; color:#475569;">${row.jobTitle}</div>
+          <div style="font-size:11px; color:#64748b; margin-top:6px;">Signed at: ${row.signedAt}</div>
+        </div>
+      </div>`).join('');
+
+    const signatureBlock = `<div style="page-break-before:always; padding:20px; font-family:Arial,Helvetica,sans-serif; background:#f8fafc;">
+      <h2 style="color:${HTML_PDF_PRIMARY_COLOR}; margin-bottom:16px;">Digital Signing Info</h2>
+      ${itemsHtml}
+    </div>`;
+
+    if (/<\/body>/i.test(enhanced)) enhanced = enhanced.replace(/<\/body>/i, `${signatureBlock}</body>`);
+    else enhanced += signatureBlock;
+
+    setHtmlContentWithSignatures(enhanced);
+  }, [isHtml, htmlContent, signatureRows, signatureQrMap]);
 
   React.useEffect(() => {
     if (isOpen && isHtml && directUrl) {
@@ -442,7 +484,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
                 <iframe
                   id="document-iframe"
                   src={isHtml ? undefined : (isPdf ? (blobUrl || viewerUrl) : viewerUrl)}
-                  srcDoc={isHtml ? (htmlContent || "") : undefined}
+                  srcDoc={isHtml ? (htmlContentWithSignatures || htmlContent || "") : undefined}
                   className="w-full h-full border-none relative z-10 bg-white"
                   title={title}
                 />
