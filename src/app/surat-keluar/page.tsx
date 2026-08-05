@@ -427,7 +427,11 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      fetch(fullUrl, { headers })
+      const previewUrl = fullUrl.includes('?')
+        ? `${fullUrl}&preview=html`
+        : `${fullUrl}?preview=html`;
+
+      fetch(previewUrl, { headers })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
