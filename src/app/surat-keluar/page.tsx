@@ -575,6 +575,7 @@ const DocumentsPage = () => {
       const res = await fetch(fullUrl, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
+      const contentType = res.headers.get('Content-Type') || '';
       const contentDisposition = res.headers.get('Content-Disposition');
       let finalFileName = fileName || 'dokumen';
       if (contentDisposition) {
@@ -583,8 +584,16 @@ const DocumentsPage = () => {
           finalFileName = match[1];
         }
       }
-      if (finalFileName.match(/\.(html?|htm)$/i)) {
-        finalFileName = finalFileName.replace(/\.(html?|htm)$/i, '.pdf');
+      if (contentType.includes('application/pdf')) {
+        if (!finalFileName.toLowerCase().endsWith('.pdf')) {
+          finalFileName = finalFileName.replace(/\.(html?|htm)$/i, '') + '.pdf';
+        }
+      } else if (contentType.includes('text/html')) {
+        if (finalFileName.toLowerCase().endsWith('.pdf')) {
+          finalFileName = finalFileName.replace(/\.pdf$/i, '.html');
+        } else if (!finalFileName.match(/\.(html?|htm)$/i)) {
+          finalFileName += '.html';
+        }
       }
 
       const blob = await res.blob();
