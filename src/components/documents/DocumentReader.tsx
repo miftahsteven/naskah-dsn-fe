@@ -49,6 +49,34 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     fullUrlWithToken = `${effectiveUrl}${separator}token=${encodeURIComponent(token)}`;
   }
 
+  const downloadFileName = isHtml
+    ? `${safeTitle.replace(/[/\\?%*:|"<>]/g, '_').replace(/\.(html?|htm)$/i, '') || 'document'}.pdf`
+    : safeTitle || 'document';
+
+  const handleDownload = async (downloadUrl: string, filename: string) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(downloadUrl, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Gagal mendownload berkas:', err);
+      alert('Gagal mendownload berkas');
+    }
+  };
+
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
   const [pdfComponents, setPdfComponents] = React.useState<{ Document?: any; Page?: any } | null>(null);
   const [pdfNumPages, setPdfNumPages] = React.useState<number>(0);
@@ -89,9 +117,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const rawUrl = `${directUrl}${directUrl.includes('?') ? '&' : '?'}raw=true`;
-
-      fetch(rawUrl, { headers })
+      fetch(directUrl, { headers })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
@@ -223,50 +249,13 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
             >
               <ExternalLink size={20} />
             </a>
-            {isHtml ? (
-              <button
-                onClick={() => {
-                  const iframe = document.getElementById('document-iframe') as HTMLIFrameElement;
-                  if (iframe && iframe.contentWindow) {
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
-                  }
-                }}
-                className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-                title="Cetak / Simpan ke PDF"
-              >
-                <Download size={20} />
-              </button>
-            ) : (
-              <button
-                onClick={async () => {
-                  try {
-                    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-                    const headers: Record<string, string> = {};
-                    if (token) {
-                      headers['Authorization'] = `Bearer ${token}`;
-                    }
-                    const res = await fetch(effectiveUrl, { headers });
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', title);
-                    document.body.appendChild(link);
-                    link.click();
-                    link.parentNode?.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                  } catch (err) {
-                    console.error("Gagal mendownload berkas:", err);
-                    alert("Gagal mendownload berkas");
-                  }
-                }}
-                className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-                title="Download file"
-              >
-                <Download size={20} />
-              </button>
-            )}
+            <button
+              onClick={() => handleDownload(fullUrlWithToken, downloadFileName)}
+              className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+              title={isHtml ? 'Download HTML sebagai PDF' : 'Download file'}
+            >
+              <Download size={20} />
+            </button>
             <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
             <button
               onClick={onClose}
