@@ -52,9 +52,17 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     fullUrlWithToken = `${effectiveUrl}${separator}token=${encodeURIComponent(token)}`;
   }
 
+  const appendQueryParam = (url: string, key: string, value: string) => {
+    if (!url) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+  };
+
   const downloadFileName = isHtml
     ? `${safeTitle.replace(/[/\\?%*:|"<>]/g, '_').replace(/\.(html?|htm)$/i, '') || 'document'}.pdf`
     : safeTitle || 'document';
+
+  const downloadUrl = isHtml ? appendQueryParam(fullUrlWithToken, 'pdf', '1') : fullUrlWithToken;
+  const htmlPreviewUrl = isHtml ? appendQueryParam(fullUrlWithToken, 'preview', 'html') : fullUrlWithToken;
 
   const handleDownload = async (downloadUrl: string, filename: string) => {
     try {
@@ -238,7 +246,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   }, [isHtml, htmlContent, signatureRows, signatureQrMap]);
 
   React.useEffect(() => {
-    if (isOpen && isHtml && directUrl) {
+    if (isOpen && isHtml && htmlPreviewUrl) {
       setHtmlContent(null);
 
       const headers: Record<string, string> = {};
@@ -246,7 +254,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      fetch(directUrl, { headers })
+      fetch(htmlPreviewUrl, { headers })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
@@ -254,7 +262,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         .then(text => setHtmlContent(text))
         .catch(err => console.error("Failed to load HTML:", err));
     }
-  }, [isOpen, isHtml, directUrl, token]);
+  }, [isOpen, isHtml, htmlPreviewUrl, token]);
 
   // Try converting DOCX to HTML in-browser using mammoth (if available).
   React.useEffect(() => {
@@ -379,7 +387,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
               <ExternalLink size={20} />
             </a>
             <button
-              onClick={() => handleDownload(fullUrlWithToken, downloadFileName)}
+              onClick={() => handleDownload(downloadUrl, downloadFileName)}
               className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
               title={isHtml ? 'Download HTML sebagai PDF' : 'Download file'}
             >
