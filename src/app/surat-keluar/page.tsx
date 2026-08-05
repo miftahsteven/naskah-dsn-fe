@@ -401,7 +401,7 @@ const RevisionModal = ({
 
 const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string }) => {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
-  const [fetchError, setFetchError] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const BASE_URL = getBaseUrl();
   const safeFileUrl = fileUrl || "";
@@ -417,32 +417,40 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
   }
 
   const isDocx = title.toLowerCase().endsWith('.docx') || title.toLowerCase().endsWith('.doc') || safeFileUrl.toLowerCase().endsWith('.docx') || safeFileUrl.toLowerCase().endsWith('.doc');
-  const isHtml = title.toLowerCase().endsWith('.html') || safeFileUrl.toLowerCase().endsWith('.html');
+  const isPdf = title.toLowerCase().endsWith('.pdf') || safeFileUrl.toLowerCase().endsWith('.pdf');
+  const isHtml = title.toLowerCase().endsWith('.html') || safeFileUrl.toLowerCase().endsWith('.html') || (!isDocx && !isPdf);
 
   useEffect(() => {
-    if (isHtml && fullUrl) {
+    if (isHtml && fullUrlWithToken) {
       setHtmlContent(null);
-      setFetchError(false);
+      setFetchError(null);
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const previewUrl = fullUrl.includes('?')
-        ? `${fullUrl}&preview=html`
-        : `${fullUrl}?preview=html`;
+      const previewUrl = fullUrlWithToken.includes('?')
+        ? `${fullUrlWithToken}&preview=html`
+        : `${fullUrlWithToken}?preview=html`;
 
       fetch(previewUrl, { headers })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        .then(async res => {
+          if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try {
+              const errJson = await res.json();
+              if (errJson.message) msg = errJson.message;
+            } catch (e) {}
+            throw new Error(msg);
+          }
           return res.text();
         })
         .then(text => setHtmlContent(text))
         .catch(err => {
-          console.error("Failed to load HTML:", err);
-          setFetchError(true);
+          console.error("Failed to load HTML preview:", err);
+          setFetchError(err.message || "Gagal memuat pratinjau dokumen.");
         });
     }
-  }, [isHtml, fullUrl, token]);
+  }, [isHtml, fullUrlWithToken, token]);
 
   const viewerUrl = isDocx 
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrlWithToken)}` 
@@ -451,8 +459,9 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
   if (isHtml) {
     if (fetchError) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center text-red-500 bg-slate-50 dark:bg-slate-900 p-4 text-center">
-          <p className="text-xs font-bold">Gagal memuat pratinjau dokumen. Silakan unduh file secara langsung.</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 bg-slate-50 dark:bg-slate-900 p-4 text-center">
+          <p className="text-xs font-bold mb-1">Gagal memuat pratinjau dokumen.</p>
+          <p className="text-[11px] text-slate-500 font-mono">{typeof fetchError === 'string' ? fetchError : ''}</p>
         </div>
       );
     }
@@ -468,7 +477,7 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
     }
     return (
       <div className="absolute inset-0 overflow-y-auto bg-[#e5e7eb] dark:bg-slate-950 p-2 md:p-6 lg:p-8 flex justify-center scrollbar-thin">
-         <div className="w-full max-w-[794px] h-[1123px] bg-white shadow-2xl ring-1 ring-black/5 relative flex-shrink-0">
+         <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl ring-1 ring-black/5 relative flex-shrink-0">
            <iframe srcDoc={htmlContent} className="w-full h-full absolute inset-0 border-none bg-white" title={title} />
          </div>
       </div>
