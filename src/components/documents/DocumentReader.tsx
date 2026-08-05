@@ -226,15 +226,57 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
     // 1. Inject QR code into matching signature boxes in letter HTML
     signatureRows.forEach(row => {
-      if (row.fullName && enhanced.includes(row.fullName)) {
-        const escapedName = escapeRegExp(row.fullName);
-        const regex = new RegExp(`(<div[^>]*style="[^"]*margin-bottom:\\s*\\d+px;?[^"]*"[^>]*>.*?<\\/div>\\s*)(<div[^>]*>\\s*` + escapedName + `)`, 'gi');
-        if (regex.test(enhanced)) {
-          enhanced = enhanced.replace(regex, (match, p1, p2) => {
-            const newP1 = p1.replace(/margin-bottom:\s*\d+px/gi, 'margin-bottom: 4px');
-            const qrImg = `<div style="text-align:center; margin:4px 0;"><img src="${signatureQrMap[row.id]}" alt="QR Code" style="width:70px; height:70px; object-fit:contain; display:inline-block;" /></div>`;
-            return newP1 + qrImg + p2;
-          });
+      const qrDataUrl = signatureQrMap[row.id];
+      if (!qrDataUrl) return;
+
+      const rawName = row.fullName || '';
+      if (!rawName) return;
+
+      const tokens = rawName
+        .split(/[\s,.]+/)
+        .filter((t: string) => t.length >= 3 && !/^(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir)$/i.test(t));
+
+      if (tokens.length === 0) return;
+
+      const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s)+');
+      const nameRegex = new RegExp(namePattern, 'gi');
+
+      const match = nameRegex.exec(enhanced);
+      if (match) {
+        const matchIndex = match.index;
+        const matchedText = match[0];
+        const prefix = enhanced.substring(0, matchIndex);
+
+        const lastOpenTagIndex = prefix.lastIndexOf('<');
+        let elementStartIndex = matchIndex;
+        if (lastOpenTagIndex !== -1) {
+          const tagSub = prefix.substring(Math.max(0, lastOpenTagIndex - 250));
+          const blockMatch = tagSub.match(/<(div|p|td|span|tr|li|b|u|strong)[^>]*>(?:(?!<\/(div|p|td|span|tr|li|b|u|strong)>).)*$/i);
+          if (blockMatch && typeof blockMatch.index === 'number') {
+            elementStartIndex = Math.max(0, lastOpenTagIndex - 250) + blockMatch.index;
+          } else {
+            elementStartIndex = lastOpenTagIndex;
+          }
+        }
+
+        const realPrefix = enhanced.substring(0, elementStartIndex);
+        const elementAndSuffix = enhanced.substring(elementStartIndex);
+
+        const qrImageHtml = `<div style="display:flex; justify-content:center; align-items:center; margin:4px auto; text-align:center;"><img src="${qrDataUrl}" alt="QR Signature" style="width:75px; height:75px; object-fit:contain; display:block;" /></div>`;
+
+        const last300 = realPrefix.slice(-300);
+
+        if (/margin-bottom:\s*\d+px/i.test(last300)) {
+          const updatedLast300 = last300.replace(/margin-bottom:\s*\d+px/gi, 'margin-bottom: 4px');
+          enhanced = realPrefix.slice(0, -300) + updatedLast300 + qrImageHtml + elementAndSuffix;
+        } else if (/(<div[^>]*style="[^"]*(?:width|height|border)[^"]*"[^>]*>\s*<\/div>)/gi.test(last300)) {
+          const updatedLast300 = last300.replace(/(<div[^>]*style="[^"]*(?:width|height|border)[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
+          enhanced = realPrefix.slice(0, -300) + updatedLast300 + elementAndSuffix;
+        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(last300)) {
+          const updatedLast300 = last300.replace(/(?:<br\s*\/?>\s*){2,}/gi, '<br/>');
+          enhanced = realPrefix.slice(0, -300) + updatedLast300 + qrImageHtml + elementAndSuffix;
+        } else {
+          enhanced = realPrefix + qrImageHtml + elementAndSuffix;
         }
       }
     });
@@ -516,6 +558,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
                 </div>
               ) : (
                 <iframe
+                  key={htmlContentWithSignatures || htmlContent || 'loading'}
                   id="document-iframe"
                   src={isHtml ? undefined : (isPdf ? (blobUrl || viewerUrl) : viewerUrl)}
                   srcDoc={isHtml ? (htmlContentWithSignatures || htmlContent || "") : undefined}
