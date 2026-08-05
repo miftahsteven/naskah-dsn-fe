@@ -19,21 +19,29 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const safeTitle = title || "";
 
   const BASE_URL = getBaseUrl();
-  const fullUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
+  const builtUrl = safeFileUrl.startsWith("http://") || safeFileUrl.startsWith("https://")
     ? safeFileUrl
     : `${BASE_URL}/${safeFileUrl.startsWith("/") ? safeFileUrl.slice(1) : safeFileUrl}`;
+  const [resolvedUrl, setResolvedUrl] = React.useState<string | null>(null);
+  const fullUrl = resolvedUrl || builtUrl;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-  let fullUrlWithToken = fullUrl;
-  if (token && (fullUrl.startsWith("http://") || fullUrl.startsWith("https://"))) {
-    const separator = fullUrl.includes('?') ? '&' : '?';
-    fullUrlWithToken = `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
-  }
 
-  const isDocx = safeTitle.toLowerCase().endsWith('.docx') || safeTitle.toLowerCase().endsWith('.doc') || safeFileUrl.toLowerCase().endsWith('.docx') || safeFileUrl.toLowerCase().endsWith('.doc');
-  const isHtml = safeTitle.toLowerCase().endsWith('.html') || safeFileUrl.toLowerCase().endsWith('.html');
-  const isPdf = safeTitle.toLowerCase().endsWith('.pdf') || safeFileUrl.toLowerCase().endsWith('.pdf');
-  const isLocalhost = fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1');
+  const isDetailEndpoint = builtUrl.includes('/api/documents/') && !builtUrl.endsWith('/download');
+  const directUrl = isDetailEndpoint ? resolvedUrl : fullUrl;
+  const effectiveUrl = directUrl || fullUrl;
+  const urlForType = safeTitle || effectiveUrl || safeFileUrl;
+  const lowerUrlForType = urlForType.toLowerCase();
+  const isDocx = lowerUrlForType.endsWith('.docx') || lowerUrlForType.endsWith('.doc');
+  const isHtml = lowerUrlForType.endsWith('.html');
+  const isPdf = lowerUrlForType.endsWith('.pdf');
+  const isLocalhost = (effectiveUrl || '').includes('localhost') || (effectiveUrl || '').includes('127.0.0.1');
+
+  let fullUrlWithToken = effectiveUrl;
+  if (token && effectiveUrl && (effectiveUrl.startsWith("http://") || effectiveUrl.startsWith("https://"))) {
+    const separator = effectiveUrl.includes('?') ? '&' : '?';
+    fullUrlWithToken = `${effectiveUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
 
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
   const [pdfComponents, setPdfComponents] = React.useState<{ Document?: any; Page?: any } | null>(null);
@@ -42,7 +50,31 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const [pdfScale, setPdfScale] = React.useState<number>(1.0);
 
   React.useEffect(() => {
-    if (isOpen && isHtml && fullUrl) {
+    let cancelled = false;
+    async function resolveDocFileUrl() {
+      if (!builtUrl) return;
+      if (builtUrl.includes('/api/documents/') && !builtUrl.endsWith('/download')) {
+        try {
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          const res = await fetch(builtUrl, { headers });
+          if (!res.ok) return;
+          const json = await res.json();
+          if (cancelled) return;
+          const version = json?.data?.versions?.[0];
+          const resolved = version?.fileUrl || json?.data?.fileUrl;
+          if (resolved) setResolvedUrl(resolved);
+        } catch (err) {
+          console.warn('Failed to resolve document detail to version URL:', err);
+        }
+      }
+    }
+    resolveDocFileUrl();
+    return () => { cancelled = true; };
+  }, [builtUrl, token]);
+
+  React.useEffect(() => {
+    if (isOpen && isHtml && directUrl) {
       setHtmlContent(null);
 
       const headers: Record<string, string> = {};
@@ -50,7 +82,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      fetch(fullUrl, { headers })
+      fetch(directUrl, { headers })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
@@ -58,11 +90,11 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         .then(text => setHtmlContent(text))
         .catch(err => console.error("Failed to load HTML:", err));
     }
-  }, [isOpen, isHtml, fullUrl, token]);
+  }, [isOpen, isHtml, directUrl, token]);
 
   // Try converting DOCX to HTML in-browser using mammoth (if available).
   React.useEffect(() => {
-    if (!(isOpen && isDocx && fullUrl)) return undefined;
+    if (!(isOpen && isDocx && directUrl)) return undefined;
 
     let cancelled = false;
 
@@ -71,7 +103,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    fetch(fullUrl, { headers })
+    fetch(directUrl, { headers })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.arrayBuffer();
@@ -93,11 +125,11 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
       cancelled = true;
       setHtmlContent(null);
     };
-  }, [isOpen, isDocx, fullUrl, token]);
+  }, [isOpen, isDocx, directUrl, token]);
 
   // Fetch PDF as blob when protected by auth or to avoid CORS issues; create object URL for iframe
   React.useEffect(() => {
-    if (!(isOpen && isPdf && fullUrl)) return undefined;
+    if (!(isOpen && isPdf && directUrl)) return undefined;
 
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -107,7 +139,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    fetch(fullUrl, { headers })
+    fetch(directUrl, { headers })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
@@ -136,7 +168,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
       }
       setBlobUrl(null);
     };
-  }, [isOpen, isPdf, fullUrl, token]);
+  }, [isOpen, isPdf, directUrl, token]);
 
   if (!isOpen) return null;
 
@@ -205,7 +237,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
                     if (token) {
                       headers['Authorization'] = `Bearer ${token}`;
                     }
-                    const res = await fetch(fullUrl, { headers });
+                    const res = await fetch(effectiveUrl, { headers });
                     const blob = await res.blob();
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
@@ -249,7 +281,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
                 Server simulasi lokal (<strong>localhost</strong>) tidak dapat diakses oleh layanan Microsoft Word Viewer secara langsung dari internet. File PDF dapat dilihat, namun file Microsoft Word sementara akan diunduh terlebih dahulu pada mode pengembang.
               </p>
               <a
-                href={fullUrl}
+                href={effectiveUrl}
                 download
                 className="flex items-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
@@ -259,7 +291,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
             </div>
           ) : (
             <>
-              {((isHtml && htmlContent === null) || (isPdf && blobUrl === null)) && (
+              {((isHtml && htmlContent === null) || (isPdf && blobUrl === null) || (isDetailEndpoint && !directUrl)) && (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none">
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 size={32} className="animate-spin text-primary/30" />
