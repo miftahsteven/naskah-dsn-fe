@@ -82,6 +82,14 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const [pdfNumPages, setPdfNumPages] = React.useState<number>(0);
   const [pdfPage, setPdfPage] = React.useState<number>(1);
   const [pdfScale, setPdfScale] = React.useState<number>(1.0);
+  const [signatureRows, setSignatureRows] = React.useState<Array<{
+    id: string;
+    fullName: string;
+    jobTitle: string;
+    signedAt: string;
+    payload: string;
+  }>>([]);
+  const [signatureQrMap, setSignatureQrMap] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
     let cancelled = false;
@@ -107,6 +115,85 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     resolveDocFileUrl();
     return () => { cancelled = true; };
   }, [builtUrl, token]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!builtUrl || !builtUrl.includes('/api/documents/')) return undefined;
+
+    async function loadDocumentSignatures() {
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const detailUrl = builtUrl.replace(/\/download$/, '');
+        const res = await fetch(detailUrl, { headers });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+
+        const signatures = json?.data?.signatures || [];
+        const rows = signatures
+          .filter((s: any) => s.signedAt)
+          .map((s: any) => ({
+            id: String(s.id),
+            fullName: s.user?.fullName || 'Penandatangan',
+            jobTitle: s.user?.jobTitle || 'Penandatangan',
+            signedAt: new Date(s.signedAt).toLocaleString('id-ID', {
+              timeZone: 'Asia/Jakarta',
+              dateStyle: 'long',
+              timeStyle: 'short',
+            }),
+            payload: JSON.stringify({
+              signatureId: s.id,
+              documentId: s.documentId,
+              userId: s.userId,
+              signedAt: s.signedAt,
+              fullName: s.user?.fullName,
+            }),
+          }));
+
+        setSignatureRows(rows);
+      } catch (err) {
+        console.warn('Failed to load document signatures for viewer:', err);
+      }
+    }
+
+    loadDocumentSignatures();
+    return () => { cancelled = true; };
+  }, [builtUrl, token]);
+
+  React.useEffect(() => {
+    if (!signatureRows.length) {
+      setSignatureQrMap({});
+      return undefined;
+    }
+
+    let cancelled = false;
+    async function generateSignatureQrs() {
+      try {
+        const qrcode = await import('qrcode');
+        const results = await Promise.all(signatureRows.map((row) =>
+          qrcode.toDataURL(row.payload, {
+            margin: 1,
+            width: 180,
+            color: { dark: '#0f172a', light: '#ffffff' },
+          })
+        ));
+
+        if (cancelled) return;
+
+        const qrMap: Record<string, string> = {};
+        signatureRows.forEach((row, index) => {
+          qrMap[row.id] = results[index];
+        });
+        setSignatureQrMap(qrMap);
+      } catch (err) {
+        console.warn('Failed to generate signature QR codes:', err);
+      }
+    }
+
+    generateSignatureQrs();
+    return () => { cancelled = true; };
+  }, [signatureRows]);
 
   React.useEffect(() => {
     if (isOpen && isHtml && directUrl) {
@@ -268,6 +355,35 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
         {/* Content Area */}
         <div className="flex-1 bg-slate-100 dark:bg-slate-900 relative">
+          {signatureRows.length > 0 && (
+            <div className="px-4 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 z-10">
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Penandatangan</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">QR Code Tanda Tangan</h3>
+                </div>
+                <span className="text-[11px] font-medium text-slate-400">Ditampilkan di viewer</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {signatureRows.map((row) => (
+                  <div key={row.id} className="flex items-center gap-3 p-3 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <div className="w-20 h-20 rounded-3xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden">
+                      {signatureQrMap[row.id] ? (
+                        <img src={signatureQrMap[row.id]} alt="QR Code" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="text-[10px] text-slate-400">Loading QR...</div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{row.fullName}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{row.jobTitle}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{row.signedAt}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {isDocx && isLocalhost ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900">
               <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-3xl shadow-sm flex items-center justify-center text-blue-500 mb-6 relative overflow-hidden">
