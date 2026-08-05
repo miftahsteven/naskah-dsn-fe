@@ -562,11 +562,23 @@ const DocumentsPage = () => {
       const res = await fetch(fullUrl, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
+      const contentDisposition = res.headers.get('Content-Disposition');
+      let finalFileName = fileName || 'dokumen';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) {
+          finalFileName = match[1];
+        }
+      }
+      if (finalFileName.match(/\.(html?|htm)$/i)) {
+        finalFileName = finalFileName.replace(/\.(html?|htm)$/i, '.pdf');
+      }
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', fileName || 'dokumen');
+      link.setAttribute('download', finalFileName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);

@@ -447,10 +447,22 @@ const DocumentDetailPage = () => {
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
       const response = await api.get(fileUrl, { responseType: 'blob' });
+      const contentDisposition = response.headers['content-disposition'];
+      let finalFileName = fileName || 'dokumen';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) {
+          finalFileName = match[1];
+        }
+      }
+      if (finalFileName.match(/\.(html?|htm)$/i)) {
+        finalFileName = finalFileName.replace(/\.(html?|htm)$/i, '.pdf');
+      }
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', fileName);
+      link.setAttribute('download', finalFileName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
