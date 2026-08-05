@@ -153,7 +153,7 @@ const ApprovalsPage = () => {
                        )}
                     </div>
                     <button 
-                      onClick={() => setReaderDoc({title: doc.title, fileUrl: currentVersion?.fileUrl || ""})}
+                      onClick={() => setReaderDoc({title: doc.title, fileUrl: currentVersion?.fileName?.toLowerCase().endsWith('.html') || currentVersion?.mimeType === 'text/html' ? `/api/documents/${doc.id}/download` : (currentVersion?.fileUrl || "")})}
                       className="text-slate-300 hover:text-primary transition-colors p-2 bg-slate-50 dark:bg-slate-800 rounded-xl"
                       title="Preview Document"
                     >

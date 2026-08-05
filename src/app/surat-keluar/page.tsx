@@ -658,7 +658,9 @@ const DocumentsPage = () => {
       alert("Tidak ada file untuk diunduh");
       return;
     }
-    handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
+    const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
+    const downloadUrl = isTemplate ? `/api/documents/${doc.id}/download` : latestVersion.fileUrl;
+    handleDownloadFile(downloadUrl, latestVersion.fileName);
   };
 
   const fetchData = async () => {
@@ -1627,7 +1629,8 @@ const DocumentsPage = () => {
                     if (!latestVersion) {
                        return <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-bold">Tidak ada file</div>;
                     }
-                    return <DocumentPreview fileUrl={latestVersion.fileUrl} title={latestVersion.fileName} />;
+                    const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
+                    return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} />;
                  })()}
               </div>
             </div>
@@ -1814,7 +1817,7 @@ const DocumentsPage = () => {
                             <p className="text-[10px] text-slate-400 mt-1 font-mono">{(v.fileSize / 1024 / 1024).toFixed(2)} MB · {new Date(v.createdAt).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</p>
                           </div>
                           <button
-                            onClick={() => handleDownloadFile(v.fileUrl, v.fileName)}
+                            onClick={() => handleDownloadFile(v.fileName?.toLowerCase().endsWith('.html') || v.mimeType === 'text/html' ? `/api/documents/${sidebarDoc.id}/versions/${v.id}/download` : v.fileUrl, v.fileName)}
                             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg transition-colors flex items-center justify-center shrink-0"
                             title="Unduh"
                           >

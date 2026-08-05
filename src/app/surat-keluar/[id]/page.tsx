@@ -476,9 +476,9 @@ const DocumentDetailPage = () => {
   const handleDownloadLatest = () => {
     if (!doc || !doc.versions || doc.versions.length === 0) return;
     const latestVersion = doc.versions[0];
-    const isTemplate = latestVersion.fileName?.endsWith('.html') || latestVersion.mimeType === 'text/html';
+    const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
     if (isTemplate) {
-      setReaderDoc({ title: latestVersion.fileName, fileUrl: latestVersion.fileUrl });
+      setReaderDoc({ title: latestVersion.fileName, fileUrl: `/api/documents/${doc.id}/download` });
     } else {
       handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
     }
@@ -606,11 +606,11 @@ const DocumentDetailPage = () => {
                         </td>
                           <td className="py-4 px-6 flex items-center justify-end gap-2 text-right">
                             <Can perform="DOC_VIEW">
-                              <button onClick={() => setReaderDoc({ title: v.fileName, fileUrl: v.fileUrl })} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Lihat Dokumen">
+                              <button onClick={() => setReaderDoc({ title: v.fileName, fileUrl: v.fileName?.toLowerCase().endsWith('.html') || v.mimeType === 'text/html' ? `/api/documents/${doc.id}/versions/${v.id}/download` : v.fileUrl })} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Lihat Dokumen">
                                 <Eye size={16} />
                               </button>
                             </Can>
-                            <button onClick={() => handleDownloadFile(v.fileUrl, v.fileName)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Unduh">
+                            <button onClick={() => handleDownloadFile(v.fileName?.toLowerCase().endsWith('.html') || v.mimeType === 'text/html' ? `/api/documents/${doc.id}/versions/${v.id}/download` : v.fileUrl, v.fileName)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all" title="Unduh">
                               <Download size={16} />
                             </button>
                             <Can perform="DOC_DELETE">
@@ -640,7 +640,7 @@ const DocumentDetailPage = () => {
                       <p className="text-[10px] text-slate-400">{new Date(v.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                       <div className="flex items-center gap-1.5">
                         <Can perform="DOC_VIEW">
-                          <button onClick={() => setReaderDoc({ title: v.fileName, fileUrl: v.fileUrl })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 rounded-lg text-[10px] font-bold text-blue-600 transition-all">
+                          <button onClick={() => setReaderDoc({ title: v.fileName, fileUrl: v.fileName?.toLowerCase().endsWith('.html') || v.mimeType === 'text/html' ? `/api/documents/${doc.id}/versions/${v.id}/download` : v.fileUrl })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 rounded-lg text-[10px] font-bold text-blue-600 transition-all">
                             <Eye size={14} /> Lihat
                           </button>
                         </Can>
@@ -651,7 +651,7 @@ const DocumentDetailPage = () => {
                             </button>
                           )}
                         </Can>
-                        <button onClick={() => handleDownloadFile(v.fileUrl, v.fileName)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-primary transition-all">
+                        <button onClick={() => handleDownloadFile(v.fileName?.toLowerCase().endsWith('.html') || v.mimeType === 'text/html' ? `/api/documents/${doc.id}/versions/${v.id}/download` : v.fileUrl, v.fileName)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-primary transition-all">
                           <Download size={14} /> Unduh
                         </button>
                       </div>
