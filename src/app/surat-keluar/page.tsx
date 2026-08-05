@@ -573,13 +573,12 @@ const DocumentsPage = () => {
       }
 
       const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '0';
+      tempDiv.style.position = 'fixed';
       tempDiv.style.top = '0';
-      tempDiv.style.zIndex = '-9999';
+      tempDiv.style.left = '0';
       tempDiv.style.width = '794px';
+      tempDiv.style.zIndex = '999999';
       tempDiv.style.background = '#ffffff';
-      tempDiv.style.pointerEvents = 'none';
       tempDiv.innerHTML = htmlText;
       document.body.appendChild(tempDiv);
 
@@ -588,7 +587,7 @@ const DocumentsPage = () => {
           margin: [8, 8, 8, 8],
           filename: pdfFileName,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
+          html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 800 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 

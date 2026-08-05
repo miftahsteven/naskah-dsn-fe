@@ -260,17 +260,19 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
         const qrImageHtml = `<div style="text-align:center; margin:2px auto; line-height:0; display:block;"><img src="${qrDataUrl}" alt="QR Signature" style="width:65px; height:65px; object-fit:contain; display:inline-block;" /></div>`;
 
-        const last300 = realPrefix.slice(-300);
+        const sliceLen = Math.min(300, realPrefix.length);
+        const prefixBase = realPrefix.slice(0, realPrefix.length - sliceLen);
+        const lastSlice = realPrefix.slice(realPrefix.length - sliceLen);
 
-        if (/margin-bottom:\s*\d+px/i.test(last300)) {
-          const updatedLast = last300.replace(/margin-bottom:\s*\d+px/gi, 'margin-bottom: 4px');
-          enhanced = realPrefix.slice(0, -300) + updatedLast + qrImageHtml + suffix;
-        } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(last300)) {
-          const updatedLast = last300.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
-          enhanced = realPrefix.slice(0, -300) + updatedLast + suffix;
-        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(last300)) {
-          const updatedLast = last300.replace(/(?:<br\s*\/?>\s*){2,}/gi, qrImageHtml);
-          enhanced = realPrefix.slice(0, -300) + updatedLast + suffix;
+        if (/margin-bottom:\s*\d+px/i.test(lastSlice)) {
+          const updatedSlice = lastSlice.replace(/margin-bottom:\s*\d+px/gi, 'margin-bottom: 4px');
+          enhanced = prefixBase + updatedSlice + qrImageHtml + suffix;
+        } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(lastSlice)) {
+          const updatedSlice = lastSlice.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
+          enhanced = prefixBase + updatedSlice + suffix;
+        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(lastSlice)) {
+          const updatedSlice = lastSlice.replace(/(?:<br\s*\/?>\s*){2,}/gi, qrImageHtml);
+          enhanced = prefixBase + updatedSlice + suffix;
         } else {
           enhanced = realPrefix + qrImageHtml + suffix;
         }
