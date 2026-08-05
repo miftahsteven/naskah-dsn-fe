@@ -23,6 +23,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
     ? safeFileUrl
     : `${BASE_URL}/${safeFileUrl.startsWith("/") ? safeFileUrl.slice(1) : safeFileUrl}`;
   const [resolvedUrl, setResolvedUrl] = React.useState<string | null>(null);
+  const [resolvedMimeType, setResolvedMimeType] = React.useState<string | null>(null);
   const fullUrl = resolvedUrl || builtUrl;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -32,9 +33,14 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const effectiveUrl = directUrl || fullUrl;
   const urlForType = safeTitle || effectiveUrl || safeFileUrl;
   const lowerUrlForType = urlForType.toLowerCase();
-  const isDocx = lowerUrlForType.endsWith('.docx') || lowerUrlForType.endsWith('.doc');
-  const isHtml = lowerUrlForType.endsWith('.html');
-  const isPdf = lowerUrlForType.endsWith('.pdf');
+  const isDocx = resolvedMimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    || resolvedMimeType === 'application/msword'
+    || lowerUrlForType.endsWith('.docx')
+    || lowerUrlForType.endsWith('.doc');
+  const isHtml = resolvedMimeType === 'text/html'
+    || lowerUrlForType.endsWith('.html')
+    || lowerUrlForType.endsWith('.htm');
+  const isPdf = resolvedMimeType === 'application/pdf' || lowerUrlForType.endsWith('.pdf');
   const isLocalhost = (effectiveUrl || '').includes('localhost') || (effectiveUrl || '').includes('127.0.0.1');
 
   let fullUrlWithToken = effectiveUrl;
@@ -64,6 +70,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
           const version = json?.data?.versions?.[0];
           const resolved = version?.fileUrl || json?.data?.fileUrl;
           if (resolved) setResolvedUrl(resolved);
+          if (version?.mimeType) setResolvedMimeType(version.mimeType);
         } catch (err) {
           console.warn('Failed to resolve document detail to version URL:', err);
         }
@@ -82,7 +89,9 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      fetch(directUrl, { headers })
+      const rawUrl = `${directUrl}${directUrl.includes('?') ? '&' : '?'}raw=true`;
+
+      fetch(rawUrl, { headers })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
