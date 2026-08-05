@@ -255,16 +255,16 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         const realPrefix = enhanced.substring(0, targetIndex);
         const suffix = enhanced.substring(targetIndex);
 
-        const qrImageHtml = `<div style="display:block; text-align:center; margin:6px auto 4px auto;"><img src="${qrDataUrl}" alt="QR Signature" style="width:70px; height:70px; object-fit:contain; display:inline-block;" /></div>`;
+        const qrImageHtml = `<div style="text-align:center; margin:2px auto; line-height:0; display:block;"><img src="${qrDataUrl}" alt="QR Signature" style="width:65px; height:65px; object-fit:contain; display:inline-block;" /></div>`;
 
-        const last150 = realPrefix.slice(-150);
+        const last200 = realPrefix.slice(-200);
 
-        if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(last150)) {
-          const updatedLast = last150.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
-          enhanced = realPrefix.slice(0, -150) + updatedLast + suffix;
-        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(last150)) {
-          const updatedLast = last150.replace(/(?:<br\s*\/?>\s*){2,}/gi, '<br/>' + qrImageHtml);
-          enhanced = realPrefix.slice(0, -150) + updatedLast + suffix;
+        if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(last200)) {
+          const updatedLast = last200.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
+          enhanced = realPrefix.slice(0, -200) + updatedLast + suffix;
+        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(last200)) {
+          const updatedLast = last200.replace(/(?:<br\s*\/?>\s*){2,}/gi, qrImageHtml);
+          enhanced = realPrefix.slice(0, -200) + updatedLast + suffix;
         } else {
           enhanced = realPrefix + qrImageHtml + suffix;
         }
