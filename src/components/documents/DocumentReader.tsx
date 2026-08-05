@@ -246,10 +246,13 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         const matchIndex = match.index;
         const prefix = enhanced.substring(0, matchIndex);
 
-        const wrapperMatch = prefix.match(/(?:<[bu]|<strong|<span|<p[^>]*>)[^<]*$/i);
+        const lastOpenTagIndex = prefix.lastIndexOf('<');
         let targetIndex = matchIndex;
-        if (wrapperMatch && typeof wrapperMatch.index === 'number') {
-          targetIndex = wrapperMatch.index;
+        if (lastOpenTagIndex !== -1) {
+          const tagSub = prefix.substring(lastOpenTagIndex);
+          if (/^<(div|p|u|b|strong|span)[^>]*>/i.test(tagSub)) {
+            targetIndex = lastOpenTagIndex;
+          }
         }
 
         const realPrefix = enhanced.substring(0, targetIndex);
@@ -257,14 +260,17 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
         const qrImageHtml = `<div style="text-align:center; margin:2px auto; line-height:0; display:block;"><img src="${qrDataUrl}" alt="QR Signature" style="width:65px; height:65px; object-fit:contain; display:inline-block;" /></div>`;
 
-        const last200 = realPrefix.slice(-200);
+        const last300 = realPrefix.slice(-300);
 
-        if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(last200)) {
-          const updatedLast = last200.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
-          enhanced = realPrefix.slice(0, -200) + updatedLast + suffix;
-        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(last200)) {
-          const updatedLast = last200.replace(/(?:<br\s*\/?>\s*){2,}/gi, qrImageHtml);
-          enhanced = realPrefix.slice(0, -200) + updatedLast + suffix;
+        if (/margin-bottom:\s*\d+px/i.test(last300)) {
+          const updatedLast = last300.replace(/margin-bottom:\s*\d+px/gi, 'margin-bottom: 4px');
+          enhanced = realPrefix.slice(0, -300) + updatedLast + qrImageHtml + suffix;
+        } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(last300)) {
+          const updatedLast = last300.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
+          enhanced = realPrefix.slice(0, -300) + updatedLast + suffix;
+        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(last300)) {
+          const updatedLast = last300.replace(/(?:<br\s*\/?>\s*){2,}/gi, qrImageHtml);
+          enhanced = realPrefix.slice(0, -300) + updatedLast + suffix;
         } else {
           enhanced = realPrefix + qrImageHtml + suffix;
         }

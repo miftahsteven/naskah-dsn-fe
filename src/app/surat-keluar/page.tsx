@@ -573,11 +573,13 @@ const DocumentsPage = () => {
       }
 
       const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.left = '-9999px';
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '0';
       tempDiv.style.top = '0';
+      tempDiv.style.zIndex = '-9999';
       tempDiv.style.width = '794px';
       tempDiv.style.background = '#ffffff';
+      tempDiv.style.pointerEvents = 'none';
       tempDiv.innerHTML = htmlText;
       document.body.appendChild(tempDiv);
 
