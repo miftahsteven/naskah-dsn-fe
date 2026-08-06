@@ -23,7 +23,7 @@ import {
   Send,
   Eye
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { getBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
@@ -518,10 +518,7 @@ const DocumentDetailPage = () => {
    */
   const handleDownloadLatestAsPdf = async (docId: string, fileName: string) => {
     try {
-      const BASE_URL = typeof window !== 'undefined'
-        ? (process.env.NEXT_PUBLIC_API_URL || (window.location.hostname.includes('mscode.id') ? 'https://mui-api.mscode.id/api' : 'http://localhost:4002/api'))
-        : 'http://localhost:4002/api';
-      const baseUrl = BASE_URL.replace(/\/api\/?$/, '');
+      const baseUrl = getBaseUrl();
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
       const res = await fetch(`${baseUrl}/api/documents/${docId}/render`, {
@@ -542,10 +539,7 @@ const DocumentDetailPage = () => {
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      const BASE_URL = typeof window !== 'undefined'
-        ? (process.env.NEXT_PUBLIC_API_URL || (window.location.hostname.includes('mscode.id') ? 'https://mui-api.mscode.id/api' : 'http://localhost:4002/api'))
-        : 'http://localhost:4002/api';
-      const baseUrl = BASE_URL.replace(/\/api\/?$/, '');
+      const baseUrl = getBaseUrl();
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const safeFileUrl = fileUrl || '';
       const fullUrl = safeFileUrl.startsWith('http://') || safeFileUrl.startsWith('https://')
