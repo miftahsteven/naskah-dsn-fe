@@ -251,6 +251,11 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       return;
     }
 
+    if (htmlContent.includes('qr-signature-img') || htmlContent.includes('alt="QR Signature"')) {
+      setHtmlContentWithSignatures(htmlContent);
+      return;
+    }
+
     if (!signatureRows.length || Object.keys(signatureQrMap).length !== signatureRows.length) {
       setHtmlContentWithSignatures(htmlContent);
       return;
@@ -340,7 +345,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
       }
 
-      const qrImageHtml = `<div style="text-align:center; margin:2px auto; line-height:0; display:block;"><img src="${qrDataUrl}" alt="QR Signature" style="width:65px; height:65px; object-fit:contain; display:inline-block;" /></div>`;
+      const qrImageHtml = `<div style="text-align:center; margin:4px auto; line-height:1; display:block;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:70px !important; height:70px !important; min-width:70px !important; min-height:70px !important; object-fit:contain !important; display:inline-block !important;" /></div>`;
 
       if (match) {
         const matchIndex = match.index;
