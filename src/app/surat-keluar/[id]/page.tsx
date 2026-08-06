@@ -930,6 +930,7 @@ const DocumentDetailPage = () => {
         onClose={() => setReaderDoc(null)}
         title={readerDoc?.title || ""}
         fileUrl={readerDoc?.fileUrl || ""}
+        docId={doc.id}
       />
 
       {/* Revision Modal */}

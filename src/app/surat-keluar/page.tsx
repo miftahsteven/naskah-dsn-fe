@@ -522,7 +522,7 @@ const DocumentsPage = () => {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [sidebarDoc, setSidebarDoc] = useState<any>(null);
   const [fetchingSidebar, setFetchingSidebar] = useState(false);
-  const [readerDoc, setReaderDoc] = useState<{ title: string, fileUrl: string } | null>(null);
+  const [readerDoc, setReaderDoc] = useState<{ title: string, fileUrl: string, id?: string } | null>(null);
 
   // Sidebar Modals
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
@@ -1931,6 +1931,7 @@ const DocumentsPage = () => {
           onClose={() => setReaderDoc(null)}
           title={readerDoc.title}
           fileUrl={readerDoc.fileUrl}
+          docId={readerDoc.id}
         />
       )}
     </div>

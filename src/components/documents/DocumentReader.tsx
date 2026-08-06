@@ -9,11 +9,12 @@ const HTML_PDF_PRIMARY_COLOR = '#2563eb';
 interface DocumentReaderProps {
   title: string;
   fileUrl: string;
+  docId?: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen, onClose }) => {
+const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, isOpen, onClose }) => {
   const [htmlContent, setHtmlContent] = React.useState<string | null>(null);
   const [htmlContentWithSignatures, setHtmlContentWithSignatures] = React.useState<string | null>(null);
 
@@ -409,7 +410,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   }, [isHtml, htmlContent, signatureRows, signatureQrMap]);
 
   React.useEffect(() => {
-    if (isOpen && isHtml && htmlPreviewUrl) {
+    if (isOpen && isHtml) {
       setHtmlContent(null);
 
       const headers: Record<string, string> = {};
@@ -417,7 +418,15 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      fetch(htmlPreviewUrl, { headers })
+      // Extract document ID from docId prop or builtUrl
+      const extractedDocId = docId || builtUrl.match(/\/api\/documents\/([^/?]+)/)?.[1];
+      const targetFetchUrl = extractedDocId 
+        ? `${BASE_URL}/api/documents/${extractedDocId}/render`
+        : htmlPreviewUrl;
+
+      if (!targetFetchUrl) return;
+
+      fetch(targetFetchUrl, { headers })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
@@ -425,7 +434,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         .then(text => setHtmlContent(text))
         .catch(err => console.error("Failed to load HTML:", err));
     }
-  }, [isOpen, isHtml, htmlPreviewUrl, token]);
+  }, [isOpen, isHtml, htmlPreviewUrl, docId, builtUrl, BASE_URL, token]);
 
   // Try converting DOCX to HTML in-browser using mammoth (if available).
   React.useEffect(() => {

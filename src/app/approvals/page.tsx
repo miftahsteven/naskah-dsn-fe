@@ -38,7 +38,7 @@ const ApprovalsPage = () => {
   const [confirmAction, setConfirmAction] = useState<'APPROVE' | 'REJECT' | 'REVISION' | null>(null);
 
   // Reader State
-  const [readerDoc, setReaderDoc] = useState<{title: string, fileUrl: string} | null>(null);
+  const [readerDoc, setReaderDoc] = useState<{title: string, fileUrl: string, id?: string, documentId?: string} | null>(null);
 
 
   const fetchQueue = async () => {
@@ -337,6 +337,7 @@ const ApprovalsPage = () => {
         onClose={() => setReaderDoc(null)}
         title={readerDoc?.title || ""}
         fileUrl={readerDoc?.fileUrl || ""}
+        docId={readerDoc?.documentId || readerDoc?.id}
       />
     </div>
   );
