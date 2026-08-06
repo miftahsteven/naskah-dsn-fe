@@ -145,9 +145,10 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         if (cancelled) return;
 
         const signatures = json?.data?.signatures || [];
-        const rows = signatures
-          .filter((s: any) => s.signedAt)
-          .map((s: any) => ({
+        const rows: any[] = [];
+
+        signatures.filter((s: any) => s.signedAt).forEach((s: any) => {
+          rows.push({
             id: String(s.id),
             userId: String(s.userId),
             fullName: s.user?.fullName || 'Penandatangan',
@@ -164,7 +165,40 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
               signedAt: s.signedAt,
               fullName: s.user?.fullName,
             }),
-          }));
+          });
+        });
+
+        // Also check approved workflow steps as fallback signatures
+        const workflowInstances = json?.data?.workflowInstances || json?.data?.workflow || [];
+        const instancesList = Array.isArray(workflowInstances) ? workflowInstances : [workflowInstances];
+        instancesList.forEach((wf: any) => {
+          (wf?.steps || []).forEach((st: any) => {
+            if ((st.status === 'APPROVED' || st.status === 'SIGNED') && st.userId) {
+              const exists = rows.some(r => r.userId === String(st.userId));
+              if (!exists) {
+                const signedDate = st.actionedAt || st.updatedAt || new Date();
+                rows.push({
+                  id: String(st.id),
+                  userId: String(st.userId),
+                  fullName: st.user?.fullName || 'Penandatangan',
+                  jobTitle: st.user?.jobTitle || 'Penandatangan',
+                  signedAt: new Date(signedDate).toLocaleString('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    dateStyle: 'long',
+                    timeStyle: 'short',
+                  }),
+                  payload: JSON.stringify({
+                    signatureId: st.id,
+                    documentId: json?.data?.id,
+                    userId: st.userId,
+                    signedAt: signedDate,
+                    fullName: st.user?.fullName,
+                  }),
+                });
+              }
+            }
+          });
+        });
 
         setSignatureRows(rows);
       } catch (err) {
