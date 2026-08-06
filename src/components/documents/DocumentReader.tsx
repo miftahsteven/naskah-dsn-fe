@@ -281,11 +281,13 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     }
 
     // 1. Inject QR code into matching signature boxes in letter HTML
-    signatureRows.forEach(row => {
+    signatureRows.forEach((row, rowIndex) => {
       const qrDataUrl = signatureQrMap[row.id];
       if (!qrDataUrl) return;
 
-      const signerIndex = penandatanganSteps.findIndex((st: any) => st.userId === row.userId);
+      const signerIndex = penandatanganSteps.length > 0
+        ? penandatanganSteps.findIndex((st: any) => st.userId === row.userId)
+        : rowIndex;
 
       // Build comprehensive candidates list for matching
       const candidates: string[] = [];
@@ -329,23 +331,41 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
 
       let match: RegExpExecArray | null = null;
       let matchedCandidate = "";
+      let bestMatch: { m: RegExpExecArray, cand: string, score: number, index: number } | null = null;
 
       for (const cand of candidates) {
         const tokens = cand
           .split(/[\s,.]+/)
           .filter((t: string) => t.length >= 3 && !/^(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir|se|ag)$/i.test(t));
-        if (tokens.length === 0) continue;
+        if (tokens.length > 0) {
+          const patternStr = tokens.map((t: string) => escapeRegExp(t)).join('[\\s\\S]{0,80}?');
+          const nameRegex = new RegExp(patternStr, 'gi');
+          let m: RegExpExecArray | null;
 
-        const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s|&nbsp;|&#160;)+');
-        const nameRegex = new RegExp(namePattern, 'gi');
-        match = nameRegex.exec(enhanced);
-        if (match) {
-          matchedCandidate = cand;
-          break;
+          while ((m = nameRegex.exec(enhanced)) !== null) {
+            const prefix = enhanced.substring(0, m.index);
+            const lastSlice = prefix.slice(Math.max(0, prefix.length - 350));
+
+            let score = 0;
+            if (/(Ketua|Sekretaris|Direktur|Pimpinan|Kepala)/i.test(lastSlice)) score += 15;
+            if (/(?:<br\s*\/?>\s*){2,}/i.test(lastSlice)) score += 5;
+            if (/margin-bottom:\s*\d+px/i.test(lastSlice)) score += 5;
+            if (/<div[^>]*style="[^"]*height/i.test(lastSlice)) score += 5;
+            if (/:\s*(<[^>]+>\s*)*$/.test(lastSlice) || /:\s*$/.test(prefix.trim())) score -= 25;
+
+            if (!bestMatch || score > bestMatch.score || (score === bestMatch.score && m.index > bestMatch.index)) {
+              bestMatch = { m, cand, score, index: m.index };
+            }
+          }
         }
       }
 
-      const qrImageHtml = `<div style="text-align:center; margin:4px auto; line-height:1; display:block;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:70px !important; height:70px !important; min-width:70px !important; min-height:70px !important; object-fit:contain !important; display:inline-block !important;" /></div>`;
+      if (bestMatch && bestMatch.score > -10) {
+        match = bestMatch.m;
+        matchedCandidate = bestMatch.cand;
+      }
+
+      const qrImageHtml = `<div style="text-align:center; margin:4px auto; line-height:1; display:block; position:relative; width:70px; height:70px;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:70px !important; height:70px !important; min-width:70px !important; min-height:70px !important; object-fit:contain !important; display:block !important; position:absolute; top:0; left:0; z-index:1;" /><img src="${BASE_URL}/images/logo-dsn.png" alt="Logo" style="width:20px !important; height:20px !important; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2; background:#fff; border-radius:50%; padding:2px; object-fit:contain; border:1px solid #1F3F23;" /></div>`;
 
       if (match) {
         const matchIndex = match.index;
@@ -374,20 +394,36 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(lastSlice)) {
           const updatedSlice = lastSlice.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
           enhanced = prefixBase + updatedSlice + suffix;
-        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(lastSlice)) {
-          const updatedSlice = lastSlice.replace(/(?:<br\s*\/?>\s*){2,}/gi, qrImageHtml);
-          enhanced = prefixBase + updatedSlice + suffix;
         } else {
-          enhanced = realPrefix + qrImageHtml + suffix;
+          const lastBrMatches = [...lastSlice.matchAll(/(?:<br\s*\/?>\s*){2,}/gi)];
+          if (lastBrMatches.length > 0) {
+            const lastBrMatch = lastBrMatches[lastBrMatches.length - 1];
+            if (lastBrMatch && typeof lastBrMatch.index === 'number') {
+              const bPrefix = lastSlice.substring(0, lastBrMatch.index);
+              const bSuffix = lastSlice.substring(lastBrMatch.index + lastBrMatch[0].length);
+              const updatedSlice = bPrefix + qrImageHtml + bSuffix;
+              enhanced = prefixBase + updatedSlice + suffix;
+            } else {
+              enhanced = realPrefix + qrImageHtml + suffix;
+            }
+          } else {
+            enhanced = realPrefix + qrImageHtml + suffix;
+          }
         }
       } else {
-        // Fallback if no candidate name matched in HTML
-        if (/margin-bottom:\s*\d+px/i.test(enhanced)) {
-          enhanced = enhanced.replace(/margin-bottom:\s*\d+px/i, (m) => "margin-bottom: 4px;" + qrImageHtml);
-        } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/i.test(enhanced)) {
-          enhanced = enhanced.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/i, qrImageHtml);
-        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(enhanced)) {
-          enhanced = enhanced.replace(/(?:<br\s*\/?>\s*){2,}/i, qrImageHtml);
+        // Safe Role-based Fallback
+        const isKetua = signerIndex === 0 || /ketua/i.test(row.jobTitle || '');
+        const targetRole = isKetua ? 'Ketua' : 'Sekretaris';
+        const roleRegex = new RegExp(`(${targetRole}\\s*,?\\s*(?:<[^>]+>|\\s)*?)(?:<br\\s*\\/?>\\s*){2,}`, 'i');
+        if (roleRegex.test(enhanced)) {
+          enhanced = enhanced.replace(roleRegex, `$1${qrImageHtml}`);
+        } else {
+          const genericRoleRegex = /(?:Ketua|Sekretaris)\s*,?\s*(?:<[^>]+>|\s)*?/i;
+          const roleMatch = genericRoleRegex.exec(enhanced);
+          if (roleMatch) {
+            const idx = roleMatch.index + roleMatch[0].length;
+            enhanced = enhanced.substring(0, idx) + qrImageHtml + enhanced.substring(idx);
+          }
         }
       }
     });
@@ -433,13 +469,11 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // Extract document ID from docId prop, builtUrl API path, or file basename
-      const fileBasename = builtUrl.replace(/^.*[/\\]/, '').replace(/\.(html?|pdf)$/i, '');
+      // Extract document ID from docId prop or builtUrl API path
       const extractedDocId = docId 
-        || builtUrl.match(/\/api\/documents\/([^/?]+)/)?.[1]
-        || (fileBasename.startsWith('file-') ? fileBasename : undefined);
+        || builtUrl.match(/\/api\/documents\/([^/?]+)/)?.[1];
 
-      const targetFetchUrl = extractedDocId 
+      const targetFetchUrl = (extractedDocId && !extractedDocId.startsWith('file-')) 
         ? `${BASE_URL}/api/documents/${encodeURIComponent(extractedDocId)}/render`
         : htmlPreviewUrl;
 
