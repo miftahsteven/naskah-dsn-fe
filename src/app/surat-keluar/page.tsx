@@ -559,63 +559,72 @@ const DocumentsPage = () => {
   };
 
   /**
-   * Converts an HTML string to PDF via html2pdf.js (client-side, no Puppeteer).
-   * Strips outer <html>/<body> tags to prevent blank PDF rendering.
+   * Opens a print window with the rendered HTML for browser-native PDF saving.
+   * No external libraries needed - uses browser's built-in print-to-PDF feature.
    */
-  const downloadHtmlAsPdf = async (htmlText: string, fileName: string) => {
-    const pdfFileName = (fileName || 'dokumen').replace(/\.(html?|htm)$/i, '') + '.pdf';
-
+  const openPrintWindow = (htmlText: string, fileName: string) => {
     if (typeof window === 'undefined') return;
 
-    if (!(window as any).html2pdf) {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Gagal memuat pustaka konversi PDF'));
-        document.head.appendChild(script);
-      });
-    }
-
-    // Extract <style> tags and <body> content only to avoid blank-page rendering
     const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
     const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const bodyContent = bodyMatch ? bodyMatch[1] : htmlText;
-    const contentToRender = styles + '\n' + bodyContent;
 
-    const tempDiv = document.createElement('div');
-    tempDiv.style.cssText = 'position:fixed;top:0;left:0;width:794px;min-height:1123px;z-index:2147483647;background:#ffffff;overflow:visible;';
-    tempDiv.innerHTML = contentToRender;
-    document.body.appendChild(tempDiv);
-
-    try {
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: pdfFileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: 794,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      await (window as any).html2pdf().set(opt).from(tempDiv).save();
-    } finally {
-      if (document.body.contains(tempDiv)) {
-        document.body.removeChild(tempDiv);
-      }
+    const printHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${fileName || 'Dokumen'}</title>
+  ${styles}
+  <style>
+    @media print {
+      .print-btn-bar { display: none !important; }
+      body { margin: 0 !important; }
     }
+    .print-btn-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #1e40af; color: white; padding: 10px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-family: Arial, sans-serif;
+    }
+    .print-btn {
+      background: white; color: #1e40af; border: none; border-radius: 6px;
+      padding: 8px 20px; font-size: 14px; font-weight: bold;
+      cursor: pointer;
+    }
+    .print-btn:hover { background: #dbeafe; }
+    body { padding-top: 56px; }
+    @media print { body { padding-top: 0; } }
+  </style>
+</head>
+<body>
+  <div class="print-btn-bar">
+    <span>📄 ${fileName ? fileName.replace(/\.(html?|htm)$/i, '.pdf') : 'Dokumen'}</span>
+    <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan sebagai PDF</button>
+  </div>
+  ${bodyContent}
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 800);
+    });
+  <\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([printHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWin = window.open(url, '_blank');
+    if (!printWin) {
+      alert('Popup diblokir browser. Izinkan popup untuk halaman ini dan coba lagi.');
+      URL.revokeObjectURL(url);
+      return;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
   /**
    * For HTML template documents: calls /render to get HTML with QR injected,
-   * then converts to PDF client-side with html2pdf.js (no Puppeteer needed).
+   * then opens a print window for browser-native PDF saving.
    */
   const downloadDocumentAsPdf = async (docId: string, fileName: string) => {
     try {
@@ -631,7 +640,7 @@ const DocumentsPage = () => {
       }
 
       const htmlText = await res.text();
-      await downloadHtmlAsPdf(htmlText, fileName);
+      openPrintWindow(htmlText, fileName);
     } catch (err) {
       console.error('Gagal mengunduh PDF:', err);
       alert('Gagal mengunduh PDF. Silakan coba lagi.');
@@ -667,7 +676,7 @@ const DocumentsPage = () => {
 
       if (contentType.includes('text/html')) {
         const htmlText = await res.text();
-        await downloadHtmlAsPdf(htmlText, finalFileName);
+        openPrintWindow(htmlText, finalFileName);
         return;
       }
 
@@ -698,7 +707,6 @@ const DocumentsPage = () => {
     }
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
     if (isTemplate) {
-      // Use /render endpoint + client-side html2pdf (no Puppeteer dependency)
       downloadDocumentAsPdf(doc.id, latestVersion.fileName);
     } else {
       handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);

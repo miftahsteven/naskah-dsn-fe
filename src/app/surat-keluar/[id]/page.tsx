@@ -445,67 +445,76 @@ const DocumentDetailPage = () => {
   );
 
   /**
-   * Converts an HTML string to a PDF file and triggers browser download.
-   * Uses html2pdf.js loaded dynamically. Strips outer <html>/<body> tags
-   * to prevent blank PDF caused by nested html tags inside a div container.
+   * Opens the document HTML in a new browser window with a print button.
+   * The user can then use Ctrl+P / Cmd+P to Save as PDF.
+   * This approach is 100% reliable - no external libraries, no Puppeteer.
    */
-  const downloadHtmlAsPdf = async (htmlText: string, fileName: string) => {
-    const pdfFileName = (fileName || 'dokumen').replace(/\.(html?|htm)$/i, '') + '.pdf';
-
+  const openPrintWindow = (htmlText: string, fileName: string) => {
     if (typeof window === 'undefined') return;
 
-    // Load html2pdf.js dynamically if not already loaded
-    if (!(window as any).html2pdf) {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Gagal memuat pustaka konversi PDF'));
-        document.head.appendChild(script);
-      });
-    }
-
-    // Extract <style> tags and <body> content only — injecting full <html> into a <div>
-    // causes html2canvas to render a blank page
+    // Extract <style> tags and <body> content only
     const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
     const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const bodyContent = bodyMatch ? bodyMatch[1] : htmlText;
-    const contentToRender = styles + '\n' + bodyContent;
 
-    const tempDiv = document.createElement('div');
-    tempDiv.style.cssText = 'position:fixed;top:0;left:0;width:794px;min-height:1123px;z-index:2147483647;background:#ffffff;overflow:visible;';
-    tempDiv.innerHTML = contentToRender;
-    document.body.appendChild(tempDiv);
-
-    try {
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: pdfFileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: 794,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      await (window as any).html2pdf().set(opt).from(tempDiv).save();
-    } finally {
-      if (document.body.contains(tempDiv)) {
-        document.body.removeChild(tempDiv);
-      }
+    // Build a clean, printable HTML page
+    const printHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${fileName || 'Dokumen'}</title>
+  ${styles}
+  <style>
+    @media print {
+      .print-btn-bar { display: none !important; }
+      body { margin: 0 !important; }
     }
+    .print-btn-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #1e40af; color: white; padding: 10px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-family: Arial, sans-serif;
+    }
+    .print-btn {
+      background: white; color: #1e40af; border: none; border-radius: 6px;
+      padding: 8px 20px; font-size: 14px; font-weight: bold;
+      cursor: pointer; display: flex; align-items: center; gap: 8px;
+    }
+    .print-btn:hover { background: #dbeafe; }
+    body { padding-top: 56px; }
+    @media print { body { padding-top: 0; } }
+  </style>
+</head>
+<body>
+  <div class="print-btn-bar">
+    <span>📄 ${fileName ? fileName.replace(/\.(html?|htm)$/i, '.pdf') : 'Dokumen'}</span>
+    <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan sebagai PDF</button>
+  </div>
+  ${bodyContent}
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 800);
+    });
+  <\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([printHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWin = window.open(url, '_blank');
+    if (!printWin) {
+      alert('Popup diblokir browser. Izinkan popup untuk halaman ini dan coba lagi.');
+      URL.revokeObjectURL(url);
+      return;
+    }
+    // Cleanup blob URL after window opens
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
   /**
-   * Downloads a document. For HTML template docs, calls the /render endpoint
-   * which returns HTML with QR codes injected, then converts to PDF client-side.
-   * This avoids any dependency on Puppeteer on the server.
+   * Downloads a document as PDF. For HTML template docs, calls the /render endpoint
+   * which returns HTML with QR codes injected, then opens a print window.
    */
   const handleDownloadLatestAsPdf = async (docId: string, fileName: string) => {
     try {
@@ -524,7 +533,7 @@ const DocumentDetailPage = () => {
       }
 
       const htmlText = await res.text();
-      await downloadHtmlAsPdf(htmlText, fileName);
+      openPrintWindow(htmlText, fileName);
     } catch (err) {
       console.error('Gagal mengunduh PDF:', err);
       alert('Gagal mengunduh PDF. Silakan coba lagi.');
@@ -556,7 +565,7 @@ const DocumentDetailPage = () => {
 
       if (contentType.includes('text/html')) {
         const htmlText = await res.text();
-        await downloadHtmlAsPdf(htmlText, finalFileName);
+        openPrintWindow(htmlText, finalFileName);
         return;
       }
 
@@ -582,12 +591,12 @@ const DocumentDetailPage = () => {
     const latestVersion = doc.versions[0];
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
     if (isTemplate) {
-      // Use new /render endpoint + client-side html2pdf (no Puppeteer dependency)
       handleDownloadLatestAsPdf(doc.id, latestVersion.fileName);
     } else {
       handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
     }
   };
+
 
   return (
     <div className="space-y-8 pb-20">
