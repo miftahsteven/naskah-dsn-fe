@@ -444,6 +444,56 @@ const DocumentDetailPage = () => {
     </div>
   );
 
+  const downloadHtmlAsPdf = async (htmlText: string, fileName: string) => {
+    const pdfFileName = (fileName || 'dokumen').replace(/\.(html?|htm)$/i, '') + '.pdf';
+    
+    if (typeof window !== 'undefined') {
+      if (!(window as any).html2pdf) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Gagal memuat pustaka konversi PDF'));
+          document.head.appendChild(script);
+        });
+      }
+
+      // Extract style tags and body content to prevent nested <html> tags from rendering as blank in html2canvas
+      let contentToRender = htmlText;
+      const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
+      const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      if (bodyMatch && bodyMatch[1]) {
+        contentToRender = styles + '\n' + bodyMatch[1];
+      }
+
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.top = '0';
+      tempDiv.style.left = '0';
+      tempDiv.style.width = '794px';
+      tempDiv.style.zIndex = '999999';
+      tempDiv.style.background = '#ffffff';
+      tempDiv.innerHTML = contentToRender;
+      document.body.appendChild(tempDiv);
+
+      try {
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: pdfFileName,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 800 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        await (window as any).html2pdf().set(opt).from(tempDiv).save();
+      } finally {
+        if (document.body.contains(tempDiv)) {
+          document.body.removeChild(tempDiv);
+        }
+      }
+    }
+  };
+
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
       const response = await api.get(fileUrl, { responseType: 'blob' });
@@ -455,6 +505,14 @@ const DocumentDetailPage = () => {
           finalFileName = match[1];
         }
       }
+
+      const contentType = response.headers['content-type'] || '';
+      if (contentType.includes('text/html')) {
+        const htmlText = await response.data.text();
+        await downloadHtmlAsPdf(htmlText, finalFileName);
+        return;
+      }
+
       if (finalFileName.match(/\.(html?|htm)$/i)) {
         finalFileName = finalFileName.replace(/\.(html?|htm)$/i, '.pdf');
       }

@@ -572,6 +572,14 @@ const DocumentsPage = () => {
         });
       }
 
+      // Extract style tags and body content to prevent nested <html> tags from rendering as blank in html2canvas
+      let contentToRender = htmlText;
+      const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
+      const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      if (bodyMatch && bodyMatch[1]) {
+        contentToRender = styles + '\n' + bodyMatch[1];
+      }
+
       const tempDiv = document.createElement('div');
       tempDiv.style.position = 'fixed';
       tempDiv.style.top = '0';
@@ -579,7 +587,7 @@ const DocumentsPage = () => {
       tempDiv.style.width = '794px';
       tempDiv.style.zIndex = '999999';
       tempDiv.style.background = '#ffffff';
-      tempDiv.innerHTML = htmlText;
+      tempDiv.innerHTML = contentToRender;
       document.body.appendChild(tempDiv);
 
       try {
