@@ -444,90 +444,136 @@ const DocumentDetailPage = () => {
     </div>
   );
 
+  /**
+   * Converts an HTML string to a PDF file and triggers browser download.
+   * Uses html2pdf.js loaded dynamically. Strips outer <html>/<body> tags
+   * to prevent blank PDF caused by nested html tags inside a div container.
+   */
   const downloadHtmlAsPdf = async (htmlText: string, fileName: string) => {
     const pdfFileName = (fileName || 'dokumen').replace(/\.(html?|htm)$/i, '') + '.pdf';
-    
-    if (typeof window !== 'undefined') {
-      if (!(window as any).html2pdf) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('Gagal memuat pustaka konversi PDF'));
-          document.head.appendChild(script);
-        });
+
+    if (typeof window === 'undefined') return;
+
+    // Load html2pdf.js dynamically if not already loaded
+    if (!(window as any).html2pdf) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Gagal memuat pustaka konversi PDF'));
+        document.head.appendChild(script);
+      });
+    }
+
+    // Extract <style> tags and <body> content only — injecting full <html> into a <div>
+    // causes html2canvas to render a blank page
+    const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
+    const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : htmlText;
+    const contentToRender = styles + '\n' + bodyContent;
+
+    const tempDiv = document.createElement('div');
+    tempDiv.style.cssText = 'position:fixed;top:0;left:0;width:794px;min-height:1123px;z-index:2147483647;background:#ffffff;overflow:visible;';
+    tempDiv.innerHTML = contentToRender;
+    document.body.appendChild(tempDiv);
+
+    try {
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: pdfFileName,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 794,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await (window as any).html2pdf().set(opt).from(tempDiv).save();
+    } finally {
+      if (document.body.contains(tempDiv)) {
+        document.body.removeChild(tempDiv);
+      }
+    }
+  };
+
+  /**
+   * Downloads a document. For HTML template docs, calls the /render endpoint
+   * which returns HTML with QR codes injected, then converts to PDF client-side.
+   * This avoids any dependency on Puppeteer on the server.
+   */
+  const handleDownloadLatestAsPdf = async (docId: string, fileName: string) => {
+    try {
+      const BASE_URL = typeof window !== 'undefined'
+        ? (process.env.NEXT_PUBLIC_API_URL || (window.location.hostname.includes('mscode.id') ? 'https://mui-api.mscode.id/api' : 'http://localhost:4002/api'))
+        : 'http://localhost:4002/api';
+      const baseUrl = BASE_URL.replace(/\/api\/?$/, '');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const res = await fetch(`${baseUrl}/api/documents/${docId}/render`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
       }
 
-      // Extract style tags and body content to prevent nested <html> tags from rendering as blank in html2canvas
-      let contentToRender = htmlText;
-      const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
-      const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      if (bodyMatch && bodyMatch[1]) {
-        contentToRender = styles + '\n' + bodyMatch[1];
-      }
-
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.top = '0';
-      tempDiv.style.left = '0';
-      tempDiv.style.width = '794px';
-      tempDiv.style.zIndex = '999999';
-      tempDiv.style.background = '#ffffff';
-      tempDiv.innerHTML = contentToRender;
-      document.body.appendChild(tempDiv);
-
-      try {
-        const opt = {
-          margin: [8, 8, 8, 8],
-          filename: pdfFileName,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 800 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        await (window as any).html2pdf().set(opt).from(tempDiv).save();
-      } finally {
-        if (document.body.contains(tempDiv)) {
-          document.body.removeChild(tempDiv);
-        }
-      }
+      const htmlText = await res.text();
+      await downloadHtmlAsPdf(htmlText, fileName);
+    } catch (err) {
+      console.error('Gagal mengunduh PDF:', err);
+      alert('Gagal mengunduh PDF. Silakan coba lagi.');
     }
   };
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      const response = await api.get(fileUrl, { responseType: 'blob' });
-      const contentDisposition = response.headers['content-disposition'];
-      let finalFileName = fileName || 'dokumen';
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (match && match[1]) {
-          finalFileName = match[1];
-        }
-      }
+      const BASE_URL = typeof window !== 'undefined'
+        ? (process.env.NEXT_PUBLIC_API_URL || (window.location.hostname.includes('mscode.id') ? 'https://mui-api.mscode.id/api' : 'http://localhost:4002/api'))
+        : 'http://localhost:4002/api';
+      const baseUrl = BASE_URL.replace(/\/api\/?$/, '');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const safeFileUrl = fileUrl || '';
+      const fullUrl = safeFileUrl.startsWith('http://') || safeFileUrl.startsWith('https://')
+        ? safeFileUrl
+        : `${baseUrl}/${safeFileUrl.startsWith('/') ? safeFileUrl.slice(1) : safeFileUrl}`;
 
-      const contentType = response.headers['content-type'] || '';
+      const res = await fetch(fullUrl, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const contentType = res.headers.get('Content-Type') || '';
+      const contentDisposition = res.headers.get('Content-Disposition') || '';
+      let finalFileName = fileName || 'dokumen';
+      const cdMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (cdMatch && cdMatch[1]) finalFileName = cdMatch[1];
+
       if (contentType.includes('text/html')) {
-        const htmlText = await response.data.text();
+        const htmlText = await res.text();
         await downloadHtmlAsPdf(htmlText, finalFileName);
         return;
       }
 
-      if (finalFileName.match(/\.(html?|htm)$/i)) {
-        finalFileName = finalFileName.replace(/\.(html?|htm)$/i, '.pdf');
-      }
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', finalFileName);
+      link.setAttribute('download', finalFileName.match(/\.(html?|htm)$/i)
+        ? finalFileName.replace(/\.(html?|htm)$/i, '.pdf')
+        : finalFileName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Gagal mengunduh berkas", err);
-      alert("Gagal mengunduh berkas");
+      console.error('Gagal mengunduh berkas', err);
+      alert('Gagal mengunduh berkas');
     }
   };
 
@@ -536,7 +582,8 @@ const DocumentDetailPage = () => {
     const latestVersion = doc.versions[0];
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
     if (isTemplate) {
-      handleDownloadFile(`/api/documents/${doc.id}/download`, latestVersion.fileName);
+      // Use new /render endpoint + client-side html2pdf (no Puppeteer dependency)
+      handleDownloadLatestAsPdf(doc.id, latestVersion.fileName);
     } else {
       handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
     }
