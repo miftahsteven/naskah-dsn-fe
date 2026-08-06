@@ -247,28 +247,45 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
       const signerIndex = penandatanganSteps.findIndex((st: any) => st.userId === row.userId);
 
-      // Build candidates for matching
+      // Build comprehensive candidates list for matching
       const candidates: string[] = [];
       if (row.fullName) {
         candidates.push(row.fullName);
+        const cleanName = row.fullName
+          .replace(/\b(Dr|K\.?H|Prof|Drs|H|Lc|Ph\.?D|M\.?A|S\.?H|M\.?Si|Ir|M\.?Ag|S\.?Ag|S\.?E)\b\.?/gi, '')
+          .replace(/[\s,.]+/g, ' ')
+          .trim();
+        if (cleanName && cleanName.length >= 3) {
+          candidates.push(cleanName);
+        }
       }
-      if (signerIndex !== -1 && templateVariables) {
+      if (templateVariables) {
         if (signerIndex === 0) {
           if (templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
           if (templateVariables.namaPenandatangan) candidates.push(templateVariables.namaPenandatangan);
         } else if (signerIndex === 1) {
           if (templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
         }
+        if (templateVariables.namaPenandatangan) candidates.push(templateVariables.namaPenandatangan);
+        if (templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
+        if (templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
       }
-      // Default fallback names
-      if (signerIndex === 0 || (signerIndex === -1 && row.fullName?.toLowerCase().includes('admin'))) {
+      // DSN-MUI official name fallbacks
+      const userLower = (row.fullName || '').toLowerCase();
+      if (signerIndex === 0 || userLower.includes('cholil') || userLower.includes('nafis') || userLower.includes('hasan') || userLower.includes('admin') || userLower.includes('ketua')) {
         candidates.push("CHOLIL NAFIS");
         candidates.push("HASANUDDIN");
       }
-      if (signerIndex === 1) {
+      if (signerIndex === 1 || userLower.includes('amirsyah') || userLower.includes('tambunan') || userLower.includes('anwar') || userLower.includes('sekretaris')) {
         candidates.push("AMIRSYAH TAMBUNAN");
         candidates.push("ANWAR ABBAS");
       }
+      candidates.push("CHOLIL NAFIS");
+      candidates.push("AMIRSYAH TAMBUNAN");
+      candidates.push("HASANUDDIN");
+      candidates.push("ANWAR ABBAS");
+      candidates.push("SHOLAHUDDIN");
+      candidates.push("ADIWARMAN");
 
       let match: RegExpExecArray | null = null;
       let matchedCandidate = "";
@@ -276,7 +293,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
       for (const cand of candidates) {
         const tokens = cand
           .split(/[\s,.]+/)
-          .filter((t: string) => t.length >= 3 && !/^(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir)$/i.test(t));
+          .filter((t: string) => t.length >= 3 && !/^(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir|se|ag)$/i.test(t));
         if (tokens.length === 0) continue;
 
         const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s|&nbsp;|&#160;)+');
@@ -287,6 +304,8 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
           break;
         }
       }
+
+      const qrImageHtml = `<div style="text-align:center; margin:2px auto; line-height:0; display:block;"><img src="${qrDataUrl}" alt="QR Signature" style="width:65px; height:65px; object-fit:contain; display:inline-block;" /></div>`;
 
       if (match) {
         const matchIndex = match.index;
@@ -302,9 +321,8 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
         }
 
         const realPrefix = enhanced.substring(0, targetIndex);
-        const suffix = enhanced.substring(targetIndex);
-
-        const qrImageHtml = `<div style="text-align:center; margin:2px auto; line-height:0; display:block;"><img src="${qrDataUrl}" alt="QR Signature" style="width:65px; height:65px; object-fit:contain; display:inline-block;" /></div>`;
+        let suffix = enhanced.substring(targetIndex);
+        suffix = suffix.replace(/^([^>]+style="[^"]*)(?:margin-top|padding-top):\s*\d+px;?/i, "$1margin-top: 2px;");
 
         const sliceLen = Math.min(300, realPrefix.length);
         const prefixBase = realPrefix.slice(0, realPrefix.length - sliceLen);
@@ -321,6 +339,15 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
           enhanced = prefixBase + updatedSlice + suffix;
         } else {
           enhanced = realPrefix + qrImageHtml + suffix;
+        }
+      } else {
+        // Fallback if no candidate name matched in HTML
+        if (/margin-bottom:\s*\d+px/i.test(enhanced)) {
+          enhanced = enhanced.replace(/margin-bottom:\s*\d+px/i, (m) => "margin-bottom: 4px;" + qrImageHtml);
+        } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/i.test(enhanced)) {
+          enhanced = enhanced.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/i, qrImageHtml);
+        } else if (/(?:<br\s*\/?>\s*){2,}/i.test(enhanced)) {
+          enhanced = enhanced.replace(/(?:<br\s*\/?>\s*){2,}/i, qrImageHtml);
         }
       }
     });
