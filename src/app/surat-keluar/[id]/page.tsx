@@ -452,16 +452,21 @@ const DocumentDetailPage = () => {
   const openPrintWindow = (htmlText: string, fileName: string) => {
     if (typeof window === 'undefined') return;
 
-    // Extract <style> tags and <body> content only
-    const styles = (htmlText.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
-    const bodyMatch = htmlText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const bodyContent = bodyMatch ? bodyMatch[1] : htmlText;
+    const BASE_URL = getBaseUrl();
+    let processedHtml = htmlText;
 
-    // Build a clean, printable HTML page
+    // Convert relative image URLs (e.g. images/logo-dsn.png) to absolute URL
+    processedHtml = processedHtml.replace(/src=["']\/?(images\/[^"']+)["']/gi, `src="${BASE_URL}/$1"`);
+
+    const styles = (processedHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
+    const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : processedHtml;
+
     const printHtml = `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
+  <base href="${BASE_URL}/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${fileName || 'Dokumen'}</title>
   ${styles}
@@ -484,6 +489,16 @@ const DocumentDetailPage = () => {
     .print-btn:hover { background: #dbeafe; }
     body { padding-top: 56px; }
     @media print { body { padding-top: 0; } }
+    img.qr-signature-img {
+      width: 70px !important;
+      height: 70px !important;
+      max-width: 70px !important;
+      max-height: 70px !important;
+      min-width: 70px !important;
+      min-height: 70px !important;
+      display: inline-block !important;
+      object-fit: contain !important;
+    }
   </style>
 </head>
 <body>
