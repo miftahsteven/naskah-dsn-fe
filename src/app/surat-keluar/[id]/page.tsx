@@ -478,7 +478,7 @@ const DocumentDetailPage = () => {
     const latestVersion = doc.versions[0];
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
     if (isTemplate) {
-      setReaderDoc({ title: latestVersion.fileName, fileUrl: `/api/documents/${doc.id}/download` });
+      handleDownloadFile(`/api/documents/${doc.id}/download`, latestVersion.fileName);
     } else {
       handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
     }

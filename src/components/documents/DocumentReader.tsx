@@ -95,6 +95,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
   const [pdfScale, setPdfScale] = React.useState<number>(1.0);
   const [signatureRows, setSignatureRows] = React.useState<Array<{
     id: string;
+    userId: string;
     fullName: string;
     jobTitle: string;
     signedAt: string;
@@ -148,6 +149,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
           .filter((s: any) => s.signedAt)
           .map((s: any) => ({
             id: String(s.id),
+            userId: String(s.userId),
             fullName: s.user?.fullName || 'Penandatangan',
             jobTitle: s.user?.jobTitle || 'Penandatangan',
             signedAt: new Date(s.signedAt).toLocaleString('id-ID', {
@@ -224,24 +226,68 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, isOpen,
 
     const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+    // Parse metadata from HTML
+    let templateVariables: any = {};
+    let penandatanganSteps: any[] = [];
+    const metaMatch = enhanced.match(/<script id="template-metadata" type="application\/json">\s*([\s\S]*?)\s*<\/script>/);
+    if (metaMatch) {
+      try {
+        const meta = JSON.parse(metaMatch[1] || '{}');
+        templateVariables = meta.templateVariables || {};
+        penandatanganSteps = (meta.steps || []).filter((st: any) => st.role === 'PENANDATANGAN');
+      } catch (e) {
+        console.warn("Failed to parse template metadata in reader:", e);
+      }
+    }
+
     // 1. Inject QR code into matching signature boxes in letter HTML
     signatureRows.forEach(row => {
       const qrDataUrl = signatureQrMap[row.id];
       if (!qrDataUrl) return;
 
-      const rawName = row.fullName || '';
-      if (!rawName) return;
+      const signerIndex = penandatanganSteps.findIndex((st: any) => st.userId === row.userId);
 
-      const tokens = rawName
-        .split(/[\s,.]+/)
-        .filter((t: string) => t.length >= 3 && !/^(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir)$/i.test(t));
+      // Build candidates for matching
+      const candidates: string[] = [];
+      if (row.fullName) {
+        candidates.push(row.fullName);
+      }
+      if (signerIndex !== -1 && templateVariables) {
+        if (signerIndex === 0) {
+          if (templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
+          if (templateVariables.namaPenandatangan) candidates.push(templateVariables.namaPenandatangan);
+        } else if (signerIndex === 1) {
+          if (templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
+        }
+      }
+      // Default fallback names
+      if (signerIndex === 0 || (signerIndex === -1 && row.fullName?.toLowerCase().includes('admin'))) {
+        candidates.push("CHOLIL NAFIS");
+        candidates.push("HASANUDDIN");
+      }
+      if (signerIndex === 1) {
+        candidates.push("AMIRSYAH TAMBUNAN");
+        candidates.push("ANWAR ABBAS");
+      }
 
-      if (tokens.length === 0) return;
+      let match: RegExpExecArray | null = null;
+      let matchedCandidate = "";
 
-      const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s|&nbsp;|&#160;)+');
-      const nameRegex = new RegExp(namePattern, 'gi');
+      for (const cand of candidates) {
+        const tokens = cand
+          .split(/[\s,.]+/)
+          .filter((t: string) => t.length >= 3 && !/^(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir)$/i.test(t));
+        if (tokens.length === 0) continue;
 
-      const match = nameRegex.exec(enhanced);
+        const namePattern = tokens.map((t: string) => escapeRegExp(t)).join('(?:<[^>]+>|\\s|&nbsp;|&#160;)+');
+        const nameRegex = new RegExp(namePattern, 'gi');
+        match = nameRegex.exec(enhanced);
+        if (match) {
+          matchedCandidate = cand;
+          break;
+        }
+      }
+
       if (match) {
         const matchIndex = match.index;
         const prefix = enhanced.substring(0, matchIndex);
