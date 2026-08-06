@@ -387,16 +387,26 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       }
     });
 
-    // Inject CSS rules to scale down large logo images in the letterhead
+    // Inject CSS rules to scale down large logo images in the letterhead and guarantee QR code display
     const imageStyle = `
       <style id="amanah-kop-styles">
-        .kop-surat img, td img, img[src^="data:image"] {
+        .kop-surat img {
           max-width: 75px !important;
           max-height: 90px !important;
           height: auto !important;
           width: auto !important;
           display: inline-block !important;
           vertical-align: middle !important;
+        }
+        img.qr-signature-img {
+          width: 70px !important;
+          height: 70px !important;
+          max-width: 70px !important;
+          max-height: 70px !important;
+          min-width: 70px !important;
+          min-height: 70px !important;
+          display: inline-block !important;
+          object-fit: contain !important;
         }
       </style>
     `;
