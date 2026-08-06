@@ -399,7 +399,7 @@ const RevisionModal = ({
   );
 };
 
-const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string }) => {
+const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: string, docId?: string }) => {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -421,18 +421,24 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
   const isHtml = title.toLowerCase().endsWith('.html') || safeFileUrl.toLowerCase().endsWith('.html') || (!isDocx && !isPdf);
 
   useEffect(() => {
-    if (isHtml && fullUrlWithToken) {
+    if (isHtml) {
       setHtmlContent(null);
       setFetchError(null);
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const previewUrl = fullUrlWithToken.includes('?')
-        ? `${fullUrlWithToken}&preview=html`
-        : `${fullUrlWithToken}?preview=html`;
 
-      fetch(previewUrl, { headers })
+      const fileBasename = safeFileUrl.replace(/^.*[/\\]/, '').replace(/\.(html?|pdf)$/i, '');
+      const extractedDocId = docId 
+        || fullUrl.match(/\/api\/documents\/([^/?]+)/)?.[1]
+        || (fileBasename.startsWith('file-') ? fileBasename : undefined);
+
+      const targetPreviewUrl = extractedDocId 
+        ? `${BASE_URL}/api/documents/${encodeURIComponent(extractedDocId)}/render`
+        : (fullUrlWithToken.includes('?') ? `${fullUrlWithToken}&preview=html` : `${fullUrlWithToken}?preview=html`);
+
+      fetch(targetPreviewUrl, { headers })
         .then(async res => {
           if (!res.ok) {
             let msg = `HTTP ${res.status}`;
@@ -450,7 +456,7 @@ const DocumentPreview = ({ fileUrl, title }: { fileUrl: string, title: string })
           setFetchError(err.message || "Gagal memuat pratinjau dokumen.");
         });
     }
-  }, [isHtml, fullUrlWithToken, token]);
+  }, [isHtml, fullUrlWithToken, docId, safeFileUrl, fullUrl, BASE_URL, token]);
 
   const viewerUrl = isDocx 
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrlWithToken)}` 
@@ -1680,7 +1686,7 @@ const DocumentsPage = () => {
                        return <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-bold">Tidak ada file</div>;
                     }
                     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-                    return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} />;
+                    return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} docId={sidebarDoc.id} />;
                  })()}
               </div>
             </div>
