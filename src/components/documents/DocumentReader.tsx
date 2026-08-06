@@ -418,10 +418,14 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // Extract document ID from docId prop or builtUrl
-      const extractedDocId = docId || builtUrl.match(/\/api\/documents\/([^/?]+)/)?.[1];
+      // Extract document ID from docId prop, builtUrl API path, or file basename
+      const fileBasename = builtUrl.replace(/^.*[/\\]/, '').replace(/\.(html?|pdf)$/i, '');
+      const extractedDocId = docId 
+        || builtUrl.match(/\/api\/documents\/([^/?]+)/)?.[1]
+        || (fileBasename.startsWith('file-') ? fileBasename : undefined);
+
       const targetFetchUrl = extractedDocId 
-        ? `${BASE_URL}/api/documents/${extractedDocId}/render`
+        ? `${BASE_URL}/api/documents/${encodeURIComponent(extractedDocId)}/render`
         : htmlPreviewUrl;
 
       if (!targetFetchUrl) return;
