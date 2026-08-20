@@ -18,6 +18,42 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const [htmlContent, setHtmlContent] = React.useState<string | null>(null);
   const [htmlContentWithSignatures, setHtmlContentWithSignatures] = React.useState<string | null>(null);
 
+  const [kopSuratBase64, setKopSuratBase64] = React.useState<string>("");
+  const [bismillahBase64, setBismillahBase64] = React.useState<string>("");
+  const [logoBase64, setLogoBase64] = React.useState<string>("");
+  const [wqaUkasBase64, setWqaUkasBase64] = React.useState<string>("");
+
+  React.useEffect(() => {
+    const toDataURL = (url: string): Promise<string> =>
+      fetch(url)
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.blob();
+        })
+        .then(
+          (blob) =>
+            new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            })
+        );
+
+    toDataURL("/images/kop-surat.png")
+      .then(b64 => setKopSuratBase64(b64))
+      .catch(err => console.warn("Failed to convert kop-surat to base64", err));
+    toDataURL("/images/bismillah.svg")
+      .then(b64 => setBismillahBase64(b64))
+      .catch(err => console.warn("Failed to convert bismillah to base64", err));
+    toDataURL("/images/logo-dsn.png")
+      .then(b64 => setLogoBase64(b64))
+      .catch(err => console.warn("Failed to convert logo to base64", err));
+    toDataURL("/images/wqa-ukas.png")
+      .then(b64 => setWqaUkasBase64(b64))
+      .catch(err => console.warn("Failed to convert wqa-ukas to base64", err));
+  }, []);
+
   // Safely check properties to avoid errors when closed with empty props
   const safeFileUrl = fileUrl || "";
   const safeTitle = title || "";
@@ -431,13 +467,27 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     // Inject CSS rules to scale down large logo images in the letterhead and guarantee QR code display
     const imageStyle = `
       <style id="amanah-kop-styles">
-        .kop-surat img, td img:not(.qr-signature-img) {
+        .kop-surat img:not(.kop-surat-img):not([alt*="Kop Surat"]), 
+        td img:not(.qr-signature-img):not(.kop-surat-img):not([alt*="Kop Surat"]) {
           max-width: 75px !important;
           max-height: 90px !important;
           height: auto !important;
           width: auto !important;
           display: inline-block !important;
           vertical-align: middle !important;
+        }
+        .kop-surat-img, img[alt*="Kop Surat"] {
+          width: 100% !important;
+          max-width: 750px !important;
+          height: auto !important;
+          display: block !important;
+          margin: 0 auto !important;
+        }
+        img[src*="bismillah"], img[alt*="Bismillah"] {
+          height: 35px !important;
+          max-height: 40px !important;
+          display: block !important;
+          margin: 0 auto !important;
         }
         img.qr-signature-img {
           width: 70px !important;
@@ -484,10 +534,31 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.text();
         })
-        .then(text => setHtmlContent(text))
+        .then(text => {
+          let processed = text;
+          if (kopSuratBase64) {
+            processed = processed.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
+            processed = processed.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 8px; margin-left: -40px; margin-right: -40px; padding-top: 10px;">
+    <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 750px; height: auto; display: block; margin: 0 auto;" />
+  </div>
+  <div style="text-align: center; margin-top: 6px; margin-bottom: 12px;">
+    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="height: 35px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
+  </div>`);
+          }
+          if (bismillahBase64) {
+            processed = processed.replace(/src=["'][^"']*bismillah\.svg["']/gi, `src="${bismillahBase64}"`);
+          }
+          if (logoBase64) {
+            processed = processed.replace(/src=["'][^"']*logo-dsn\.png["']/gi, `src="${logoBase64}"`);
+          }
+          if (wqaUkasBase64) {
+            processed = processed.replace(/src=["'][^"']*wqa-ukas\.png["']/gi, `src="${wqaUkasBase64}"`);
+          }
+          setHtmlContent(processed);
+        })
         .catch(err => console.error("Failed to load HTML:", err));
     }
-  }, [isOpen, isHtml, htmlPreviewUrl, docId, builtUrl, BASE_URL, token]);
+  }, [isOpen, isHtml, htmlPreviewUrl, docId, builtUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64]);
 
   // Try converting DOCX to HTML in-browser using mammoth (if available).
   React.useEffect(() => {

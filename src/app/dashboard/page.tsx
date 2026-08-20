@@ -66,8 +66,11 @@ const DashboardPage = () => {
       ]);
       setStatsData(statsRes.data.data);
       setRecentDocs(docsRes.data.data || []);
-    } catch (err) {
-      console.error("Gagal memuat dashboard", err);
+    } catch (err: any) {
+      // Don't use console.error to avoid Next.js dev overlay for 401s
+      if (err?.response?.status !== 401) {
+        console.log("Gagal memuat dashboard", err);
+      }
     } finally {
       setLoading(false);
     }

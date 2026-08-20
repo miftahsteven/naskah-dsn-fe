@@ -46,8 +46,8 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and not a retry, try to refresh token
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/login')) {
+    // If error is 401 and not a retry, try to refresh token (exclude auth endpoints)
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url && !originalRequest.url.includes('/auth/')) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refreshToken');
 
@@ -64,10 +64,21 @@ api.interceptors.response.use(
         } catch (refreshError) {
           // Refresh failed, logout user
           useAuthStore.getState().logout();
-          return Promise.reject(refreshError);
+          
+          // Force redirect to login immediately
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+          
+          // Return a pending promise to prevent throwing an error to the caller while navigating away
+          return new Promise(() => {});
         }
       } else {
         useAuthStore.getState().logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return new Promise(() => {});
       }
     }
 

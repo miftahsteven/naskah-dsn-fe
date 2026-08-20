@@ -489,6 +489,19 @@ const DocumentDetailPage = () => {
     .print-btn:hover { background: #dbeafe; }
     body { padding-top: 56px; }
     @media print { body { padding-top: 0; } }
+    .kop-surat-img, img[alt*="Kop Surat"] {
+      width: 100% !important;
+      max-width: 750px !important;
+      height: auto !important;
+      display: block !important;
+      margin: 0 auto !important;
+    }
+    img[src*="bismillah"], img[alt*="Bismillah"] {
+      height: 35px !important;
+      max-height: 40px !important;
+      display: block !important;
+      margin: 0 auto !important;
+    }
     img.qr-signature-img {
       width: 70px !important;
       height: 70px !important;

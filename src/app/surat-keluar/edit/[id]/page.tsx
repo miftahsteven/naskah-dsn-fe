@@ -29,6 +29,7 @@ import {
 
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import SimpleRichEditor from "@/components/SimpleRichEditor";
 
 // List of available templates
 const templatesList = [
@@ -39,6 +40,60 @@ const templatesList = [
   { id: "tugas", name: "Surat Tugas" },
   { id: "informasi", name: "Surat Informasi" },
 ];
+
+const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
+  "Rekomendasi DPS": [
+    "Rekomendasi DPS (Baru)",
+    "Rekomendasi DPS (PAW)",
+    "Rekomendasi DPS (Perpanjangan)"
+  ],
+  "Sertifikat Kesesuaian Syariah": [
+    "Penjualan Langsung Berjenjang",
+    "Teknologi Informasi",
+    "Bank Kustodian",
+    "Wisata",
+    "Rumah Sakit",
+    "Inovasi Keuangan Digital",
+    "Klinik dan Lab"
+  ],
+  "Pernyataan Kesesuaian Syariah": [
+    "Bank Indonesia",
+    "Kementerian Keuangan",
+    "Ikatan Akuntan Indonesia",
+    "LKS, LBS dan LPS",
+    "Lainnya"
+  ],
+  "Rekomendasi TAS": [
+    "Sukuk Mudharabah",
+    "Sukuk Ijarah",
+    "TAS SCF",
+    "Lainnya"
+  ],
+  "Silaturahim Stakeholders": [
+    "Otoritas",
+    "Asosiasi",
+    "Industri LKS - Perbankan",
+    "Industri LKS - Pasar Modal",
+    "Industri LKS - IKNB",
+    "Industri LBS",
+    "Industri LPS",
+    "Lainnya"
+  ],
+  "Surat Lainnya": [
+    "Tidak Berkategori",
+    "Surat Perintah Kerja",
+    "Penjelasan atas Pengaduan",
+    "Konsolidasi MUI dan KBL",
+    "Undangan SW Calon DPS",
+    "Ucapan Terima Kasih"
+  ],
+  "Bagian Keuangan DSN-MUI": [
+    "Tagihan LKS-LBS-LPS",
+    "Tagihan Kontribusi DPS",
+    "Tagihan Invoice",
+    "Surat Lainnya"
+  ]
+};
 
 // Gregorian to Hijriah date approximation
 function getEstimatedHijriah(gregorianDateString: string): string {
@@ -220,11 +275,23 @@ const EditTemplateLetterPage = () => {
   const editorRef = useRef<HTMLDivElement>(null);
 
   const [logoBase64, setLogoBase64] = useState<string>("");
+  const [kopSuratBase64, setKopSuratBase64] = useState<string>("");
+  const [bismillahBase64, setBismillahBase64] = useState<string>("");
+  const [wqaUkasBase64, setWqaUkasBase64] = useState<string>("");
 
   useEffect(() => {
     toDataURL("/images/logo-dsn.png")
       .then(base64 => setLogoBase64(base64))
-      .catch(err => console.error("Failed to convert logo to base64", err));
+      .catch(err => console.warn("Failed to convert logo to base64", err));
+    toDataURL("/images/kop-surat.png")
+      .then(base64 => setKopSuratBase64(base64))
+      .catch(err => console.warn("Failed to convert kop surat to base64", err));
+    toDataURL("/images/bismillah.svg")
+      .then(base64 => setBismillahBase64(base64))
+      .catch(err => console.warn("Failed to convert bismillah to base64", err));
+    toDataURL("/images/wqa-ukas.png")
+      .then(base64 => setWqaUkasBase64(base64))
+      .catch(err => console.warn("Failed to convert wqa-ukas to base64", err));
   }, []);
 
   // Metadata Configurations
@@ -240,6 +307,7 @@ const EditTemplateLetterPage = () => {
 
   // Form Fields
   const [categoryId, setCategoryId] = useState("");
+  const [subCategory, setSubCategory] = useState("");
   const [classificationId, setClassificationId] = useState("");
   
   // Dynamic template states from DB
@@ -413,6 +481,7 @@ const EditTemplateLetterPage = () => {
         }
 
         setCategoryId(doc.categoryId || "");
+        setSubCategory(doc.subCategory || "");
         setClassificationId(doc.classificationId || "");
         setPerihal(doc.title || "");
         setGeneratedDocNumber(doc.documentNumber || "");
@@ -450,6 +519,7 @@ const EditTemplateLetterPage = () => {
                 setLampiran(meta.lampiran || "");
                 setCatatan(meta.catatan || "");
                 setInitialBodyHtml(meta.bodyHtml || "");
+                setSubCategory(meta.subCategory || "");
                 setTemplateVariables(meta.templateVariables || {});
 
                 if (meta.pemparafList || meta.approverList || meta.penandatanganList) {
@@ -511,7 +581,6 @@ const EditTemplateLetterPage = () => {
     }
   }, [initialBodyHtml]);
 
-  // Document number generator
   const fetchDocNumber = useCallback(async (templateCode: string) => {
     setLoadingDocNumber(true);
     try {
@@ -525,9 +594,36 @@ const EditTemplateLetterPage = () => {
       };
       const apiCode = legacyMap[templateCode] || templateCode;
       const res = await api.get("/documents/generate-number", { params: { templateCode: apiCode } });
-      setGeneratedDocNumber(res.data.data.documentNumber);
+      
+      const monthRoman = res.data.data.month || "VIII";
+      const currentYear = res.data.data.year || new Date().getFullYear();
+      const systemSequence = res.data.data.sequenceNumber || "001";
+      
+      const match = templateCode.match(/^([A-Za-z])-(\d+)/);
+      if (match) {
+        const prefix = match[1].toUpperCase();
+        const seq = match[2];
+        setGeneratedDocNumber(`${prefix}-${seq}/DSN-MUI/${monthRoman}/${currentYear}`);
+      } else {
+        const seqPadded = systemSequence.toString().padStart(4, "0");
+        setGeneratedDocNumber(`U-${seqPadded}/DSN-MUI/${monthRoman}/${currentYear}`);
+      }
     } catch (err) {
       console.error("Gagal generate nomor surat:", err);
+      // Fallback: generate client-side
+      const now = new Date();
+      const romanMonths = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      const monthRoman = romanMonths[now.getMonth()];
+      const currentYear = now.getFullYear();
+      
+      const match = templateCode.match(/^([A-Za-z])-(\d+)/);
+      if (match) {
+        const prefix = match[1].toUpperCase();
+        const seq = match[2];
+        setGeneratedDocNumber(`${prefix}-${seq}/DSN-MUI/${monthRoman}/${currentYear}`);
+      } else {
+        setGeneratedDocNumber(`U-0001/DSN-MUI/${monthRoman}/${currentYear}`);
+      }
     } finally {
       setLoadingDocNumber(false);
     }
@@ -632,7 +728,7 @@ const EditTemplateLetterPage = () => {
   };
 
   const hasTabError = (tabId: string) => {
-    if (tabId === "info") return !!(formErrors.generatedDocNumber || formErrors.selectedTemplate || formErrors.perihal || formErrors.categoryId || formErrors.classificationId);
+    if (tabId === "info") return !!(formErrors.generatedDocNumber || formErrors.selectedTemplate || formErrors.perihal || formErrors.categoryId || formErrors.subCategory || formErrors.classificationId);
     if (tabId === "detail") return !!(formErrors.tempatDibuat || formErrors.tanggalMasehi || formErrors.tanggalHijriah);
     if (tabId === "variables") return Object.keys(formErrors).some(k => k.startsWith("var_"));
     if (tabId === "signers") return !!formErrors.steps;
@@ -658,6 +754,13 @@ const EditTemplateLetterPage = () => {
     if (!categoryId) {
       errors.categoryId = "Kategori surat wajib dipilih";
       if (!firstInvalidTab) firstInvalidTab = "info";
+    } else {
+      const selectedCatName = categories.find(c => c.id === categoryId)?.name;
+      const subCats = selectedCatName ? CATEGORY_SUBCATEGORIES[selectedCatName] : undefined;
+      if (subCats && subCats.length > 0 && !subCategory) {
+        errors.subCategory = "Subkategori surat wajib dipilih";
+        if (!firstInvalidTab) firstInvalidTab = "info";
+      }
     }
     if (!classificationId) {
       errors.classificationId = "Klasifikasi surat wajib dipilih";
@@ -808,6 +911,7 @@ const EditTemplateLetterPage = () => {
         steps,
         bodyHtml,
         categoryId,
+        subCategory,
         classificationId,
         documentNumber: generatedDocNumber
       }).replace(/<\/script>/g, '<\\/script>');
@@ -1022,6 +1126,7 @@ const EditTemplateLetterPage = () => {
         penandatanganList,
         bodyHtml: "",
         categoryId,
+        subCategory,
         classificationId,
         documentNumber: generatedDocNumber,
         templateVariables
@@ -1029,7 +1134,13 @@ const EditTemplateLetterPage = () => {
 
       const replacedHtml = selectedTemplateObj.htmlContent.replace(
         /\{\{(\w+)\}\}/g,
-        (_: string, key: string) => templateVariables[key] || ""
+        (_: string, key: string) => {
+          let val = templateVariables[key] || "";
+          if (key === "agendaDetail" || key === "daftarUndangan") {
+            val = val.replace(/\r?\n/g, "");
+          }
+          return val;
+        }
       );
 
       if (replacedHtml.includes("<head>")) {
@@ -1054,6 +1165,26 @@ const EditTemplateLetterPage = () => {
       }
     }
 
+    // Ensure all images (kop surat, bismillah, logo, wqa) are fully inlined as Base64 in finalHtml
+    if (kopSuratBase64) {
+      finalHtml = finalHtml.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
+      finalHtml = finalHtml.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 8px; margin-left: -40px; margin-right: -40px; padding-top: 10px;">
+    <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 750px; height: auto; display: block; margin: 0 auto;" />
+  </div>
+  <div style="text-align: center; margin-top: 6px; margin-bottom: 12px;">
+    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="height: 35px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
+  </div>`);
+    }
+    if (bismillahBase64) {
+      finalHtml = finalHtml.replace(/src=["'][^"']*bismillah\.svg["']/gi, `src="${bismillahBase64}"`);
+    }
+    if (logoBase64) {
+      finalHtml = finalHtml.replace(/src=["'][^"']*logo-dsn\.png["']/gi, `src="${logoBase64}"`);
+    }
+    if (wqaUkasBase64) {
+      finalHtml = finalHtml.replace(/src=["'][^"']*wqa-ukas\.png["']/gi, `src="${wqaUkasBase64}"`);
+    }
+
     // Convert HTML string to File object
     const htmlFile = new File([finalHtml], `${selectedTemplateObj?.name || 'document'}_${perihal}.html`, {
       type: "text/html",
@@ -1064,6 +1195,9 @@ const EditTemplateLetterPage = () => {
     formData.append("title", perihal);
     formData.append("documentNumber", generatedDocNumber);
     formData.append("categoryId", categoryId);
+    if (subCategory) {
+      formData.append("subCategory", subCategory);
+    }
     formData.append("classificationId", classificationId);
     formData.append("changeNotes", "Updated via interactive builder");
 
@@ -1228,46 +1362,22 @@ const EditTemplateLetterPage = () => {
                   <div className="bg-white text-slate-800 p-6 sm:p-10 shadow-2xl rounded-2xl min-h-[900px] border border-slate-100 flex flex-col overflow-hidden" style={{ fontSize: "11pt", fontFamily: "Arial, sans-serif" }}>
                     
                     {/* Kop Surat Header */}
-                    <div className="border-b-[3px] border-double border-slate-900 pb-2 mb-3">
-                      <div className="flex items-center justify-between gap-3">
-                        {/* Left: Logo */}
-                        <div className="w-[55px] h-[55px] flex-shrink-0">
-                          <img
-                            src="/images/logo-dsn.png"
-                            alt="Logo DSN-MUI"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                        
-                        {/* Center: Organization info */}
-                        <div className="text-left flex-1 min-w-0">
-                          <h2 className="text-slate-900 font-extrabold text-[10.5px] sm:text-[11.5px] uppercase tracking-tight leading-snug whitespace-nowrap">
-                            DEWAN SYARIAH NASIONAL - MAJELIS ULAMA INDONESIA
-                          </h2>
-                          <p className="text-slate-800 font-bold text-[8px] sm:text-[8.5px] leading-normal whitespace-nowrap">
-                            National Sharia Board - Indonesian Council of Ulama
-                          </p>
-                          <p className="text-slate-600 text-[7px] mt-0.5 leading-normal whitespace-nowrap">
-                            SECRETARIAT : Jl. Dempo No.19 Pegangsaan - Jakarta Pusat 10320
-                          </p>
-                          <p className="text-slate-600 text-[7px] leading-normal whitespace-nowrap">
-                            Telp. (021) 3904146 &nbsp; Email: sekretariat@dsnmui.or.id &nbsp; Web: www.dsnmui.or.id
-                          </p>
-                        </div>
-                        
-                        {/* Right: Certification Box */}
-                        <div className="w-[65px] border border-slate-900 p-0.5 flex-shrink-0 text-center font-sans text-[6px] leading-tight font-bold text-slate-800">
-                          <div className="border-b border-slate-900 pb-0.5 mb-0.5 text-[5px]">REGISTERED</div>
-                          <div className="font-extrabold text-[7.5px] tracking-wide">WQA</div>
-                          <div className="text-[6px] my-0.5">ISO 9001:2015</div>
-                          <div className="border-t border-dashed border-slate-900 pt-0.5 mt-0.5 text-[4.5px]">UKAS 134</div>
-                        </div>
-                      </div>
+                    <div className="mb-4">
+                      <img
+                        src="/images/kop-surat.png"
+                        alt="Kop Surat DSN-MUI"
+                        className="w-full h-auto block"
+                      />
                     </div>
 
                     {/* Bismillah Calligraphy */}
-                    <div className="text-center text-lg font-serif text-slate-900 mb-4 tracking-wide font-medium">
-                      بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+                    <div className="flex justify-center mb-6 mt-4">
+                      <img 
+                        src="/images/bismillah.svg" 
+                        alt="Bismillah" 
+                        className="h-[50px] object-contain" 
+                        style={{ filter: "brightness(0)" }} 
+                      />
                     </div>
 
                     {/* Letter Title */}
@@ -1390,7 +1500,13 @@ const EditTemplateLetterPage = () => {
                       </style>
                       ${selectedTemplateObj.htmlContent.replace(
                         /\{\{(\w+)\}\}/g,
-                        (_: string, key: string) => templateVariables[key] || `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`
+                        (_: string, key: string) => {
+                          let val = templateVariables[key] || "";
+                          if (key === "agendaDetail" || key === "daftarUndangan") {
+                            val = val.replace(/\r?\n/g, "");
+                          }
+                          return val || `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`;
+                        }
                       )}
                     ` : ""}
                     className="w-full min-h-[850px] border-0 rounded-2xl"
@@ -1559,33 +1675,78 @@ const EditTemplateLetterPage = () => {
 
                   {/* Row 3: Kategori & Klasifikasi */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
-                        Kategori <span className="text-red-500 font-bold ml-0.5">*</span>
-                      </label>
-                      <select
-                        required
-                        className={cn(
-                          "w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm appearance-none",
-                          formErrors.categoryId
-                            ? "border-2 border-red-500 focus:ring-red-200 dark:focus:ring-red-900/40"
-                            : "border-none focus:ring-primary/20"
+                    {/* Category and Subcategory Wrapper */}
+                    <div className="space-y-4 col-span-1">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                          Kategori <span className="text-red-500 font-bold ml-0.5">*</span>
+                        </label>
+                        <select
+                          required
+                          className={cn(
+                            "w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm appearance-none",
+                            formErrors.categoryId
+                              ? "border-2 border-red-500 focus:ring-red-200 dark:focus:ring-red-900/40"
+                              : "border-none focus:ring-primary/20"
+                          )}
+                          value={categoryId}
+                          onChange={(e) => {
+                            setCategoryId(e.target.value);
+                            clearFieldError("categoryId");
+                            setSubCategory("");
+                            clearFieldError("subCategory");
+                          }}
+                        >
+                          <option value="">Pilih Kategori</option>
+                          {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                        </select>
+                        {formErrors.categoryId && (
+                          <p className="text-[10px] text-red-500 font-semibold ml-1 flex items-center gap-1 mt-1">
+                            <AlertCircle size={10} />
+                            {formErrors.categoryId}
+                          </p>
                         )}
-                        value={categoryId}
-                        onChange={(e) => {
-                          setCategoryId(e.target.value);
-                          clearFieldError("categoryId");
-                        }}
-                      >
-                        <option value="">Pilih Kategori</option>
-                        {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                      </select>
-                      {formErrors.categoryId && (
-                        <p className="text-[10px] text-red-500 font-semibold ml-1 flex items-center gap-1 mt-1">
-                          <AlertCircle size={10} />
-                          {formErrors.categoryId}
-                        </p>
-                      )}
+                      </div>
+
+                      {/* Subcategory */}
+                      {(() => {
+                        const selectedCatName = categories.find(c => c.id === categoryId)?.name;
+                        const subCats = selectedCatName ? CATEGORY_SUBCATEGORIES[selectedCatName] : undefined;
+                        if (!subCats || subCats.length === 0) return null;
+                        
+                        return (
+                          <div className="space-y-2 animate-in fade-in duration-300">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                              Subkategori <span className="text-red-500 font-bold ml-0.5">*</span>
+                            </label>
+                            <select
+                              required
+                              className={cn(
+                                "w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm appearance-none",
+                                formErrors.subCategory
+                                  ? "border-2 border-red-500 focus:ring-red-200 dark:focus:ring-red-900/40"
+                                  : "border-none focus:ring-primary/20"
+                              )}
+                              value={subCategory}
+                              onChange={(e) => {
+                                setSubCategory(e.target.value);
+                                clearFieldError("subCategory");
+                              }}
+                            >
+                              <option value="">Pilih Subkategori</option>
+                              {subCats.map((sub, idx) => (
+                                <option key={idx} value={sub}>{sub}</option>
+                              ))}
+                            </select>
+                            {formErrors.subCategory && (
+                              <p className="text-[10px] text-red-500 font-semibold ml-1 flex items-center gap-1 mt-1">
+                                <AlertCircle size={10} />
+                                {formErrors.subCategory}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="space-y-2">
@@ -1796,20 +1957,32 @@ const EditTemplateLetterPage = () => {
                             </label>
 
                             {v.type === "textarea" ? (
-                              <textarea
-                                required={v.required}
-                                placeholder={v.placeholder || `Masukkan ${v.label}`}
-                                className={cn(
-                                  "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none",
-                                  v.key === "agendaDetail" || v.key === "daftarUndangan" ? "h-[160px]" : "h-[80px]",
-                                  hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
-                                )}
-                                value={templateVariables[v.key] || ""}
-                                onChange={(e) => {
-                                  setTemplateVariables({ ...templateVariables, [v.key]: e.target.value });
-                                  clearFieldError(errKey);
-                                }}
-                              />
+                              v.key === "agendaDetail" || v.key === "daftarUndangan" ? (
+                                <SimpleRichEditor
+                                  value={templateVariables[v.key] || ""}
+                                  placeholder={v.placeholder || `Masukkan ${v.label}`}
+                                  hasError={hasErr}
+                                  onChange={(val) => {
+                                    setTemplateVariables({ ...templateVariables, [v.key]: val });
+                                    clearFieldError(errKey);
+                                  }}
+                                />
+                              ) : (
+                                <textarea
+                                  required={v.required}
+                                  placeholder={v.placeholder || `Masukkan ${v.label}`}
+                                  className={cn(
+                                    "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none",
+                                    v.key.toLowerCase().includes("lampiran") || v.key.toLowerCase().includes("undangan") || v.key.toLowerCase().includes("agenda") ? "h-[160px]" : "h-[80px]",
+                                    hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
+                                  )}
+                                  value={templateVariables[v.key] || ""}
+                                  onChange={(e) => {
+                                    setTemplateVariables({ ...templateVariables, [v.key]: e.target.value });
+                                    clearFieldError(errKey);
+                                  }}
+                                />
+                              )
                             ) : v.type === "date" ? (
                               <input
                                 type="date"
