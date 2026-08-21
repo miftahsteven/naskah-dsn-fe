@@ -578,7 +578,8 @@ const CreateDocumentPage = () => {
         month: "long",
         year: "numeric",
       });
-      setVar("tanggalSurat", formattedDate);
+      const withM = formattedDate.endsWith(" M") ? formattedDate : `${formattedDate} M`;
+      setVar("tanggalSurat", withM);
     }
     if (selectedTemplateObj.variables?.some((v: any) => v.key === "tanggalMasehi")) {
       const formattedDate = new Date(tanggalMasehi).toLocaleDateString("id-ID", {
@@ -586,10 +587,33 @@ const CreateDocumentPage = () => {
         month: "long",
         year: "numeric",
       });
-      setVar("tanggalMasehi", formattedDate);
+      const withM = formattedDate.endsWith(" M") ? formattedDate : `${formattedDate} M`;
+      setVar("tanggalMasehi", withM);
     }
     if (selectedTemplateObj.variables?.some((v: any) => v.key === "tanggalHijriah")) {
       setVar("tanggalHijriah", tanggalHijriah);
+    }
+
+    // Default template variables for signers and standard fields
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKiri")) {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+        setVar("jabatanKiri", "Ketua");
+      }
+    }
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKanan")) {
+      if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+        setVar("jabatanKanan", "Sekretaris");
+      }
+    }
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaKetua")) {
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+      }
+    }
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaSekretaris")) {
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
     }
 
     if (updated) {
