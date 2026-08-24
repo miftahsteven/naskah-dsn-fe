@@ -878,7 +878,9 @@ const EditTemplateLetterPage = () => {
           if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {
             continue;
           }
-          if (!templateVariables[v.key] || !templateVariables[v.key].trim()) {
+          const val = templateVariables[v.key];
+          const textContent = typeof val === "string" ? val.replace(/<[^>]*>/g, "").trim() : "";
+          if (!val || (!val.trim() && !textContent)) {
             errors[`var_${v.key}`] = `${v.label} wajib diisi`;
             if (!firstInvalidTab) firstInvalidTab = "variables";
           }
@@ -1225,8 +1227,12 @@ const EditTemplateLetterPage = () => {
         /\{\{(\w+)\}\}/g,
         (_: string, key: string) => {
           let val = templateVariables[key] || "";
-          if (key === "agendaDetail" || key === "daftarUndangan") {
-            val = val.replace(/\r?\n/g, "");
+          if (key === "agendaDetail" || key === "daftarUndangan" || key === "keteranganNarahubung" || key === "keterangan") {
+            if (!val.includes("<p>") && !val.includes("<div>") && !val.includes("<br")) {
+              val = val.replace(/\n/g, "<br>");
+            } else {
+              val = val.replace(/\r?\n/g, "");
+            }
           }
           return val;
         }
@@ -2068,7 +2074,7 @@ const EditTemplateLetterPage = () => {
                         const errKey = `var_${v.key}`;
                         const hasErr = !!formErrors[errKey];
                         return (
-                          <div key={v.key} className={cn("space-y-2", v.key === "agendaDetail" && "md:col-span-2")}>
+                          <div key={v.key} className={cn("space-y-2", (v.key === "headerTtd" || v.key === "agendaDetail" || v.key === "daftarUndangan" || v.key === "keteranganNarahubung" || v.key === "keterangan" || v.key === "daftarNamaPenugasan" || v.key === "tempatKegiatan" || v.key === "keperluan" || v.type === "wysiwyg") && "md:col-span-2")}>
                             {v.key === "agendaRapat" && (
                               <div className="flex items-center gap-2 mb-1.5 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 md:col-span-2">
                                 <input
@@ -2101,33 +2107,31 @@ const EditTemplateLetterPage = () => {
                               {v.required && <span className="text-red-500 ml-0.5">*</span>}
                             </label>
 
-                            {v.type === "textarea" ? (
-                              v.key === "agendaDetail" || v.key === "daftarUndangan" ? (
-                                <SimpleRichEditor
-                                  value={templateVariables[v.key] || ""}
-                                  placeholder={v.placeholder || `Masukkan ${v.label}`}
-                                  hasError={hasErr}
-                                  onChange={(val) => {
-                                    setTemplateVariables({ ...templateVariables, [v.key]: val });
-                                    clearFieldError(errKey);
-                                  }}
-                                />
-                              ) : (
-                                <textarea
-                                  required={v.required}
-                                  placeholder={v.placeholder || `Masukkan ${v.label}`}
-                                  className={cn(
-                                    "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none",
-                                    v.key.toLowerCase().includes("lampiran") || v.key.toLowerCase().includes("undangan") || v.key.toLowerCase().includes("agenda") ? "h-[160px]" : "h-[80px]",
-                                    hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
-                                  )}
-                                  value={templateVariables[v.key] || ""}
-                                  onChange={(e) => {
-                                    setTemplateVariables({ ...templateVariables, [v.key]: e.target.value });
-                                    clearFieldError(errKey);
-                                  }}
-                                />
-                              )
+                            {v.type === "wysiwyg" || v.key === "agendaDetail" || v.key === "daftarUndangan" || v.key === "keteranganNarahubung" || v.key === "keterangan" ? (
+                              <SimpleRichEditor
+                                value={templateVariables[v.key] || ""}
+                                placeholder={v.placeholder || `Masukkan ${v.label}`}
+                                hasError={hasErr}
+                                onChange={(val) => {
+                                  setTemplateVariables({ ...templateVariables, [v.key]: val });
+                                  clearFieldError(errKey);
+                                }}
+                              />
+                            ) : v.type === "textarea" ? (
+                              <textarea
+                                required={v.required}
+                                placeholder={v.placeholder || `Masukkan ${v.label}`}
+                                className={cn(
+                                  "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none",
+                                  v.key.toLowerCase().includes("lampiran") || v.key.toLowerCase().includes("undangan") || v.key.toLowerCase().includes("agenda") || v.key.toLowerCase().includes("nama") ? "h-[120px]" : "h-[80px]",
+                                  hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
+                                )}
+                                value={templateVariables[v.key] || ""}
+                                onChange={(e) => {
+                                  setTemplateVariables({ ...templateVariables, [v.key]: e.target.value });
+                                  clearFieldError(errKey);
+                                }}
+                              />
                             ) : v.type === "date" ? (
                               <input
                                 type="date"

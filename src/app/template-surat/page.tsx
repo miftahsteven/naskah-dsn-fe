@@ -27,14 +27,16 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import SimpleRichEditor from "@/components/SimpleRichEditor";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TemplateVariable {
   key: string;
   label: string;
-  type: "text" | "textarea" | "date";
+  type: "text" | "textarea" | "date" | "wysiwyg";
   required: boolean;
   placeholder?: string;
+  defaultValue?: string;
 }
 
 interface LetterTemplate {
@@ -135,6 +137,7 @@ function VariableRow({
         >
           <option value="text">Text</option>
           <option value="textarea">Textarea</option>
+          <option value="wysiwyg">WYSIWYG / Rich Text</option>
           <option value="date">Tanggal</option>
         </select>
       </div>
@@ -535,7 +538,13 @@ function PreviewModal({
                     {v.label}
                     {v.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
-                  {v.type === "textarea" ? (
+                  {v.type === "wysiwyg" || v.key === "agendaDetail" || v.key === "daftarUndangan" || v.key === "keteranganNarahubung" || v.key === "keterangan" ? (
+                    <SimpleRichEditor
+                      value={values[v.key] || ""}
+                      placeholder={v.placeholder || `Isi ${v.label}`}
+                      onChange={(val) => setValues({ ...values, [v.key]: val })}
+                    />
+                  ) : v.type === "textarea" ? (
                     <textarea
                       rows={3}
                       className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-[#006633] outline-none bg-white resize-none"
