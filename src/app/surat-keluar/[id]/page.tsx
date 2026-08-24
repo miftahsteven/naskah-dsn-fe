@@ -21,7 +21,8 @@ import {
   Trash2,
   X,
   Send,
-  Eye
+  Eye,
+  FileCheck
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -797,6 +798,45 @@ const DocumentDetailPage = () => {
               </div>
             </div>
           </div>
+
+          {/* Dokumen Pendukung (Evidence Files) */}
+          {doc.evidenceFiles && doc.evidenceFiles.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <FileText size={20} className="text-primary" />
+                  Dokumen Pendukung
+                </h3>
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                  Digabung di PDF Unduhan
+                </span>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                {doc.evidenceFiles.map((ev: any) => (
+                  <div key={ev.id} className="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                        <FileCheck size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{ev.name}</p>
+                        <p className="text-[10px] text-slate-400">{(ev.fileSize / 1024 / 1024).toFixed(2)} MB • {ev.mimeType || 'Berkas Lampiran'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleDownloadFile(ev.fileUrl, ev.name)}
+                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-lg transition-all"
+                        title="Unduh Berkas Lampiran"
+                      >
+                        <Download size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Sidebar Info */}

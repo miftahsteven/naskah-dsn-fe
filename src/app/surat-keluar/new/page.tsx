@@ -234,17 +234,50 @@ const getDefaultTemplateBody = (id: string): string => {
       `;
     case "tugas":
       return `
-        <p>Dengan hormat,</p>
-        <p>Dalam rangka implementasi program digitalisasi administrasi di lingkungan Pengurus Besar Nahdlatul Ulama, dengan ini menugaskan kepada:</p>
-        <table style="width: 100%; margin: 12px 0; border-collapse: collapse;">
+        <p style="text-align: justify; text-indent: 30px; margin-bottom: 8px;">Menunjuk surat dari Lembaga Penggerak Ekonomi Umat (LPEU) Majelis Ulama Indonesia No. A-120/LPEU MUI/VII/2026 tertanggal 28 Juli 2026, dan berdasarkan keputusan Rapat Kesekretarisan Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) tanggal 6 Agustus 2026, DSN-MUI dengan ini <strong>menugaskan</strong> kepada:</p>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
           <tbody>
-            <tr><td style="width: 25%; padding: 4px 0; font-weight: bold;">Nama</td><td>: Dr. Miftahul Ulum</td></tr>
-            <tr><td style="padding: 4px 0; font-weight: bold;">Jabatan</td><td>: Direktur TI & Sistem Informasi</td></tr>
-            <tr><td style="padding: 4px 0; font-weight: bold;">Tugas</td><td>: Melakukan sosialisasi & pendampingan teknis penggunaan aplikasi persuratan digital di kantor wilayah Jawa Barat.</td></tr>
-            <tr><td style="padding: 4px 0; font-weight: bold;">Durasi Tugas</td><td>: 8 Juni s.d 12 Juni 2026</td></tr>
+            <tr>
+              <td style="width: 100px; vertical-align: top; padding: 2px 0;">Nama</td>
+              <td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td>
+              <td style="padding: 2px 0;">
+                <div>1. Ibnu Wazi<br/>&nbsp;&nbsp;&nbsp;(Anggota Bidang Fatwa)</div>
+                <div style="margin-top: 4px;">2. Dr. Nofrianto, M.Ag., CM.<br/>&nbsp;&nbsp;&nbsp;(Anggota Bidang Layanan, Literasi, Relasi Industri, dan Regulasi)</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="vertical-align: top; padding: 4px 0 2px 0;">Keperluan</td>
+              <td style="vertical-align: top; padding: 4px 0 2px 0;">:</td>
+              <td style="padding: 4px 0 2px 0;">
+                menghadiri kegiatan <em>Risk Based Performance Management Training</em>, yang diselenggarakan oleh LPEU MUI, yang insyaAllah dilaksanakan pada:
+                <table style="width: 100%; border-collapse: collapse; margin-top: 4px;">
+                  <tr><td style="width: 100px; font-weight: bold; padding: 2px 0;">Hari, tanggal</td><td style="width: 15px; font-weight: bold; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">Jumat-Sabtu, 7-8 Agustus 2026</td></tr>
+                  <tr><td style="font-weight: bold; padding: 2px 0;">Waktu</td><td style="font-weight: bold; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">08.00 WIB - selesai (<em>Rundown</em> acara terlampir)</td></tr>
+                  <tr><td style="font-weight: bold; padding: 2px 0;">Tempat</td><td style="font-weight: bold; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">Aula Buya Hamka Gedung MUI Pusat<br/>Jl. Proklamasi 51, Menteng, Jakarta Pusat</td></tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="vertical-align: top; padding: 4px 0 2px 0;">Keterangan</td>
+              <td style="vertical-align: top; padding: 4px 0 2px 0;">:</td>
+              <td style="padding: 4px 0 2px 0;">
+                <div>Narahubung:</div>
+                <div style="margin-top: 2px;">
+                  <strong>❖ Sekretariat DSN-MUI</strong><br/>
+                  Telp./WA: 0818 404 852 (Sdr. Abdul Wasik, M.Si) | Hotline: 0822 6000 4146<br/>
+                  Email: sekretariat@dsnmui.or.id / dsnmui@gmail.com
+                </div>
+                <div style="margin-top: 4px;">
+                  <strong>❖ LPEU MUI</strong><br/>
+                  Telp.: 0812 1569 7070 (Admin WA LPEU MUI)<br/>
+                  Email: lpeu.mui.pusat@gmail.com
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
-        <p>Setelah melaksanakan tugas tersebut, penerima tugas wajib memberikan laporan tertulis hasil pelaksanaan kegiatan kepada pimpinan organisasi. Atas perhatian dan dukungannya, diucapkan terima kasih.</p>
+        <p style="text-align: justify; text-indent: 30px; margin-top: 6px; margin-bottom: 6px;">Demikian Surat Tugas ini diberikan kepada yang bersangkutan untuk dilaksanakan sebagaimana mestinya dan melaporkan hasilnya kepada Pimpinan DSN-MUI.</p>
+        <p style="text-align: justify; text-indent: 30px; margin-top: 0; margin-bottom: 8px;">Apabila dalam penugasan ini terdapat kekeliruan, atau ada kebutuhan organisasi, akan diperbaiki sebagaimana mestinya.</p>
       `;
     case "informasi":
       return `
@@ -721,6 +754,10 @@ const CreateDocumentPage = () => {
     formData.append("classificationId", classificationId);
     formData.append("documentType", "OUTGOING");
 
+    if (dokumenPendukung) {
+      formData.append("dokumenPendukung", dokumenPendukung);
+    }
+
     try {
       const docRes = await api.post("/documents", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -731,6 +768,19 @@ const CreateDocumentPage = () => {
       });
 
       const documentId = docRes.data.data.id;
+
+      // Fallback: upload evidence file if not already created
+      if (dokumenPendukung && (!docRes.data.data.evidenceFiles || docRes.data.data.evidenceFiles.length === 0)) {
+        const evidenceFormData = new FormData();
+        evidenceFormData.append("file", dokumenPendukung);
+        try {
+          await api.post(`/documents/${documentId}/evidence/files`, evidenceFormData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } catch (evErr) {
+          console.warn("Evidence file fallback upload:", evErr);
+        }
+      }
 
       // Submit Workflow Config
       await api.post("/workflow/submit", {
@@ -1235,9 +1285,8 @@ const CreateDocumentPage = () => {
     formData.append("classificationId", classificationId);
     formData.append("documentType", "OUTGOING");
 
-    // Optional supporting document metadata in catatan if needed
-    if (catatan) {
-      // Custom notes are sent as part of the document if supported, or we just put it in title or logs
+    if (dokumenPendukung) {
+      formData.append("dokumenPendukung", dokumenPendukung);
     }
 
     try {
@@ -1247,6 +1296,19 @@ const CreateDocumentPage = () => {
       });
 
       const documentId = docRes.data.data.id;
+
+      // Fallback: upload evidence file if not already created in initial creation
+      if (dokumenPendukung && (!docRes.data.data.evidenceFiles || docRes.data.data.evidenceFiles.length === 0)) {
+        const evidenceFormData = new FormData();
+        evidenceFormData.append("file", dokumenPendukung);
+        try {
+          await api.post(`/documents/${documentId}/evidence/files`, evidenceFormData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } catch (evErr) {
+          console.warn("Evidence file fallback upload:", evErr);
+        }
+      }
 
       // 2. Submit the Workflow config
       await api.post("/workflow/submit", {
