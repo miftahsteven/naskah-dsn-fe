@@ -595,6 +595,26 @@ const CreateDocumentPage = () => {
     }
 
     // Default template variables for signers and standard fields
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "tempatPenerima")) {
+      if (!newVars.tempatPenerima || newVars.tempatPenerima.trim() === "") {
+        setVar("tempatPenerima", "TEMPAT");
+      }
+    }
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "alamatLembaga")) {
+      if (!newVars.alamatLembaga || newVars.alamatLembaga.trim() === "") {
+        setVar("alamatLembaga", "TEMPAT");
+      }
+    }
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "kota_tujuan")) {
+      if (!newVars.kota_tujuan || newVars.kota_tujuan.trim() === "") {
+        setVar("kota_tujuan", "TEMPAT");
+      }
+    }
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "headerTtd")) {
+      if (!newVars.headerTtd || newVars.headerTtd.trim() === "") {
+        setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL-\nMAJELIS ULAMA INDONESIA");
+      }
+    }
     if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKiri")) {
       if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
         setVar("jabatanKiri", "Ketua");
@@ -613,6 +633,15 @@ const CreateDocumentPage = () => {
     if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaSekretaris")) {
       if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
         setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+    }
+
+    // Generic fallback for any template variable with defaultValue
+    if (selectedTemplateObj.variables) {
+      for (const v of selectedTemplateObj.variables) {
+        if (v.defaultValue && (!newVars[v.key] || newVars[v.key].trim() === "")) {
+          setVar(v.key, v.defaultValue);
+        }
       }
     }
 
@@ -1905,29 +1934,24 @@ const CreateDocumentPage = () => {
                           srcDoc={selectedTemplateObj ? `
                             <style>
                               body {
-                                font-family: Arial, sans-serif !important;
-                                font-size: 11pt !important;
-                                line-height: 1.5 !important;
-                              }
-                              div, p, td, th, li, span {
-                                font-size: 11pt !important;
-                                line-height: 1.5 !important;
+                                font-family: Arial, sans-serif;
+                                font-size: 11pt;
+                                line-height: 1.4;
+                                margin: 0;
+                                padding: 0;
                               }
                               h2 {
-                                font-size: 13pt !important;
+                                font-size: 13pt;
                               }
                               h1 {
-                                font-size: 14pt !important;
+                                font-size: 14pt;
                               }
                             </style>
                             ${selectedTemplateObj.htmlContent.replace(
                             /\{\{(\w+)\}\}/g,
                             (_: string, key: string) => {
-                              let val = templateVariables[key] || "";
-                              if (key === "agendaDetail" || key === "daftarUndangan") {
-                                val = val.replace(/\r?\n/g, "");
-                              }
-                              return val || `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`;
+                              const val = templateVariables[key];
+                              return (val !== undefined && val !== "") ? val : `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`;
                             }
                           )}
                           ` : ""}
