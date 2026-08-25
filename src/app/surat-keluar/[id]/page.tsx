@@ -896,9 +896,16 @@ const DocumentDetailPage = () => {
                             {step.status === 'PENDING' && step.actionedAt ? 'PENDING - REVISI MASUK' : step.status}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          {step.user?.jabatan?.name || step.user?.role?.name || "Penandatangan"}
-                        </p>
+                        {(() => {
+                          const roleLabel = (step.roleId === 'PEMPARAF' || step.role === 'PEMPARAF') ? 'Pemaraf' : (step.roleId === 'APPROVER' || step.role === 'APPROVER') ? 'Approver' : 'Penandatangan';
+                          const jobTitle = step.user?.jabatan?.name || step.user?.jobTitle || step.user?.role?.name;
+                          return (
+                            <p className="text-[10px] text-slate-500 font-medium">
+                              <span className="font-semibold text-slate-600 dark:text-slate-400">{roleLabel}</span>
+                              {jobTitle ? ` · ${jobTitle}` : ""}
+                            </p>
+                          );
+                        })()}
                         {step.comment && (
                           <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
                             <p className="text-[10px] text-slate-600 dark:text-slate-400 italic leading-relaxed">&ldquo;{step.comment}&rdquo;</p>

@@ -182,35 +182,49 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         if (cancelled) return;
 
         const signatures = json?.data?.signatures || [];
-        const rows: any[] = [];
-
-        signatures.filter((s: any) => s.signedAt).forEach((s: any) => {
-          rows.push({
-            id: String(s.id),
-            userId: String(s.userId),
-            fullName: s.user?.fullName || 'Penandatangan',
-            jobTitle: s.user?.jobTitle || 'Penandatangan',
-            signedAt: new Date(s.signedAt).toLocaleString('id-ID', {
-              timeZone: 'Asia/Jakarta',
-              dateStyle: 'long',
-              timeStyle: 'short',
-            }),
-            payload: JSON.stringify({
-              signatureId: s.id,
-              documentId: s.documentId,
-              userId: s.userId,
-              signedAt: s.signedAt,
-              fullName: s.user?.fullName,
-            }),
+        const workflowInstances = json?.data?.workflowInstances || json?.data?.workflow || [];
+        const instancesList = Array.isArray(workflowInstances) ? workflowInstances : [workflowInstances];
+        
+        // Find penandatangan userIds from workflow steps
+        const penandatanganUserIds: string[] = [];
+        instancesList.forEach((wf: any) => {
+          (wf?.steps || []).forEach((st: any) => {
+            if (!st.roleId || st.roleId === 'PENANDATANGAN' || st.role === 'PENANDATANGAN') {
+              if (st.userId) penandatanganUserIds.push(String(st.userId));
+            }
           });
         });
 
-        // Also check approved workflow steps as fallback signatures
-        const workflowInstances = json?.data?.workflowInstances || json?.data?.workflow || [];
-        const instancesList = Array.isArray(workflowInstances) ? workflowInstances : [workflowInstances];
+        const rows: any[] = [];
+
+        signatures
+          .filter((s: any) => s.signedAt && (penandatanganUserIds.length === 0 || penandatanganUserIds.includes(String(s.userId))))
+          .forEach((s: any) => {
+            rows.push({
+              id: String(s.id),
+              userId: String(s.userId),
+              fullName: s.user?.fullName || 'Penandatangan',
+              jobTitle: s.user?.jobTitle || 'Penandatangan',
+              signedAt: new Date(s.signedAt).toLocaleString('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                dateStyle: 'long',
+                timeStyle: 'short',
+              }),
+              payload: JSON.stringify({
+                signatureId: s.id,
+                documentId: s.documentId,
+                userId: s.userId,
+                signedAt: s.signedAt,
+                fullName: s.user?.fullName,
+              }),
+            });
+          });
+
+        // Also check approved workflow steps as fallback signatures (PENANDATANGAN only)
         instancesList.forEach((wf: any) => {
           (wf?.steps || []).forEach((st: any) => {
-            if ((st.status === 'APPROVED' || st.status === 'SIGNED') && st.userId) {
+            const isPenandatangan = !st.roleId || st.roleId === 'PENANDATANGAN' || st.role === 'PENANDATANGAN';
+            if ((st.status === 'APPROVED' || st.status === 'SIGNED') && st.userId && isPenandatangan) {
               const exists = rows.some(r => r.userId === String(st.userId));
               if (!exists) {
                 const signedDate = st.actionedAt || st.updatedAt || new Date();
@@ -338,35 +352,20 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
       }
       if (templateVariables) {
-        if (signerIndex === 0) {
-          if (templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
-          if (templateVariables.namaPenandatangan) candidates.push(templateVariables.namaPenandatangan);
-        } else if (signerIndex === 1) {
-          if (templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
-        }
+        if (signerIndex === 0 && templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
+        if (signerIndex === 1 && templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
         if (templateVariables.namaPenandatangan) candidates.push(templateVariables.namaPenandatangan);
-        if (templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
-        if (templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
       }
       // DSN-MUI official name fallbacks
       const userLower = (row.fullName || '').toLowerCase();
-      if (signerIndex === 0 || userLower.includes('cholil') || userLower.includes('nafis') || userLower.includes('hasan') || userLower.includes('admin') || userLower.includes('ketua')) {
+      if (signerIndex === 0 || userLower.includes('cholil') || userLower.includes('nafis') || userLower.includes('hasan') || userLower.includes('ketua')) {
         candidates.push("CHOLIL NAFIS");
         candidates.push("HASANUDDIN");
-      }
-      if (signerIndex === 1 || userLower.includes('amirsyah') || userLower.includes('tambunan') || userLower.includes('anwar') || userLower.includes('sekretaris')) {
+      } else if (signerIndex === 1 || userLower.includes('amirsyah') || userLower.includes('tambunan') || userLower.includes('anwar') || userLower.includes('sekretaris')) {
         candidates.push("AMIRSYAH TAMBUNAN");
         candidates.push("ANWAR ABBAS");
       }
-      candidates.push("CHOLIL NAFIS");
-      candidates.push("AMIRSYAH TAMBUNAN");
-      candidates.push("HASANUDDIN");
-      candidates.push("ANWAR ABBAS");
-      candidates.push("SHOLAHUDDIN");
-      candidates.push("ADIWARMAN");
 
-      let match: RegExpExecArray | null = null;
-      let matchedCandidate = "";
       let bestMatch: { m: RegExpExecArray, cand: string, score: number, index: number } | null = null;
 
       for (const cand of candidates) {
@@ -380,31 +379,44 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
 
           while ((m = nameRegex.exec(enhanced)) !== null) {
             const prefix = enhanced.substring(0, m.index);
-            const lastSlice = prefix.slice(Math.max(0, prefix.length - 350));
+            
+            if (prefix.lastIndexOf('<script') > prefix.lastIndexOf('</script>') ||
+                prefix.lastIndexOf('<style') > prefix.lastIndexOf('</style>')) {
+              continue;
+            }
+
+            const wideSlice = prefix.slice(Math.max(0, prefix.length - 600));
+            const closeSlice = prefix.slice(Math.max(0, prefix.length - 200));
 
             let score = 0;
-            if (/(Ketua|Sekretaris|Direktur|Pimpinan|Kepala)/i.test(lastSlice)) score += 15;
-            if (/(?:<br\s*\/?>\s*){2,}/i.test(lastSlice)) score += 5;
-            if (/margin-bottom:\s*\d+px/i.test(lastSlice)) score += 5;
-            if (/<div[^>]*style="[^"]*height/i.test(lastSlice)) score += 5;
-            if (/:\s*(<[^>]+>\s*)*$/.test(lastSlice) || /:\s*$/.test(prefix.trim())) score -= 25;
+            if (/Lampiran\s+[0-9I|IVX]+/i.test(prefix)) score -= 100;
+            if (/Wakil\s*(?:Ketua|Sekretaris)\s*:/i.test(wideSlice)) score -= 100;
+            if (/:\s*(<[^>]+>\s*)*$/.test(closeSlice) || /:\s*$/.test(prefix.trim())) score -= 100;
+            if (/<li[^>]*>/i.test(closeSlice) && !/<\/li>/i.test(closeSlice)) score -= 50;
+            if (/<blockquote/i.test(closeSlice) && !/<\/blockquote>/i.test(closeSlice)) score -= 50;
 
-            if (!bestMatch || score > bestMatch.score || (score === bestMatch.score && m.index > bestMatch.index)) {
+            if (/(?:Ketua|Sekretaris|Direktur|Pimpinan|Kepala|Menyetujui|Mengetahui|Ketum|Sekjen)/i.test(wideSlice)) score += 30;
+            if (/(?:<br\s*\/?>\s*){2,}/i.test(wideSlice)) score += 15;
+            if (/margin-bottom:\s*\d{2,}px/i.test(wideSlice)) score += 25;
+            if (/<div[^>]*style="[^"]*height:\s*\d{2,}px/i.test(wideSlice)) score += 25;
+            if (/<!--\s*QR_CODE_TTE_PLACEHOLDER\s*-->/i.test(wideSlice)) score += 30;
+
+            if (row.jobTitle) {
+              const rRegex = new RegExp(escapeRegExp(row.jobTitle), 'i');
+              if (rRegex.test(wideSlice)) score += 20;
+            }
+
+            if (!bestMatch || score > bestMatch.score) {
               bestMatch = { m, cand, score, index: m.index };
             }
           }
         }
       }
 
-      if (bestMatch && bestMatch.score > -10) {
-        match = bestMatch.m;
-        matchedCandidate = bestMatch.cand;
-      }
+      const qrImageHtml = `<div style="text-align:left; margin:-12px 0 4px 0; line-height:1; display:block; position:relative; width:60px; height:60px;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:60px !important; height:60px !important; min-width:60px !important; min-height:60px !important; object-fit:contain !important; display:block !important; position:absolute; top:0; left:0; z-index:1;" /><img src="${BASE_URL}/images/logo-dsn.png" alt="Logo" style="width:16px !important; height:16px !important; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2; background:#fff; border-radius:50%; padding:2px; object-fit:contain; border:1px solid #1F3F23;" /></div>`;
 
-      const qrImageHtml = `<div style="text-align:center; margin:4px auto; line-height:1; display:block; position:relative; width:70px; height:70px;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:70px !important; height:70px !important; min-width:70px !important; min-height:70px !important; object-fit:contain !important; display:block !important; position:absolute; top:0; left:0; z-index:1;" /><img src="${BASE_URL}/images/logo-dsn.png" alt="Logo" style="width:20px !important; height:20px !important; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2; background:#fff; border-radius:50%; padding:2px; object-fit:contain; border:1px solid #1F3F23;" /></div>`;
-
-      if (match) {
-        const matchIndex = match.index;
+      if (bestMatch && bestMatch.score > 0) {
+        const matchIndex = bestMatch.m.index;
         const prefix = enhanced.substring(0, matchIndex);
 
         const lastOpenTagIndex = prefix.lastIndexOf('<');
@@ -420,16 +432,23 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         let suffix = enhanced.substring(targetIndex);
         suffix = suffix.replace(/^([^>]+style="[^"]*)(?:margin-top|padding-top):\s*\d+px;?/i, "$1margin-top: 2px;");
 
-        const sliceLen = Math.min(1000, realPrefix.length);
+        const sliceLen = Math.min(600, realPrefix.length);
         const prefixBase = realPrefix.slice(0, realPrefix.length - sliceLen);
         const lastSlice = realPrefix.slice(realPrefix.length - sliceLen);
 
-        if (/margin-bottom:\s*\d+px/i.test(lastSlice)) {
+        if (lastSlice.includes('qr-signature-img')) {
+          return;
+        }
+
+        if (/(<div[^>]*style="[^"]*height:\s*\d+px[^"]*"[^>]*>\s*<\/div>)/gi.test(lastSlice)) {
+          const updatedSlice = lastSlice.replace(/(<div[^>]*style="[^"]*height:\s*\d+px[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
+          enhanced = prefixBase + updatedSlice + suffix;
+        } else if (/<!--\s*QR_CODE_TTE_PLACEHOLDER\s*-->/gi.test(lastSlice)) {
+          const updatedSlice = lastSlice.replace(/<!--\s*QR_CODE_TTE_PLACEHOLDER\s*-->/gi, qrImageHtml);
+          enhanced = prefixBase + updatedSlice + suffix;
+        } else if (/margin-bottom:\s*\d+px/i.test(lastSlice)) {
           const updatedSlice = lastSlice.replace(/margin-bottom:\s*\d+px/gi, 'margin-bottom: 4px');
           enhanced = prefixBase + updatedSlice + qrImageHtml + suffix;
-        } else if (/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi.test(lastSlice)) {
-          const updatedSlice = lastSlice.replace(/(<div[^>]*style="[^"]*height:[^"]*"[^>]*>\s*<\/div>)/gi, qrImageHtml);
-          enhanced = prefixBase + updatedSlice + suffix;
         } else {
           const lastBrMatches = [...lastSlice.matchAll(/(?:<br\s*\/?>\s*){2,}/gi)];
           if (lastBrMatches.length > 0) {
@@ -448,18 +467,21 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
       } else {
         // Safe Role-based Fallback
-        const isKetua = signerIndex === 0 || /ketua/i.test(row.jobTitle || '');
-        const targetRole = isKetua ? 'Ketua' : 'Sekretaris';
-        const roleRegex = new RegExp(`(${targetRole}\\s*,?\\s*(?:<[^>]+>|\\s)*?)(?:<br\\s*\\/?>\\s*){2,}`, 'i');
-        if (roleRegex.test(enhanced)) {
-          enhanced = enhanced.replace(roleRegex, `$1${qrImageHtml}`);
-        } else {
-          const genericRoleRegex = /(?:Ketua|Sekretaris)\s*,?\s*(?:<[^>]+>|\s)*?/i;
-          const roleMatch = genericRoleRegex.exec(enhanced);
-          if (roleMatch) {
-            const idx = roleMatch.index + roleMatch[0].length;
-            enhanced = enhanced.substring(0, idx) + qrImageHtml + enhanced.substring(idx);
-          }
+        const isKetua = signerIndex === 0 || /ketua|ketum/i.test(row.jobTitle || '') || /cholil|nafis/i.test((candidates || []).join(' '));
+        const targetRole = isKetua ? '(?:Ketua|Menyetujui|Ketum)' : '(?:Sekretaris|Mengetahui|Sekjen)';
+
+        const lampiranMatch = enhanced.match(/Lampiran\s+[0-9I|IVX]+/i);
+        const lampiranIndex = lampiranMatch ? lampiranMatch.index : -1;
+        const searchContent = lampiranIndex !== -1 ? enhanced.substring(0, lampiranIndex) : enhanced;
+
+        const roleRegex = new RegExp(`(${targetRole}\\s*,?\\s*(?:<[^>]+>|\\s)*?)(?:<div[^>]*style="[^"]*height:[^"]*"[^>]*>\\s*<\\/div>|(?:<br\\s*\\/?>\\s*){2,})`, 'i');
+        const roleMatch = roleRegex.exec(searchContent);
+        if (roleMatch) {
+          const idx = roleMatch.index;
+          const matchLen = roleMatch[0].length;
+          const p = enhanced.substring(0, idx);
+          const s = enhanced.substring(idx + matchLen);
+          enhanced = p + roleMatch[1] + qrImageHtml + s;
         }
       }
     });

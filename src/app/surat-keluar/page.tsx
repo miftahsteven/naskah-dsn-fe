@@ -1888,7 +1888,15 @@ const DocumentsPage = () => {
                                       {step.status}
                                     </span>
                                   </div>
-                                  <p className="text-[10px] text-slate-400 font-medium">{step.user?.jobTitle || "Penandatangan"}</p>
+                                  {(() => {
+                                    const roleLabel = (step.roleId === 'PEMPARAF' || step.role === 'PEMPARAF') ? 'Pemaraf' : (step.roleId === 'APPROVER' || step.role === 'APPROVER') ? 'Approver' : 'Penandatangan';
+                                    return (
+                                      <p className="text-[10px] text-slate-400 font-medium">
+                                        <span className="font-semibold text-slate-500 dark:text-slate-400">{roleLabel}</span>
+                                        {step.user?.jobTitle ? ` · ${step.user.jobTitle}` : ""}
+                                      </p>
+                                    );
+                                  })()}
                                   {step.comment && (
                                     <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/50 text-[11px] text-slate-600 dark:text-slate-400 leading-normal">
                                       <span className="italic">&ldquo;{step.comment}&rdquo;</span>
