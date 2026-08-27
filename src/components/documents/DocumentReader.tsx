@@ -302,7 +302,9 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     }
 
     if (htmlContent.includes('qr-signature-img') || htmlContent.includes('alt="QR Signature"')) {
-      setHtmlContentWithSignatures(htmlContent);
+      let cleaned = htmlContent.replace(/margin:\s*-12px\s+0\s+4px\s+0/gi, 'margin: 4px 0 4px 0');
+      cleaned = cleaned.replace(/margin:\s*-?\d+px\s+0\s+\d+px\s+0\s*!important/gi, 'margin: 4px 0 4px 0 !important');
+      setHtmlContentWithSignatures(cleaned);
       return;
     }
 
@@ -413,7 +415,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
       }
 
-      const qrImageHtml = `<div style="text-align:left; margin:-12px 0 4px 0; line-height:1; display:block; position:relative; width:60px; height:60px;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:60px !important; height:60px !important; min-width:60px !important; min-height:60px !important; object-fit:contain !important; display:block !important; position:absolute; top:0; left:0; z-index:1;" /><img src="${BASE_URL}/images/logo-dsn.png" alt="Logo" style="width:16px !important; height:16px !important; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2; background:#fff; border-radius:50%; padding:2px; object-fit:contain; border:1px solid #1F3F23;" /></div>`;
+      const qrImageHtml = `<div style="text-align:left; margin:4px 0 4px 0; line-height:1; display:block; position:relative; width:60px; height:60px;"><img src="${qrDataUrl}" alt="QR Signature" class="qr-signature-img" style="width:60px !important; height:60px !important; min-width:60px !important; min-height:60px !important; object-fit:contain !important; display:block !important; position:absolute; top:0; left:0; z-index:1;" /><img src="${BASE_URL}/images/logo-dsn.png" alt="Logo" style="width:16px !important; height:16px !important; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2; background:#fff; border-radius:50%; padding:2px; object-fit:contain; border:1px solid #1F3F23;" /></div>`;
 
       if (bestMatch && bestMatch.score > 0) {
         const matchIndex = bestMatch.m.index;
@@ -512,14 +514,40 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           margin: 0 auto !important;
         }
         img.qr-signature-img {
-          width: 70px !important;
-          height: 70px !important;
-          max-width: 70px !important;
-          max-height: 70px !important;
-          min-width: 70px !important;
-          min-height: 70px !important;
+          width: 60px !important;
+          height: 60px !important;
+          max-width: 60px !important;
+          max-height: 60px !important;
+          min-width: 60px !important;
+          min-height: 60px !important;
           display: inline-block !important;
           object-fit: contain !important;
+        }
+        div[style*="width: 60px"][style*="height: 60px"],
+        div[style*="width: 70px"][style*="height: 70px"] {
+          margin: 4px 0 4px 0 !important;
+          width: 60px !important;
+          height: 60px !important;
+        }
+        /* Official TTE Footer - Hidden on screen preview, fixed at bottom edge on print/PDF */
+        @media screen {
+          .amanah-letter-footer {
+            display: none !important;
+          }
+        }
+        @media print {
+          .amanah-letter-footer {
+            display: table !important;
+            position: fixed !important;
+            bottom: 5mm !important;
+            left: 15mm !important;
+            right: 15mm !important;
+            width: calc(100% - 30mm) !important;
+            max-width: 750px !important;
+            margin: 0 auto !important;
+            background: transparent !important;
+            z-index: 99999 !important;
+          }
         }
       </style>
     `;
@@ -557,6 +585,21 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           return res.text();
         })
         .then(text => {
+          const FOOTER_HTML = `<table class="amanah-letter-footer" style="display: none; width: 100%; border-collapse: collapse; margin-top: 14px; font-family: Arial, sans-serif;">
+    <tr>
+      <td style="vertical-align: middle; text-align: left; padding: 2px 10px 2px 0; font-size: 7.5pt; line-height: 1.35; font-style: italic; color: #1f2937;">
+        Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silahkan pindai QR-Code
+      </td>
+      <td style="vertical-align: middle; text-align: right; width: 32px; padding: 2px 0;">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle;">
+          <path d="M16 2L5 6.5V14.5C5 21.2 9.7 27.5 16 29.5C22.3 27.5 27 21.2 27 14.5V6.5L16 2Z" fill="#006633" stroke="#004D26" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="16" cy="16" r="8.5" fill="#006633" stroke="#ffffff" stroke-width="1" stroke-dasharray="2 1.5"/>
+          <path d="M12 16L14.8 18.8L20.5 13" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </td>
+    </tr>
+  </table>`;
+
           let processed = text;
           if (kopSuratBase64) {
             processed = processed.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
@@ -566,6 +609,15 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   <div style="text-align: center; margin-top: 6px; margin-bottom: 12px;">
     <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="height: 35px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
   </div>`);
+          }
+          processed = processed.replace(/(\\?\${FOOTER_HTML}|\${FOOTER_HTML})/g, FOOTER_HTML);
+          if (!processed.includes('amanah-letter-footer')) {
+            const lastDivIdx = processed.lastIndexOf('</div>');
+            if (lastDivIdx !== -1) {
+              processed = processed.substring(0, lastDivIdx) + FOOTER_HTML + '\n' + processed.substring(lastDivIdx);
+            } else {
+              processed += '\n' + FOOTER_HTML;
+            }
           }
           if (bismillahBase64) {
             processed = processed.replace(/src=["'][^"']*bismillah\.svg["']/gi, `src="${bismillahBase64}"`);
