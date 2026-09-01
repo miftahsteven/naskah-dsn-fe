@@ -505,24 +505,21 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
           let processed = text;
           if (kopSuratBase64) {
             processed = processed.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
-            processed = processed.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 8px; margin-left: -40px; margin-right: -40px; padding-top: 10px;">
-    <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 750px; height: auto; display: block; margin: 0 auto;" />
+            processed = processed.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 4px; margin-left: 0; margin-right: 0; padding-top: 0;">
+    <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
   </div>
-  <div style="text-align: center; margin-top: 6px; margin-bottom: 12px;">
-    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="height: 35px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
+  <div style="text-align: center; margin-top: 8px; margin-bottom: 14px;">
+    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
   </div>`);
           }
-          processed = processed.replace(/(\\?\${FOOTER_HTML}|\${FOOTER_HTML})/g, FOOTER_HTML);
-          if (!processed.includes('amanah-letter-footer')) {
-            const lastDivIdx = processed.lastIndexOf('</div>');
-            if (lastDivIdx !== -1) {
-              processed = processed.substring(0, lastDivIdx) + FOOTER_HTML + '\n' + processed.substring(lastDivIdx);
-            } else {
-              processed += '\n' + FOOTER_HTML;
-            }
-          }
+          processed = processed.replace(/border-top:\s*1px\s*solid\s*#000000;?/gi, 'border-top: none;');
+          processed = processed.replace(/border-top:\s*1px\s*solid\s*black;?/gi, 'border-top: none;');
+          processed = processed.replace(/border-top:\s*1px\s*solid\s*#000;?/gi, 'border-top: none;');
+          processed = processed.replace(/<table class="amanah-letter-footer"[\s\S]*?<\/table>/gi, '');
+          processed = processed.replace(/(\\?\${FOOTER_HTML}|\${FOOTER_HTML})/g, '');
           if (bismillahBase64) {
             processed = processed.replace(/src=["'][^"']*bismillah\.svg["']/gi, `src="${bismillahBase64}"`);
+            processed = processed.replace(/src=["']data:image\/svg\+xml;base64,[^"']*["']/gi, `src="${bismillahBase64}"`);
           }
           if (logoBase64) {
             processed = processed.replace(/src=["'][^"']*logo-dsn\.png["']/gi, `src="${logoBase64}"`);
@@ -530,6 +527,18 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
           if (wqaUkasBase64) {
             processed = processed.replace(/src=["'][^"']*wqa-ukas\.png["']/gi, `src="${wqaUkasBase64}"`);
           }
+          processed = processed.replace(/(<img[^>]*(?:bismillah|Bismillah)[^>]*style=["'])([^"']*)(["'])/gi, (match, p1, p2, p3) => {
+            let cleanStyle = p2.replace(/height:\s*[^;]+;?/gi, '').replace(/max-height:\s*[^;]+;?/gi, '').replace(/width:\s*[^;]+;?/gi, '').replace(/max-width:\s*[^;]+;?/gi, '').trim();
+            return `${p1}${cleanStyle ? cleanStyle + '; ' : ''}width: 260px; max-width: 45%; height: auto; max-height: 48px; margin: 8px auto 14px auto;${p3}`;
+          });
+          processed = processed.replace(
+            /(<!--\s*SALAM\s*PENUTUP\s*-->[\s\S]*?<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh[\.,]?)\s*(<\/p>)/gi,
+            '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
+          );
+          processed = processed.replace(
+            /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
+            '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
+          );
           setHtmlContent(processed);
         })
         .catch(err => {
@@ -657,10 +666,47 @@ const DocumentsPage = () => {
 
     // Convert relative image URLs (e.g. images/logo-dsn.png) to absolute URL
     processedHtml = processedHtml.replace(/src=["']\/?(images\/[^"']+)["']/gi, `src="${BASE_URL}/$1"`);
+    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*#000000;?/gi, 'border-top: none;');
+    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*black;?/gi, 'border-top: none;');
+    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*#000;?/gi, 'border-top: none;');
+    processedHtml = processedHtml.replace(/<table class="amanah-letter-footer"[\s\S]*?<\/table>/gi, '');
+    processedHtml = processedHtml.replace(/\\?\${FOOTER_HTML}/g, '');
+    processedHtml = processedHtml.replace(/(<img[^>]*(?:bismillah|Bismillah)[^>]*style=["'])([^"']*)(["'])/gi, (match, p1, p2, p3) => {
+      let cleanStyle = p2.replace(/height:\s*[^;]+;?/gi, '').replace(/max-height:\s*[^;]+;?/gi, '').replace(/width:\s*[^;]+;?/gi, '').replace(/max-width:\s*[^;]+;?/gi, '').trim();
+      return `${p1}${cleanStyle ? cleanStyle + '; ' : ''}width: 260px; max-width: 45%; height: auto; max-height: 48px; margin: 8px auto 14px auto;${p3}`;
+    });
+    processedHtml = processedHtml.replace(
+      /(<!--\s*SALAM\s*PENUTUP\s*-->[\s\S]*?<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh[\.,]?)\s*(<\/p>)/gi,
+      '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
+    );
+    processedHtml = processedHtml.replace(
+      /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
+      '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
+    );
+
+    const FOOTER_HTML = `<table class="amanah-letter-footer" style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
+    <tr>
+      <td style="vertical-align: middle; text-align: left; padding: 4px 10px 4px 0; font-size: 7.5pt; line-height: 1.25; font-style: italic; color: #1f2937; border-top: 1px solid #e5e7eb;">
+        Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silahkan pindai QR-Code
+      </td>
+      <td style="vertical-align: middle; text-align: right; width: 32px; padding: 4px 0; border-top: 1px solid #e5e7eb;">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle;">
+          <path d="M16 2L5 6.5V14.5C5 21.2 9.7 27.5 16 29.5C22.3 27.5 27 21.2 27 14.5V6.5L16 2Z" fill="#006633" stroke="#004D26" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="16" cy="16" r="8.5" fill="#006633" stroke="#ffffff" stroke-width="1" stroke-dasharray="2 1.5"/>
+          <path d="M12 16L14.8 18.8L20.5 13" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </td>
+    </tr>
+  </table>`;
 
     const styles = (processedHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
     const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const bodyContent = bodyMatch ? bodyMatch[1] : processedHtml;
+    let bodyInner = bodyMatch ? bodyMatch[1] : processedHtml;
+    if (bodyInner.includes('master-page-table')) {
+      bodyInner = bodyInner
+        .replace(/<table class="master-page-table"[\s\S]*?<tbody>\s*<tr>\s*<td>/gi, '')
+        .replace(/<\/td>\s*<\/tr>\s*<\/tbody>\s*<tfoot>[\s\S]*?<\/tfoot>\s*<\/table>/gi, '');
+    }
 
     const printHtml = `<!DOCTYPE html>
 <html lang="id">
@@ -671,9 +717,20 @@ const DocumentsPage = () => {
   <title>${fileName || 'Dokumen'}</title>
   ${styles}
   <style>
+    @page {
+      size: A4;
+      margin-top: 20mm !important;
+      margin-bottom: 12mm !important;
+      margin-left: 25mm !important;
+      margin-right: 20mm !important;
+    }
     @media print {
       .print-btn-bar { display: none !important; }
-      body { margin: 0 !important; }
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+      }
     }
     .print-btn-bar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
@@ -687,56 +744,172 @@ const DocumentsPage = () => {
       cursor: pointer;
     }
     .print-btn:hover { background: #dbeafe; }
-    body { padding-top: 56px; }
-    @media print { body { padding-top: 0; } }
+    body {
+      padding-top: 56px;
+      font-family: Arial, Helvetica, sans-serif !important;
+      font-size: 10.5pt !important;
+      line-height: 1.25 !important;
+      color: #111827 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* Master Print Layout Table */
+    table.master-page-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      border: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    table.master-page-table > tbody > tr > td {
+      padding: 0 !important;
+      border: none !important;
+      vertical-align: top !important;
+    }
+    table.master-page-table > tfoot > tr > td {
+      height: 20mm !important; /* Reserves space so body never overlaps footer */
+      padding: 0 !important;
+      border: none !important;
+    }
+
+    /* Ensure container uses full printable width within standard margins */
+    @media screen {
+      body {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+      }
+      .master-page-table {
+        max-width: 750px !important;
+        margin: 0 auto !important;
+        padding: 20px 30px !important;
+        background: #ffffff !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        box-sizing: border-box !important;
+        order: 1 !important;
+      }
+      .amanah-letter-footer {
+        display: table !important;
+        order: 2 !important;
+        width: 100% !important;
+        max-width: 750px !important;
+        margin: 16px auto 20px auto !important;
+        padding: 0 30px !important;
+        box-sizing: border-box !important;
+      }
+    }
+    @media print {
+      .master-page-table {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      tfoot {
+        display: table-footer-group !important;
+      }
+      .amanah-letter-footer {
+        display: table !important;
+        position: fixed !important;
+        bottom: 4mm !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        background: #ffffff !important;
+        z-index: 99999 !important;
+      }
+    }
+
+    /* Eliminate unwanted horizontal lines / borders on page break sections */
+    hr { display: none !important; }
+    div[style*="border-top: 1px solid #000000"],
+    div[style*="border-top:1px solid #000000"],
+    div[style*="border-top: 1px solid black"],
+    div[style*="border-top:1px solid black"],
+    div[style*="border-top: 1px solid #000"],
+    div[style*="border-top:1px solid #000"] {
+      border-top: none !important;
+      padding-top: 0 !important;
+    }
+
+    div[style*="margin-left: -30px"],
+    div[style*="margin-left:-30px"],
+    div[style*="margin-left: -40px"],
+    div[style*="margin-left:-40px"] {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      padding-top: 0 !important;
+    }
+    div, p, span, td, th, li, a, ol, ul, b, strong {
+      font-family: Arial, Helvetica, sans-serif !important;
+      line-height: 1.25 !important;
+    }
+    p, td, th, li, ol, ul {
+      font-size: 10.5pt !important;
+    }
+    ol, ul {
+      margin-top: 2px !important;
+      margin-bottom: 4px !important;
+      padding-left: 20px !important;
+    }
+    li {
+      margin-bottom: 2px !important;
+      font-size: 10.5pt !important;
+    }
+    p {
+      margin-top: 0px !important;
+      margin-bottom: 4px !important;
+      font-size: 10.5pt !important;
+    }
+    *[style*="font-size: 11pt"],
+    *[style*="font-size:11pt"],
+    *[style*="font-size: 12pt"],
+    *[style*="font-size:12pt"],
+    *[style*="font-size: 13pt"],
+    *[style*="font-size:13pt"],
+    *[style*="font-size: 14pt"],
+    *[style*="font-size:14pt"] {
+      font-size: 10.5pt !important;
+    }
     .kop-surat-img, img[alt*="Kop Surat"] {
       width: 100% !important;
-      max-width: 750px !important;
+      max-width: 100% !important;
       height: auto !important;
       display: block !important;
-      margin: 0 auto !important;
+      margin: 0 auto 4px auto !important;
     }
     img[src*="bismillah"], img[alt*="Bismillah"] {
-      height: 35px !important;
-      max-height: 40px !important;
+      width: 260px !important;
+      max-width: 45% !important;
+      height: auto !important;
+      max-height: 48px !important;
       display: block !important;
-      margin: 0 auto !important;
+      margin: 8px auto 14px auto !important;
+      object-fit: contain !important;
+      filter: brightness(0) !important;
     }
     img.qr-signature-img {
-      width: 60px !important;
-      height: 60px !important;
-      max-width: 60px !important;
-      max-height: 60px !important;
-      min-width: 60px !important;
-      min-height: 60px !important;
+      width: 55px !important;
+      height: 55px !important;
+      max-width: 55px !important;
+      max-height: 55px !important;
       display: inline-block !important;
       object-fit: contain !important;
     }
     div[style*="width: 60px"][style*="height: 60px"],
     div[style*="width: 70px"][style*="height: 70px"] {
-      margin: 4px 0 4px 0 !important;
-      width: 60px !important;
-      height: 60px !important;
+      margin: 2px 0 2px 0 !important;
+      width: 55px !important;
+      height: 55px !important;
     }
-    /* Official TTE Footer - Hidden on screen preview, fixed at bottom edge on print/PDF */
-    @media screen {
-      .amanah-letter-footer {
-        display: none !important;
-      }
-    }
-    @media print {
-      .amanah-letter-footer {
-        display: table !important;
-        position: fixed !important;
-        bottom: 5mm !important;
-        left: 15mm !important;
-        right: 15mm !important;
-        width: calc(100% - 30mm) !important;
-        max-width: 750px !important;
-        margin: 0 auto !important;
-        background: transparent !important;
-        z-index: 99999 !important;
-      }
+    .amanah-letter-footer td {
+      font-size: 7.5pt !important;
+      line-height: 1.25 !important;
     }
   </style>
 </head>
@@ -745,7 +918,23 @@ const DocumentsPage = () => {
     <span>📄 ${fileName ? fileName.replace(/\.(html?|htm)$/i, '.pdf') : 'Dokumen'}</span>
     <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan sebagai PDF</button>
   </div>
-  ${bodyContent}
+  ${FOOTER_HTML}
+  <table class="master-page-table">
+    <tbody>
+      <tr>
+        <td>
+          ${bodyInner}
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>
+          <div style="height: 20mm;"></div>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
   <script>
     window.addEventListener('load', function() {
       setTimeout(function() { window.print(); }, 800);

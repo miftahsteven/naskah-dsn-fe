@@ -1026,7 +1026,7 @@ const CreateDocumentPage = () => {
               font-family: Arial, sans-serif;
               color: #111827;
               line-height: 1.5;
-              font-size: 11pt;
+              font-size: 10.5pt;
               margin: 0;
               padding-top: 4.2cm;
               padding-bottom: 0.5cm;
@@ -1076,7 +1076,7 @@ const CreateDocumentPage = () => {
               display: flex;
               justify-content: space-between;
               margin-bottom: 24px;
-              font-size: 11pt;
+              font-size: 10.5pt;
             }
             .meta-col {
               display: flex;
@@ -1093,7 +1093,7 @@ const CreateDocumentPage = () => {
             }
             .recipient-block {
               margin-bottom: 24px;
-              font-size: 11pt;
+              font-size: 10.5pt;
             }
             .letter-title {
               text-align: center;
@@ -1106,7 +1106,7 @@ const CreateDocumentPage = () => {
               color: #111827;
             }
             .letter-body {
-              font-size: 11pt;
+              font-size: 10.5pt;
               min-height: 250px;
             }
             table {
@@ -1117,7 +1117,7 @@ const CreateDocumentPage = () => {
             td, th {
               padding: 6px 8px;
               vertical-align: top;
-              font-size: 11pt;
+              font-size: 10.5pt;
             }
           </style>
         </head>
@@ -1256,12 +1256,12 @@ const CreateDocumentPage = () => {
     }
 
     // Ensure all images (kop surat, bismillah, logo, wqa) are fully inlined as Base64 in finalHtml
-    const FOOTER_HTML = `<table class="amanah-letter-footer" style="display: none; width: 100%; border-collapse: collapse; margin-top: 14px; font-family: Arial, sans-serif;">
+    const FOOTER_HTML = `<table class="amanah-letter-footer" style="display: table; width: 100%; border-collapse: collapse; margin-top: 20px; page-break-inside: avoid; font-family: Arial, sans-serif;">
     <tr>
-      <td style="vertical-align: middle; text-align: left; padding: 2px 10px 2px 0; font-size: 7.5pt; line-height: 1.35; font-style: italic; color: #1f2937;">
+      <td style="vertical-align: middle; text-align: left; padding: 4px 10px 4px 0; font-size: 7.5pt; line-height: 1.25; font-style: italic; color: #1f2937; border-top: 1px solid #e5e7eb;">
         Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silahkan pindai QR-Code
       </td>
-      <td style="vertical-align: middle; text-align: right; width: 32px; padding: 2px 0;">
+      <td style="vertical-align: middle; text-align: right; width: 32px; padding: 4px 0; border-top: 1px solid #e5e7eb;">
         <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle;">
           <path d="M16 2L5 6.5V14.5C5 21.2 9.7 27.5 16 29.5C22.3 27.5 27 21.2 27 14.5V6.5L16 2Z" fill="#006633" stroke="#004D26" stroke-width="1.5" stroke-linejoin="round"/>
           <circle cx="16" cy="16" r="8.5" fill="#006633" stroke="#ffffff" stroke-width="1" stroke-dasharray="2 1.5"/>
@@ -1273,11 +1273,11 @@ const CreateDocumentPage = () => {
 
     if (kopSuratBase64) {
       finalHtml = finalHtml.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
-      finalHtml = finalHtml.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 8px; margin-left: -40px; margin-right: -40px; padding-top: 10px;">
-    <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 750px; height: auto; display: block; margin: 0 auto;" />
+      finalHtml = finalHtml.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 4px; margin-left: 0; margin-right: 0; padding-top: 0;">
+    <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
   </div>
-  <div style="text-align: center; margin-top: 6px; margin-bottom: 12px;">
-    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="height: 35px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
+  <div style="text-align: center; margin-top: 8px; margin-bottom: 14px;">
+    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
   </div>`);
     }
     finalHtml = finalHtml.replace(/(\\?\${FOOTER_HTML}|\${FOOTER_HTML})/g, FOOTER_HTML);
@@ -1882,38 +1882,44 @@ const CreateDocumentPage = () => {
                         </div>
 
                         {/* Physical A4 Visual Paper */}
-                        <div
-                          className="bg-white text-slate-800 shadow-2xl rounded-2xl min-h-[900px] border border-slate-100 flex flex-col overflow-hidden text-left relative"
-                          style={{
-                            fontSize: "11pt",
-                            fontFamily: "Arial, sans-serif",
-                            lineHeight: "1.5",
-                            paddingTop: "4.2cm",
-                            paddingBottom: "0.5cm",
-                            paddingRight: "3.17cm",
-                            paddingLeft: "2.82cm",
-                            boxSizing: "border-box"
-                          }}
-                        >
+                        <div className="bg-slate-100 dark:bg-slate-900/60 p-2 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-center overflow-x-auto">
+                          <div
+                            className="bg-white text-slate-800 shadow-2xl rounded-sm min-h-[1050px] border border-slate-200/80 flex flex-col text-left relative w-[794px] max-w-full"
+                            style={{
+                              fontSize: "10.5pt",
+                              fontFamily: "Arial, sans-serif",
+                              lineHeight: "1.45",
+                              padding: "20mm 20mm 20mm 20mm",
+                              boxSizing: "border-box"
+                            }}
+                          >
 
-                          {/* Kop Surat Header */}
-                          <div className="mb-4">
-                            <img
-                              src="/images/kop-surat.png"
-                              alt="Kop Surat DSN-MUI"
-                              className="w-full h-auto block"
-                            />
-                          </div>
+                            {/* Kop Surat Header */}
+                            <div className="mb-2">
+                              <img
+                                src="/images/kop-surat.png"
+                                alt="Kop Surat DSN-MUI"
+                                className="w-full h-auto block"
+                              />
+                            </div>
 
-                          {/* Bismillah Calligraphy */}
-                          <div className="flex justify-center mb-6 mt-4">
-                            <img 
-                              src="/images/bismillah.svg" 
-                              alt="Bismillah" 
-                              className="h-[50px] object-contain" 
-                              style={{ filter: "brightness(0)" }} 
-                            />
-                          </div>
+                            {/* Bismillah Calligraphy */}
+                            <div className="flex justify-center mb-4 mt-2">
+                              <img 
+                                src={bismillahBase64 || "/images/bismillah.svg"} 
+                                alt="Bismillah" 
+                                style={{ 
+                                  width: "260px", 
+                                  maxWidth: "45%", 
+                                  height: "auto", 
+                                  maxHeight: "48px", 
+                                  objectFit: "contain", 
+                                  filter: "brightness(0)",
+                                  display: "block",
+                                  margin: "0 auto"
+                                }} 
+                              />
+                            </div>
 
                           {/* Letter Title */}
                           <div className="text-center font-extrabold underline uppercase tracking-wide text-slate-900 mb-6" style={{ fontSize: "12pt" }}>
@@ -1921,7 +1927,7 @@ const CreateDocumentPage = () => {
                           </div>
 
                           {/* Letter Metadata Info block */}
-                          <div className="flex justify-between items-start mb-6 text-slate-700" style={{ fontSize: "11pt" }}>
+                          <div className="flex justify-between items-start mb-6 text-slate-700" style={{ fontSize: "10.5pt" }}>
                             <div className="space-y-1">
                               <div className="flex gap-2">
                                 <span className="font-bold w-[75px]">Nomor</span>
@@ -1943,7 +1949,7 @@ const CreateDocumentPage = () => {
                           </div>
 
                           {/* Recipient Address */}
-                          <div className="mb-6 text-slate-700 space-y-1" style={{ fontSize: "11pt" }}>
+                          <div className="mb-6 text-slate-700 space-y-1" style={{ fontSize: "10.5pt" }}>
                             <p>Kepada Yang Terhormat,</p>
                             <p className="font-bold text-slate-900">Pimpinan / Anggota Organisasi</p>
                             <p>di — Tempat</p>
@@ -1956,7 +1962,7 @@ const CreateDocumentPage = () => {
                               contentEditable
                               suppressContentEditableWarning
                               className="outline-none min-h-[300px] border-none py-1 focus:ring-1 focus:ring-primary/20 rounded-xl px-2 transition-all"
-                              style={{ fontSize: "11pt", fontFamily: "Arial, sans-serif", lineHeight: "1.5" }}
+                              style={{ fontSize: "10.5pt", fontFamily: "Arial, sans-serif", lineHeight: "1.5" }}
                             />
                           </div>
 
@@ -1978,7 +1984,7 @@ const CreateDocumentPage = () => {
                                   <p className="font-bold uppercase tracking-widest mb-16 text-slate-500" style={{ fontSize: "10pt" }}>
                                     {label}
                                   </p>
-                                  <p className="font-extrabold underline text-slate-900" style={{ fontSize: "11pt" }}>{u.fullName}</p>
+                                  <p className="font-extrabold underline text-slate-900" style={{ fontSize: "10.5pt" }}>{u.fullName}</p>
                                   <p className="font-semibold text-slate-500" style={{ fontSize: "10pt" }}>{u.jobTitle || u.role?.name || "Pejabat Organisasi"}</p>
                                 </div>
                               );
@@ -2009,37 +2015,43 @@ const CreateDocumentPage = () => {
                             );
                           })()}
 
+                          </div>
                         </div>
                       </>
                     ) : (
                       /* iframe dynamic preview mode for DB templates */
-                      <div className="bg-white text-slate-800 shadow-2xl rounded-2xl min-h-[900px] border border-slate-100 flex flex-col overflow-hidden">
+                      <div className="bg-slate-100 dark:bg-slate-900/60 p-2 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-center overflow-x-auto">
                         <iframe
-                          srcDoc={selectedTemplateObj ? `
-                            <style>
-                              body {
-                                font-family: Arial, sans-serif;
-                                font-size: 11pt;
-                                line-height: 1.4;
-                                margin: 0;
-                                padding: 0;
+                          srcDoc={selectedTemplateObj ? (
+                            '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+                            '<style>' +
+                            '* { box-sizing: border-box; }' +
+                            'html, body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, sans-serif; color: #111827; -webkit-font-smoothing: antialiased; }' +
+                            'body { padding: 16px 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }' +
+                            '.a4-page-sheet { width: 794px; max-width: 100%; min-height: 1123px; background: #ffffff; padding: 20mm 20mm 20mm 20mm; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04); border-radius: 3px; box-sizing: border-box; font-size: 10.5pt; line-height: 1.45; position: relative; }' +
+                            '.kop-surat-img, img[alt*="Kop Surat"] { width: 100% !important; max-width: 100% !important; height: auto !important; display: block !important; margin: 0 auto 6px auto !important; }' +
+                            'img[src*="bismillah"], img[alt*="Bismillah"], .bismillah-img { width: 260px !important; max-width: 45% !important; height: auto !important; max-height: 48px !important; display: block !important; margin: 8px auto 14px auto !important; object-fit: contain !important; filter: brightness(0) !important; }' +
+                            'p, td, li, span { font-size: 10.5pt; line-height: 1.45; }' +
+                            'table { font-size: 10.5pt; }' +
+                            'table td { vertical-align: top; }' +
+                            '.page-break { page-break-before: always; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1; position: relative; }' +
+                            '.page-break::before { content: "📄 HALAMAN BERIKUTNYA (LAMPIRAN)"; display: block; text-align: center; font-size: 9pt; font-weight: bold; color: #64748b; margin-bottom: 20px; letter-spacing: 0.5px; }' +
+                            '</style></head><body><div class="a4-page-sheet">' +
+                            (bismillahBase64
+                              ? (selectedTemplateObj.htmlContent || '')
+                                  .replace(/src=["'][^"']*bismillah\.svg["']/gi, 'src="' + bismillahBase64 + '"')
+                                  .replace(/src=["']data:image\/svg\+xml;base64,[^"']*["']/gi, 'src="' + bismillahBase64 + '"')
+                              : (selectedTemplateObj.htmlContent || '')
+                            ).replace(
+                              /\{\{(\w+)\}\}/g,
+                              (_: string, key: string) => {
+                                const val = templateVariables[key];
+                                return (val !== undefined && val !== "") ? val : '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
                               }
-                              h2 {
-                                font-size: 13pt;
-                              }
-                              h1 {
-                                font-size: 14pt;
-                              }
-                            </style>
-                            ${selectedTemplateObj.htmlContent.replace(
-                            /\{\{(\w+)\}\}/g,
-                            (_: string, key: string) => {
-                              const val = templateVariables[key];
-                              return (val !== undefined && val !== "") ? val : `<span style="background:#fef3c7;padding:0 2px;">{{${key}}}</span>`;
-                            }
-                          )}
-                          ` : ""}
-                          className="w-full min-h-[850px] border-0 rounded-2xl"
+                            ) +
+                            '</div></body></html>'
+                          ) : ""}
+                          className="w-full min-h-[1150px] border-0 rounded-2xl bg-transparent"
                           title="preview"
                         />
                       </div>

@@ -236,7 +236,7 @@ function TemplateFormModal({
 
   const CATEGORIES = ["Pernyataan", "Opini", "Perjanjian", "Rekomendasi", "Surat Internal", "Surat Keputusan", "Surat Mandat", "Surat Tugas", "Lainnya"];
 
-  const placeholderHtml = `<div style="font-family: Arial; font-size: 12pt; padding: 40px;">
+  const placeholderHtml = `<div style="font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; max-width: 750px; margin: auto; padding: 0px 40px 10px 40px;">
   <h2>NAMA LEMBAGA</h2>
   <p>Nomor: <strong>{{nomorSurat}}</strong></p>
   <p>Kepada Yth. <strong>{{namaPenerima}}</strong></p>
