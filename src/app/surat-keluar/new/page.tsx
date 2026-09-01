@@ -1222,8 +1222,16 @@ const CreateDocumentPage = () => {
         /\{\{(\w+)\}\}/g,
         (_: string, key: string) => {
           let val = templateVariables[key] || "";
-          if (key === "agendaDetail" || key === "daftarUndangan" || key === "keteranganNarahubung" || key === "keterangan") {
-            if (!val.includes("<p>") && !val.includes("<div>") && !val.includes("<br")) {
+          if (
+            key === "agendaDetail" ||
+            key === "daftarUndangan" ||
+            key === "daftarUndanganLampiran" ||
+            key === "agendaRapatLampiran" ||
+            key === "keteranganNarahubung" ||
+            key === "keterangan" ||
+            key === "deskripsiTransaksi"
+          ) {
+            if (!val.includes("<p>") && !val.includes("<div>") && !val.includes("<br") && !val.includes("<ul>") && !val.includes("<ol>")) {
               val = val.replace(/\n/g, "<br>");
             } else {
               val = val.replace(/\r?\n/g, "");
@@ -2521,8 +2529,31 @@ const CreateDocumentPage = () => {
                             .map((v: any) => {
                               const errKey = `var_${v.key}`;
                               const hasErr = !!formErrors[errKey];
+                              const isRichText =
+                                v.type === "wysiwyg" ||
+                                v.key === "agendaDetail" ||
+                                v.key === "daftarUndangan" ||
+                                v.key === "daftarUndanganLampiran" ||
+                                v.key === "agendaRapatLampiran" ||
+                                v.key === "keteranganNarahubung" ||
+                                v.key === "keterangan" ||
+                                v.key === "deskripsiTransaksi" ||
+                                v.key.toLowerCase().includes("lampiran") ||
+                                v.key.toLowerCase().includes("wysiwyg");
+
                               return (
-                                <div key={v.key} className={cn("space-y-2", (v.key === "headerTtd" || v.key === "agendaDetail" || v.key === "daftarUndangan" || v.key === "keteranganNarahubung" || v.key === "keterangan" || v.key === "daftarNamaPenugasan" || v.key === "tempatKegiatan" || v.key === "keperluan" || v.type === "wysiwyg") && "md:col-span-2")}>
+                                <div
+                                  key={v.key}
+                                  className={cn(
+                                    "space-y-2",
+                                    (v.key === "headerTtd" ||
+                                      v.key === "daftarNamaPenugasan" ||
+                                      v.key === "tempatKegiatan" ||
+                                      v.key === "keperluan" ||
+                                      isRichText) &&
+                                      "md:col-span-2"
+                                  )}
+                                >
                                   {v.key === "agendaRapat" && (
                                     <div className="flex items-center gap-2 mb-1.5 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 md:col-span-2">
                                       <input
@@ -2536,7 +2567,7 @@ const CreateDocumentPage = () => {
                                             ...templateVariables,
                                             agendaRapat: isChecked ? "Terlampir" : "",
                                             showAgendaDetail: isChecked ? "block" : "none",
-                                            ...(isChecked ? {} : { agendaDetail: "" })
+                                            ...(isChecked ? {} : { agendaDetail: "" }),
                                           });
                                           // clear errors
                                           const newErrs = { ...formErrors };
@@ -2555,7 +2586,7 @@ const CreateDocumentPage = () => {
                                     {v.required && <span className="text-red-500 ml-0.5">*</span>}
                                   </label>
 
-                                  {v.type === "wysiwyg" || v.key === "agendaDetail" || v.key === "daftarUndangan" || v.key === "keteranganNarahubung" || v.key === "keterangan" ? (
+                                  {isRichText ? (
                                     <SimpleRichEditor
                                       value={templateVariables[v.key] || ""}
                                       placeholder={v.placeholder || `Masukkan ${v.label}`}

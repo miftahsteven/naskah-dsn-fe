@@ -538,7 +538,16 @@ function PreviewModal({
                     {v.label}
                     {v.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
-                  {v.type === "wysiwyg" || v.key === "agendaDetail" || v.key === "daftarUndangan" || v.key === "keteranganNarahubung" || v.key === "keterangan" ? (
+                  {v.type === "wysiwyg" ||
+                  v.key === "agendaDetail" ||
+                  v.key === "daftarUndangan" ||
+                  v.key === "daftarUndanganLampiran" ||
+                  v.key === "agendaRapatLampiran" ||
+                  v.key === "keteranganNarahubung" ||
+                  v.key === "keterangan" ||
+                  v.key === "deskripsiTransaksi" ||
+                  v.key.toLowerCase().includes("lampiran") ||
+                  v.key.toLowerCase().includes("wysiwyg") ? (
                     <SimpleRichEditor
                       value={values[v.key] || ""}
                       placeholder={v.placeholder || `Isi ${v.label}`}
