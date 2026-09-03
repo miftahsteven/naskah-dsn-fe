@@ -258,15 +258,15 @@ export default function SimpleRichEditor({
 }: SimpleRichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
-  const lastValueRef = useRef(value);
+  const lastValueRef = useRef<string | null>(null);
   const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    if (value !== lastValueRef.current && el.innerHTML !== value) {
-      el.innerHTML = value;
-      lastValueRef.current = value;
+    if (lastValueRef.current === null || (value !== lastValueRef.current && el.innerHTML !== value)) {
+      el.innerHTML = value || "";
+      lastValueRef.current = value || "";
     }
   }, [value]);
 

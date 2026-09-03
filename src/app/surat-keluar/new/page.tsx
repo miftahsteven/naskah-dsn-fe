@@ -99,6 +99,313 @@ const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
   ]
 };
 
+export const DEFAULT_ISI_PERMOHONAN_PKL = `<ol style="margin-top: 4px; margin-bottom: 6px; padding-left: 24px; line-height: 1.35; text-align: justify;">
+  <li style="margin-bottom: 6px; text-align: justify;">Sebagai persyaratan kelulusan, setiap peserta diminta melakukan Praktik Kerja Lapangan (PKL) ke Lembaga Keuangan Syariah/Rumah Sakit Syariah 2026.</li>
+  <li style="margin-bottom: 6px; text-align: justify;">Dalam kegiatan PKL, peserta akan diminta membuat review terhadap beberapa dokumen pengawasan asli yang menjadi tugas Dewan Pengawas Syariah (DPS) diantaranya : (1) Kontrak Akad, (2) SOP, (3) Laporan Keuangan, (4) Opini DPS dan (5) Dokumen Pemasaran.</li>
+</ol>
+<p style="text-align: justify; margin-top: 6px; margin-bottom: 6px; text-indent: 0; line-height: 1.35;">
+  Sehubungan dengan kegiatan diatas, kami mohon dengan hormat kiranya Bapak/Ibu berkenan memberikan berkas-berkas yang diperlukan untuk peserta berikut melakukan PKL di Lembaga yang Bapak/Ibu pimpin. Adapun identitas peserta adalah:
+</p>
+<table style="margin-left: 20px; border-collapse: collapse; margin-top: 4px; margin-bottom: 6px; font-size: 10.5pt; line-height: 1.35;">
+  <tr>
+    <td style="width: 80px; vertical-align: top; padding: 2px 0;">Nama</td>
+    <td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td>
+    <td style="font-weight: bold; padding: 2px 0;">Nama Peserta</td>
+  </tr>
+  <tr>
+    <td style="vertical-align: top; padding: 2px 0;">Alamat</td>
+    <td style="vertical-align: top; padding: 2px 0;">:</td>
+    <td style="padding: 2px 0;">Alamat Peserta<br>Alamat Peserta</td>
+  </tr>
+  <tr>
+    <td style="vertical-align: top; padding: 2px 0;">No. Telp</td>
+    <td style="vertical-align: top; padding: 2px 0;">:</td>
+    <td style="padding: 2px 0;">08xx........</td>
+  </tr>
+  <tr>
+    <td style="vertical-align: top; padding: 2px 0;">E-Mail</td>
+    <td style="vertical-align: top; padding: 2px 0;">:</td>
+    <td style="padding: 2px 0;">fulan@.....</td>
+  </tr>
+</table>
+<p style="text-align: justify; margin-top: 6px; margin-bottom: 6px; text-indent: 0; line-height: 1.35;">
+  Seluruh dokumen yang diberikan ke peserta hanya akan digunakan untuk kepentingan pelatihan dan tidak akan berpengaruh terhadap laporan pengawasan DPS kepada DSN-MUI.
+</p>`;
+
+export const DEFAULT_ISI_INFORMASI_PELATIHAN = `<p style="text-align: justify; margin-top: 6px; margin-bottom: 6px; text-indent: 0; line-height: 1.35;">
+  Berdasarkan Pelatihan Dasar Muamalah Maliyah dan Fatwa DSN-MUI (PDMMF) Privat yang sudah diikuti oleh Bpk Abdullah Syamsul Arifin, Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) mengadakan Pelatihan Dasar Pengawas Syariah (PDPS) di Lembaga Keuangan Syariah (LKS). Sertifikat pelatihan ini dapat digunakan sebagai syarat mengajukan permohonan Surat Rekomendasi DPS dari DSN-MUI dan/atau mengikuti sertifikasi profesi DPS di Lembaga Sertifikasi Profesi (LSP-MUI). Berikut ini adalah teknis penyelenggaraanya:
+</p>
+<ol style="margin-top: 4px; margin-bottom: 6px; padding-left: 24px; line-height: 1.35; text-align: justify;">
+  <li style="margin-bottom: 6px; text-align: justify;">Pelatihan Privat dilaksanakan dengan minimal 1 orang dan maksimal 5 orang peserta yang mengikuti pelatihan;</li>
+  <li style="margin-bottom: 6px; text-align: justify;">Pelatihan dilaksanakan secara daring dengan menggunakan media Google ClassRoom dan Zoom Cloud Meeting (agenda terlampir);</li>
+  <li style="margin-bottom: 6px; text-align: justify;">Biaya kontribusi pelatihan adalah Rp. 7.500.000 (Tujuh Juta Lima Ratus Ribu Rupiah/orang/pelatihan;</li>
+  <li style="margin-bottom: 6px; text-align: justify;">Jadwal Pelatihan akan diberikan jika peserta sudah mengkonfirmasi keikutsertaan dengan membayar biaya pelatihan;</li>
+  <li style="margin-bottom: 6px; text-align: justify;">Dalam pelatihan ini terdapat post-test dan ujian wawancara dimana hanya yang lulus post-test dan wawancara yang mendapatkan sertifikat pelatihan dari DSN-MUI.</li>
+  <li style="margin-bottom: 6px; text-align: justify;">Pendaftaran dapat dilakukan dengan menghubungi Sdri. Heny di 0813-1564-5752, Hotline DSN-MUI (HP: 0822 6000 4146)</li>
+</ol>`;
+
+export const DEFAULT_LAMPIRAN_INFORMASI_PELATIHAN = `<div style="text-align: center; font-weight: bold; font-size: 11pt; margin-bottom: 12px; letter-spacing: 0.5px;">
+  RUNDOWN PDPS
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 9pt; line-height: 1.25; font-family: Arial, sans-serif;">
+  <thead>
+    <tr style="background-color: #000000; color: #ffffff; text-align: center; font-weight: bold;">
+      <th style="border: 1px solid #333; padding: 6px 4px; width: 15%;">Hari, Tanggal</th>
+      <th style="border: 1px solid #333; padding: 6px 4px; width: 15%;">Pukul</th>
+      <th style="border: 1px solid #333; padding: 6px 4px; width: 12%;">Durasi</th>
+      <th style="border: 1px solid #333; padding: 6px 4px; width: 38%;">Materi</th>
+      <th style="border: 1px solid #333; padding: 6px 4px; width: 20%;">Media</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- HARI 1 -->
+    <tr>
+      <td rowspan="3" style="border: 1px solid #333; padding: 6px; text-align: center; font-weight: bold; background-color: #ffff00; vertical-align: middle;">Hari-1</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #ffff00;">09.00 - 10.00</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #ffff00;"></td>
+      <td style="border: 1px solid #333; padding: 4px 6px; font-weight: bold; text-align: center; background-color: #ffff00;">ORIENTASI PELATIHAN</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; font-weight: bold; background-color: #ffff00;">ZOOM CLOUD MEETING</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3; font-style: italic;">Akses Kelas Online Materi Pengantar &amp; Regulasi Perbankan Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #cfe2f3;">Pengantar &amp; Regulasi Perbankan Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3;">Google Classroom</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">19.00 - 21.00</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">90 menit</td>
+      <td style="border: 1px solid #333; padding: 4px 6px;">Kuis Materi Pengantar dan Regulasi Perbankan Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+    </tr>
+
+    <!-- HARI 2 -->
+    <tr>
+      <td rowspan="2" style="border: 1px solid #333; padding: 6px; text-align: center; font-weight: bold; vertical-align: middle;">Hari-2</td>
+      <td colspan="2" style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3; font-style: italic;">Akses Kelas Online Materi Akuntansi Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #cfe2f3;">Materi Akuntansi Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3;">Google Classroom</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">09.00 - 24.00</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+      <td style="border: 1px solid #333; padding: 4px 6px;">Simulasi Materi Akuntansi Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+    </tr>
+
+    <!-- HARI 3 -->
+    <tr>
+      <td rowspan="2" style="border: 1px solid #333; padding: 6px; text-align: center; font-weight: bold; vertical-align: middle;">Hari-3</td>
+      <td colspan="2" style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3; font-style: italic;">Akses Kelas Online Materi Akta Perjanjian &amp; Opini Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #cfe2f3;">Materi Akta Perjanjian &amp; Opini Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3;">Google Classroom</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">09.00 - 24.00</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+      <td style="border: 1px solid #333; padding: 4px 6px;">Simulasi Materi Akta Perjanjian dan Opini Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+    </tr>
+
+    <!-- HARI 4 -->
+    <tr>
+      <td rowspan="3" style="border: 1px solid #333; padding: 6px; text-align: center; font-weight: bold; vertical-align: middle;">Hari-4</td>
+      <td colspan="2" style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3; font-style: italic;">Akses Kelas Online SOP &amp; Pemasaran Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #cfe2f3;">Materi SOP &amp; Pemasaran Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3;">Google Classroom</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">09.00 - 24.00</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+      <td style="border: 1px solid #333; padding: 4px 6px;">Simulasi Materi SOP &amp; Pemasaran Syariah</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Google Classroom</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3; font-style: italic;">Akses Kelas Online Simulasi Produk Baru dan Evaluasi Uji Petik</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #cfe2f3;">Simulasi Produk Baru &amp; Evaluasi Uji Petik</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #cfe2f3;">Google Classroom</td>
+    </tr>
+
+    <!-- HARI 5 -->
+    <tr>
+      <td style="border: 1px solid #333; padding: 6px; text-align: center; font-weight: bold;">Hari-5</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">09.00 - 12.00</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">120 menit</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; font-weight: bold;">Live Tanya Jawab Materi</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Zoom Cloud Meeting</td>
+    </tr>
+
+    <!-- UJIAN -->
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">Sesuai kesepakatan</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">20.00 - 20.45</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">45 menit</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #d9d2e9;">Ujian Post test</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">Zoom Cloud Meeting &amp; G-Form</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">Sesuai kesepakatan</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">20.00 - 20.45</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">45 menit</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #d9d2e9;">Ujian Online HER 1**</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">Zoom Cloud Meeting &amp; G-Form</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">Sesuai kesepakatan</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">20.00 - 20.45</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">45 menit</td>
+      <td style="border: 1px solid #333; padding: 4px 6px; background-color: #d9d2e9;">Ujian Online HER 2**</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center; background-color: #d9d2e9;">Zoom Cloud Meeting &amp; G-Form</td>
+    </tr>
+
+    <!-- PKL SECTION -->
+    <tr style="background-color: #ffff00; font-weight: bold; text-align: center;">
+      <td colspan="5" style="border: 1px solid #333; padding: 5px;">PKL</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">***</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">***</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">***</td>
+      <td style="border: 1px solid #333; padding: 4px 6px;">Ujian Wawancara</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Zoom Cloud Meeting</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">***</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">***</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">***</td>
+      <td style="border: 1px solid #333; padding: 4px 6px;">Ujian HER Wawancara</td>
+      <td style="border: 1px solid #333; padding: 4px; text-align: center;">Zoom Cloud Meeting</td>
+    </tr>
+  </tbody>
+</table>`;
+
+export const DEFAULT_ISI_KETERANGAN_WAWANCARA = `<p style="text-align: justify; margin-top: 0; margin-bottom: 6px; line-height: 1.4;">Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) dengan ini menerangkan bahwa pada tanggal 29 April 2026 telah dilakukan wawancara melalui <em>video conference</em> atas nama:</p><table style="margin-left: 20px; border-collapse: collapse; margin-top: 4px; margin-bottom: 10px; font-size: 10.5pt; line-height: 1.35;"><tr><td style="width: 130px; vertical-align: top; padding: 2px 0;">Nama</td><td style="width: 20px; vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">Ahmad Munif</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">Nomor Pokok</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">24090290001</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">Program Studi</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">Studi Islam (Konsentrasi Hukum Islam)</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">University</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">UIN Walisongo Semarang</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">Keperluan</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0; text-align: justify;">Penyusunan penelitian Disertasi dengan judul <em>Ijtihad Dalam Fatwa Dewan Syariah Nasional Majelis Ulama Indonesia (DSN-MUI) tentang Transaksi Ekonomi Berbasis Teknologi Digital Perspektif Metodologis</em></td></tr></table><p style="text-align: justify; margin-top: 8px; margin-bottom: 10px; line-height: 1.4;">Demikian Surat Keterangan ini dibuat untuk digunakan sebagaimana mestinya.</p>`;
+
+export const DEFAULT_ISI_KETERANGAN_PELATIHAN = `<p style="text-align: justify; margin-top: 0; margin-bottom: 6px; line-height: 1.4;">Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) dengan ini menerangkan bahwa pada tanggal 10-25 April 2026, telah mengikuti Pelatihan Dasar Muamalah Maliyah dan Fatwa (PDMMF) dan Pelatihan Dasar Pengawas Syariah (PDPS) untuk Lembaga Keuangan Syariah bidang Perbankan peserta atas nama :</p><table style="margin-left: 20px; border-collapse: collapse; margin-top: 4px; margin-bottom: 10px; font-size: 10.5pt; line-height: 1.35;"><tr><td style="width: 110px; vertical-align: top; padding: 2px 0;">Nama</td><td style="width: 20px; vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">Purmansyah Ariadi</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">Lembaga</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">PT. BPR Syariah Al Falah Banyuasin</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">Alamat</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0; text-align: justify;">LR.Pasma Putra II NO.43 RT.023 RW.005 Kelurahan 3 Ilir Kecamatan Ilir Timur II Palembang</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">No. HP</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">08163295721</td></tr><tr><td style="vertical-align: top; padding: 2px 0;">Tempat</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">Google Classroom dan Kantor DSN-MUI, Jl. Dempo No. 19 Jakarta</td></tr></table><p style="text-align: justify; margin-top: 8px; margin-bottom: 8px; line-height: 1.4;">Dan berdasarkan ujian pada tahap PDMMF yang telah dilaksanakan pada tanggal 23 April 2026, peserta di atas dinyatakan <strong>TIDAK LULUS</strong> sehingga tidak dapat melanjutkan ujian pada tahap PDPS.</p><p style="text-align: justify; margin-top: 8px; margin-bottom: 10px; line-height: 1.4;">Demikian Surat Keterangan ini diberikan kepada yang bersangkutan untuk dipergunakan sebagaimana mestinya.</p>`;
+
+export const DEFAULT_DAFTAR_UNDANGAN_BPH = `<div style="font-size: 10.5pt; line-height: 1.35;">
+  <div style="font-weight: bold; margin-bottom: 4px;">1. Unsur Pimpinan:</div>
+  <table style="margin-left: 16px; border-collapse: collapse; font-size: 10.5pt; line-height: 1.35; margin-bottom: 12px;">
+    <tr><td style="width: 140px; vertical-align: top; padding: 2px 0;">Ketua</td><td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">K.H. M. Cholil Nafis, Lc., Ph.D.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Ketua</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Prof. Dr. K.H. Hasanudin, M.Ag.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Ketua</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">K.H. Sholahudin Al Aiyub, M.Si.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Ketua</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Prof. Dr. K.H. M. Asrorun Ni’am Sholeh, S.H., M.A.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Ketua</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Ir. H. Adiwarman A. Karim, S.E., M.B.A., M.A.E.P.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. H. Amirsyah Tambunan, M.A</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. K.H. Moch. Bukhori Muslim, Lc., M.A.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Kanny Hidaya, S.E., M.A.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. Asrori S. Karni, S.Ag., M.H.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Drs. H. Muhammad Ziyad, M.A.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Bendahara</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Hj. Trisna Ningsih Yulati Djuwaeli, S.E., M.M.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Bendahara</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">M. Gunawan Yasni, S.E., Ak., M.M., C.I.F.A., F.I.I.S., C.R.P., C.A.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Bendahara</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. M. Dawud Arif Khan, S.E., Ak., M.Si., C.P.A. QIA, QGIA.</td></tr>
+  </table>
+  <div style="font-weight: bold; margin-bottom: 2px;">2. Koordinator Bidang Fatwa</div>
+  <div style="margin-left: 16px; margin-bottom: 12px;">Prof. Dr. H. Jaih Mubarok, S.E., M.H., M.Ag.</div>
+  <div style="font-weight: bold; margin-bottom: 2px;">3. Koordinator Bidang Layanan, Literasi, Relasi Industri dan Regulasi</div>
+  <div style="margin-left: 16px;">Dr. H. Asep Supyadillah, M.Ag.</div>
+</div>`;
+
+export const DEFAULT_AGENDA_DETAIL_BPH = `<div style="font-size: 10.5pt; line-height: 1.35; text-align: justify;">
+  <div style="font-weight: bold; margin-bottom: 6px;">Pukul 13.00 - 15.00 WIB:</div>
+  <ol style="margin-top: 0; margin-bottom: 10px; padding-left: 20px;">
+    <li style="margin-bottom: 6px; padding-left: 6px;">Laporan Hasil Pertemuan Silaturahmi DSN-MUI dengan PT. Bank Syariah Indonesia Tbk terkait Permohonan Fatwa DSN-MUI terkait Pengenaan Mu'nah pada Gadai Tabungan Emas BSI oleh PT. Bank Syariah Indonesia dilaporkan oleh Kyai Bukhori Muslim.</li>
+    <li style="margin-bottom: 6px; padding-left: 6px;">Laporan Menerima Kunjungan Komisi III DPRD Provinsi Nusa Tenggara Barat dilaporkan oleh Kyai Sholahudin Al Aiyub.</li>
+    <li style="margin-bottom: 6px; padding-left: 6px;">Laporan hasil menerima Silaturahim Direksi PT BPD Kalimantan Selatan (Bank Kalsel) pada Jumat, 31 Juli 2026 terkait Permohonan Rekomendasi DPS dilaporkan oleh Ust Adiwarman Karim.</li>
+    <li style="margin-bottom: 6px; padding-left: 6px;">Laporan terkait tindaklanjut Permohonan Rekomendasi DPS, TAS, dan Sertifikasi Syariah dan surat masuk (oleh Ust Asep):
+      <ol type="a" style="margin-top: 4px; margin-bottom: 4px; padding-left: 18px;">
+        <li style="margin-bottom: 4px; padding-left: 4px;">Permohonan Rekomendasi Tim Ahli Syariah Penerbitan Sukuk Mudharabah Berkelanjutan V Tahap III Tahun 2026 dari PT Indah Kiat Pulp & Paper Tbk.</li>
+        <li style="margin-bottom: 4px; padding-left: 4px;">Permohonan Rekomendasi Tim Ahli Syariah untuk Penerbitan Sukuk Wakalah bi al-Istitsmar Jangka Menengah I PT Mitra Tekno Madani Tahun 2026 dari PT PNM Investment Management.</li>
+        <li style="margin-bottom: 4px; padding-left: 4px;">Invitation to the 7th Centralized Shari’ah Authorities Forum (CSAF) & Islamic Finance Events dari Central Bank of The U.A.E.</li>
+        <li style="margin-bottom: 4px; padding-left: 4px;">Laporan Hasil Pelatihan Dasar Muamalah Maliyah dan Fatwa (PDMMF) tanggal 30-31 Juli 2026 di MUI Pusat.</li>
+      </ol>
+    </li>
+    <li style="margin-bottom: 6px; padding-left: 6px;">Dan lain-lain.</li>
+  </ol>
+  <div style="font-weight: bold; margin-top: 10px; margin-bottom: 4px;">Pukul 15.00 – 15.30 WIB:</div>
+  <div style="font-style: italic; margin-left: 20px; margin-bottom: 10px;">Break Sholat Ashar</div>
+  <div style="font-weight: bold; margin-top: 10px; margin-bottom: 6px;">Pukul 15.30 – 16.30 WIB:</div>
+  <ol start="6" style="margin-top: 0; margin-bottom: 10px; padding-left: 20px;">
+    <li style="margin-bottom: 6px; padding-left: 6px;">Silaturahim dan Diskusi Permohonan Pernyataan Kesesuaian Syariah SBSN CWLS Seri SWR007 Tahun 2026 dengan DJPPR Kementerian Keuangan RI.</li>
+  </ol>
+</div>`;
+
+const DEFAULT_DAFTAR_UNDANGAN_KESEKRETARISAN = `<table style="border-collapse: collapse; font-size: 10.5pt; line-height: 1.35;">
+  <tr><td style="width: 140px; vertical-align: top; padding: 2px 0;">Sekretaris</td><td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. H. Amirsyah Tambunan, M.A</td></tr>
+  <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. K.H. Moch. Bukhori Muslim, Lc., M.A.</td></tr>
+  <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Kanny Hidaya, S.E., M.A.</td></tr>
+  <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. Asrori S. Karni, S.Ag., M.H.</td></tr>
+  <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Drs. H. Muhammad Ziyad, M.A.</td></tr>
+</table>`;
+
+const DEFAULT_AGENDA_DETAIL_KESEKRETARISAN = `<ol style="margin-top: 0; margin-bottom: 10px; padding-left: 20px; font-size: 10.5pt; line-height: 1.35;">
+  <li style="margin-bottom: 6px; padding-left: 6px;">Tindak Lanjut Keputusan Rapat Pimpinan.</li>
+  <li style="margin-bottom: 6px; padding-left: 6px;">Pembahasan surat-surat Masuk</li>
+  <li style="margin-bottom: 6px; padding-left: 6px;">Dan lain-lain.</li>
+</ol>`;
+
+const DEFAULT_ISI_KONTRIBUSI_DPS = `<ol style="margin-top: 0; margin-bottom: 8px; padding-left: 24px; text-align: justify; line-height: 1.35;">
+  <li style="margin-bottom: 8px; padding-left: 6px;">
+    Rapat Pimpinan DSN-MUI Tanggal 4 Februari 2026 telah menetapkan bahwa setiap DPS memberikan iuran bulanan kepada DSN-MUI, paling sedikit 5% dari penerimaan honor/gaji sebagai DPS. Untuk mendukung pelaksanaan kegiatan dan program DSN-MUI.
+  </li>
+  <li style="margin-bottom: 8px; padding-left: 6px;">
+    Nomor rekening untuk kontribusi DPS dapat menggunakan Virtual Account di PT Bank Syariah Indonesia Tbk. <strong>8316480000000007</strong> atas nama <strong>KH SHOLAHUDIN AL AIYUB MSI</strong>. Jika Virtual Account tersebut bermasalah maka kontribusi dapat transfer ke No. Rek. <strong>1983863270</strong> atas nama <strong>Dewan Syariah Nasional MUI</strong> di Bank Syariah Indonesia dengan memberikan keterangan nama DPS yang bersangkutan.
+  </li>
+  <li style="margin-bottom: 8px; padding-left: 6px;">
+    Untuk memudahkan pencatatan kami di bagian keuangan mohon kiranya, Bapak/Ibu menyampaikan bukti transfernya. Yaitu melalui email <strong>keuangan@dsnmui.or.id</strong> dan <strong>datakeuangandsnmui@gmail.com</strong> atau bisa menghubungi Whastapp Hotline Bagian Keuangan DSN-MUI di <strong>+62 811-9000-3456</strong>.
+  </li>
+</ol>`;
+
+const DEFAULT_NAMA_TIM_SURAT_TUGAS = `<div style="line-height: 1.25;">
+  <div style="font-weight: bold;">1. Penanggung Jawab:</div>
+  <div style="margin-left: 16px; margin-bottom: 2px;">
+    1) K.H. M. Cholil Nafis, Lc., Ph.D.<br>
+    2) Dr. H. Amisyah Tambunan, M.A.<br>
+    3) Hj. Trisna Ningsih Yuliati Djuwaeli, S.E., M.M.
+  </div>
+  <div style="font-weight: bold;">2. Pengarah:</div>
+  <div style="margin-left: 16px; margin-bottom: 2px;">
+    1) Prof. Dr. K.H. Hasanudin, M.Ag.<br>
+    2) Prof. Dr. K.H. M. Asrorun Niam Sholeh, S.H., M.A.<br>
+    3) Drs. H. Muhammad Ziyad, M.A.<br>
+    4) Prof. Dr. H. Jaih Mubarok, S.E., M.H., M.Ag.
+  </div>
+  <div style="font-weight: bold;">3. Pelaksana:</div>
+  <div style="margin-left: 16px;">
+    1) Dr. K.H. Moch. Bukhori Muslim, Lc., M.A.<br>
+    2) Dr. Yulizar Djamaluddin Sanrego, M.Ec.<br>
+    3) K.H. Mahbub Ma’afi Ramdlan, S.H.I., M.Hum.<br>
+    4) K.H. Muhammad Faishol, Lc., M.A.<br>
+    5) Ibnu Wazi<br>
+    6) Dr. Asep Supyadillah, M.Ag.
+  </div>
+</div>`;
+
+const DEFAULT_KEPERLUAN_SURAT_TUGAS_TIM = `<p style="margin: 0; line-height: 1.25; text-align: justify;">
+  Tim DSN-MUI untuk melakukan kajian permohonan Fatwa terkait Pengenaan Mu’nah Gadai Tabungan Emas BSI dari PT Bank Syariah Indonesia Tbk.
+</p>`;
+
+const DEFAULT_KETERANGAN_SURAT_TUGAS_TIM = `<div style="line-height: 1.25;">
+  <div>Narahubung</div>
+  <div style="font-weight: bold; margin-bottom: 1px;">❖ Sekretariat DSN-MUI</div>
+  <table style="border-collapse: collapse; font-size: 9.5pt; line-height: 1.25;">
+    <tr>
+      <td style="width: 44px; vertical-align: top; padding: 1px 0;">Telp</td>
+      <td style="width: 14px; vertical-align: top; padding: 1px 0;">:</td>
+      <td style="padding: 1px 0;">0818 404 852 (Kepala Sekretariat, Abdul Wasik, M.Si)</td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top; padding: 1px 0;">WA</td>
+      <td style="vertical-align: top; padding: 1px 0;">:</td>
+      <td style="padding: 1px 0;">0822 6000 4146 (Hotline DSN-MUI)</td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top; padding: 1px 0;">Email</td>
+      <td style="vertical-align: top; padding: 1px 0;">:</td>
+      <td style="padding: 1px 0;">sekretariat@dsnmui.or.id dan dsnmui@gmail.com</td>
+    </tr>
+  </table>
+</div>`;
+
 // Gregorian to Hijriah date approximation
 function getEstimatedHijriah(gregorianDateString: string): string {
   if (!gregorianDateString) return "";
@@ -366,7 +673,22 @@ const CreateDocumentPage = () => {
     return mapping[val] || val;
   };
 
-  const selectedTemplateObj = dbTemplates.find(t => t.code === selectedTemplate) || null;
+  const selectedTemplateObj = React.useMemo(() => {
+    const found = dbTemplates.find(t => t.code === selectedTemplate);
+    if (!found) return null;
+    let vars = found.variables;
+    if (typeof vars === "string") {
+      try {
+        vars = JSON.parse(vars);
+      } catch {
+        vars = [];
+      }
+    }
+    return {
+      ...found,
+      variables: Array.isArray(vars) ? vars : []
+    };
+  }, [dbTemplates, selectedTemplate]);
   const isEditorMode = selectedTemplateObj ? EDITOR_TEMPLATES.includes(selectedTemplateObj.code) : true;
 
   const [tempatDibuat, setTempatDibuat] = useState("Jakarta");
@@ -571,13 +893,55 @@ const CreateDocumentPage = () => {
         setPerihal("Undangan Rapat Bidang Fatwa DSN-MUI");
       } else if (selectedTemplate === "U-0643-UNDANGAN-KESEKRETARISAN") {
         setPerihal("Undangan Rapat Kesekretarisan Badan Pengurus DSN-MUI");
+        setLampiran("1 (satu) berkas");
       } else if (selectedTemplate === "U-0638-UNDANGAN-BPH") {
         setPerihal("Undangan Rapat Pimpinan Badan Pengurus DSN-MUI");
+        setLampiran("1 (satu) berkas");
       } else if (selectedTemplate === "U-0667-UNDANGAN-LAYANAN") {
         setPerihal("Undangan Rapat Bidang Layanan, Literasi, Relasi Industri, dan Regulasi DSN-MUI");
+      } else if (selectedTemplate === "U-0000-PERMOHONAN-PKL") {
+        setPerihal("Permohonan Dokumen Untuk Praktik Kerja Lapangan (PKL)");
+        setLampiran("-----");
+      } else if (selectedTemplate === "U-0617-INFORMASI-PELATIHAN") {
+        setPerihal("Penyampaian Informasi terkait Pelatihan PDPS Privat");
+        setLampiran("1 (satu) lembar");
+      } else if (selectedTemplate === "U-0541-KETERANGAN-WAWANCARA") {
+        setPerihal("Surat Keterangan Wawancara");
+        setLampiran("-----");
+      } else if (selectedTemplate === "U-0563-KETERANGAN-PELATIHAN") {
+        setPerihal("Surat Keterangan Mengikuti Pelatihan");
+        setLampiran("-----");
+      } else if (selectedTemplate === "ST-0663-TUGAS-TIM") {
+        setPerihal("Surat Tugas Tim");
+        setLampiran("-----");
+      } else if (selectedTemplate === "ST-0650-TUGAS") {
+        setPerihal("Surat Tugas DSN-MUI");
+        setLampiran("-----");
+      } else if (selectedTemplate === "U-0477-KONTRIBUSI-DPS") {
+        setPerihal("Surat Edaran Iuran Bulanan Dewan Pengawas Syariah (DPS)");
+        setLampiran("----");
       }
     }
   }, [selectedTemplate]);
+
+  // When selectedTemplate changes, reset template variables to the new template defaults
+  const prevTemplateRef = useRef(selectedTemplate);
+  useEffect(() => {
+    if (prevTemplateRef.current !== selectedTemplate) {
+      prevTemplateRef.current = selectedTemplate;
+      if (selectedTemplateObj && Array.isArray(selectedTemplateObj.variables)) {
+        setTemplateVariables((prev) => {
+          const updated: Record<string, string> = { ...prev };
+          for (const v of selectedTemplateObj.variables) {
+            if (v.defaultValue) {
+              updated[v.key] = v.defaultValue;
+            }
+          }
+          return updated;
+        });
+      }
+    }
+  }, [selectedTemplate, selectedTemplateObj]);
 
   // Sync template variables when selectedTemplateObj or metadata fields change
   useEffect(() => {
@@ -648,24 +1012,369 @@ const CreateDocumentPage = () => {
         setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL-\nMAJELIS ULAMA INDONESIA");
       }
     }
-    if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKiri")) {
+    if (selectedTemplate === "U-0000-PERMOHONAN-PKL") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri === "Ketua") {
+        setVar("jabatanKiri", "Wakil Ketua");
+      }
+      if (!newVars.namaKiri || newVars.namaKiri === "K.H. M. CHOLIL NAFIS, Lc., Ph.D." || newVars.namaKiri.includes("M.A.E.P.")) {
+        setVar("namaKiri", "Ir. H. ADIWARMAN A. KARIM, S.E., M.B.A.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan === "Sekretaris") {
+        setVar("jabatanKanan", "Wakil Sekretaris");
+      }
+      if (!newVars.namaKanan || newVars.namaKanan === "Dr. H. AMIRSYAH TAMBUNAN, M.A.") {
+        setVar("namaKanan", "Dr. ASRORI S. KARNI, S.Ag., M.H.");
+      }
+      const isBlankIsiSurat =
+        !newVars.isiSurat ||
+        newVars.isiSurat.trim() === "" ||
+        newVars.isiSurat === "<p></p>" ||
+        newVars.isiSurat === "<p><br></p>" ||
+        newVars.isiSurat === "<p>&nbsp;</p>" ||
+        newVars.isiSurat.trim() === "<br>";
+      if (isBlankIsiSurat) {
+        setVar("isiSurat", DEFAULT_ISI_PERMOHONAN_PKL);
+      }
+    } else if (selectedTemplate === "U-0617-INFORMASI-PELATIHAN") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri === "Ketua") {
+        setVar("jabatanKiri", "Wakil Ketua");
+      }
+      if (!newVars.namaKiri || newVars.namaKiri === "K.H. M. CHOLIL NAFIS, Lc., Ph.D.") {
+        setVar("namaKiri", "Ir. H. ADIWARMAN A. KARIM, S.E., M.B.A., M.A.E.P.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan === "Sekretaris") {
+        setVar("jabatanKanan", "Wakil Sekretaris");
+      }
+      if (!newVars.namaKanan || newVars.namaKanan === "Dr. H. AMIRSYAH TAMBUNAN, M.A.") {
+        setVar("namaKanan", "Dr. ASRORI S. KARNI, S.Ag., M.H.");
+      }
+      if (!newVars.penerimaSurat || newVars.penerimaSurat === "Jabatan\nNama Lembaga") {
+        setVar("penerimaSurat", "VP Unit Usaha Syariah\nPT. Bank Jatim");
+      }
+      const isBlankIsiSurat =
+        !newVars.isiSurat ||
+        newVars.isiSurat.trim() === "" ||
+        newVars.isiSurat === "<p></p>" ||
+        newVars.isiSurat === "<p><br></p>" ||
+        newVars.isiSurat === "<p>&nbsp;</p>" ||
+        newVars.isiSurat.trim() === "<br>";
+      if (isBlankIsiSurat) {
+        setVar("isiSurat", DEFAULT_ISI_INFORMASI_PELATIHAN);
+      }
+      if (!newVars.lampiranKonten || newVars.lampiranKonten.trim() === "") {
+        setVar("lampiranKonten", DEFAULT_LAMPIRAN_INFORMASI_PELATIHAN);
+      }
+      if (!newVars.lampiranDisplay) {
+        setVar("lampiranDisplay", "block");
+      }
+    } else if (selectedTemplate === "U-0541-KETERANGAN-WAWANCARA") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri === "Ketua") {
+        setVar("jabatanKiri", "Wakil Ketua");
+      }
+      if (!newVars.namaKiri || newVars.namaKiri === "K.H. M. CHOLIL NAFIS, Lc., Ph.D.") {
+        setVar("namaKiri", "Ir. H. ADIWARMAN A. KARIM, S.E., M.B.A., M.A.E.P.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan === "Sekretaris") {
+        setVar("jabatanKanan", "Wakil Sekretaris");
+      }
+      if (!newVars.namaKanan || newVars.namaKanan === "Dr. H. AMIRSYAH TAMBUNAN, M.A.") {
+        setVar("namaKanan", "Dr. ASRORI S. KARNI, S.Ag., M.H.");
+      }
+      if (!newVars.headerTtd || newVars.headerTtd.trim() === "" || newVars.headerTtd.includes("-")) {
+        setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL\nMAJELIS ULAMA INDONESIA");
+      }
+      const isBlankIsiSurat =
+        !newVars.isiSurat ||
+        newVars.isiSurat.trim() === "" ||
+        newVars.isiSurat === "<p></p>" ||
+        newVars.isiSurat === "<p><br></p>" ||
+        newVars.isiSurat === "<p>&nbsp;</p>" ||
+        newVars.isiSurat.trim() === "<br>";
+      if (isBlankIsiSurat) {
+        setVar("isiSurat", DEFAULT_ISI_KETERANGAN_WAWANCARA);
+      }
+      if (!newVars.lampiranDisplay) {
+        setVar("lampiranDisplay", "none");
+      }
+    } else if (selectedTemplate === "U-0563-KETERANGAN-PELATIHAN") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri === "Ketua") {
+        setVar("jabatanKiri", "Wakil Ketua");
+      }
+      if (!newVars.namaKiri || newVars.namaKiri === "K.H. M. CHOLIL NAFIS, Lc., Ph.D.") {
+        setVar("namaKiri", "Ir. H. ADIWARMAN A. KARIM, S.E., M.B.A., M.A.E.P.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan === "Sekretaris") {
+        setVar("jabatanKanan", "Wakil Sekretaris");
+      }
+      if (!newVars.namaKanan || newVars.namaKanan === "Dr. H. AMIRSYAH TAMBUNAN, M.A.") {
+        setVar("namaKanan", "Dr. ASRORI S. KARNI, S.Ag., M.H.");
+      }
+      if (!newVars.headerTtd || newVars.headerTtd.trim() === "") {
+        setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL-\nMAJELIS ULAMA INDONESIA");
+      }
+      const isBlankIsiSurat =
+        !newVars.isiSurat ||
+        newVars.isiSurat.trim() === "" ||
+        newVars.isiSurat === "<p></p>" ||
+        newVars.isiSurat === "<p><br></p>" ||
+        newVars.isiSurat === "<p>&nbsp;</p>" ||
+        newVars.isiSurat.trim() === "<br>";
+      if (isBlankIsiSurat) {
+        setVar("isiSurat", DEFAULT_ISI_KETERANGAN_PELATIHAN);
+      }
+      if (!newVars.lampiranDisplay) {
+        setVar("lampiranDisplay", "none");
+      }
+    } else if (selectedTemplate === "ST-0663-TUGAS-TIM") {
+      if (!newVars.tanggalRapatPimpinan || newVars.tanggalRapatPimpinan.trim() === "") {
+        setVar("tanggalRapatPimpinan", "5 Agustus 2026");
+      }
+      if (!newVars.jabatan || newVars.jabatan.trim() === "") {
+        setVar("jabatan", "Pengurus DSN-MUI");
+      }
+      if (!newVars.waktuTugas || newVars.waktuTugas.trim() === "") {
+        setVar("waktuTugas", "12 Agustus 2026 – 12 September 2026");
+      }
+      if (!newVars.waktuTugasMulai) {
+        setVar("waktuTugasMulai", "2026-08-12");
+      }
+      if (!newVars.waktuTugasSelesai) {
+        setVar("waktuTugasSelesai", "2026-09-12");
+      }
+      const isBlankNamaTim =
+        !newVars.namaTim ||
+        newVars.namaTim.trim() === "" ||
+        newVars.namaTim === "<p></p>" ||
+        newVars.namaTim === "<p><br></p>" ||
+        newVars.namaTim === "<p>&nbsp;</p>" ||
+        newVars.namaTim.trim() === "<br>";
+      if (isBlankNamaTim) {
+        setVar("namaTim", DEFAULT_NAMA_TIM_SURAT_TUGAS);
+      }
+      const isBlankKeperluan =
+        !newVars.keperluan ||
+        newVars.keperluan.trim() === "" ||
+        newVars.keperluan === "<p></p>" ||
+        newVars.keperluan === "<p><br></p>" ||
+        newVars.keperluan === "<p>&nbsp;</p>" ||
+        newVars.keperluan.trim() === "<br>";
+      if (isBlankKeperluan) {
+        setVar("keperluan", DEFAULT_KEPERLUAN_SURAT_TUGAS_TIM);
+      }
+      const isBlankKeterangan =
+        !newVars.keterangan ||
+        newVars.keterangan.trim() === "" ||
+        newVars.keterangan === "<p></p>" ||
+        newVars.keterangan === "<p><br></p>" ||
+        newVars.keterangan === "<p>&nbsp;</p>" ||
+        newVars.keterangan.trim() === "<br>";
+      if (isBlankKeterangan) {
+        setVar("keterangan", DEFAULT_KETERANGAN_SURAT_TUGAS_TIM);
+      }
+      if (!newVars.headerTtd || newVars.headerTtd.trim() === "") {
+        setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL-\nMAJELIS ULAMA INDONESIA");
+      }
       if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
         setVar("jabatanKiri", "Ketua");
       }
-    }
-    if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKanan")) {
+      if (!newVars.namaKiri || newVars.namaKiri.trim() === "") {
+        setVar("namaKiri", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+      }
       if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
         setVar("jabatanKanan", "Sekretaris");
       }
-    }
-    if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaKetua")) {
+      if (!newVars.namaKanan || newVars.namaKanan.trim() === "") {
+        setVar("namaKanan", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.lampiranDisplay) {
+        setVar("lampiranDisplay", "none");
+      }
+    } else if (selectedTemplate === "ST-0650-TUGAS") {
+      if (!newVars.jabatan || newVars.jabatan.trim() === "" || newVars.jabatan === "Pengurus DSN-MUI") {
+        setVar("jabatan", "1. Koordinator Bidang Layanan, Literasi, Relasi Industri dan Regulasi\n2. Anggota Bidang Fatwa");
+      }
+      if (!newVars.daftarNamaPenugasan || newVars.daftarNamaPenugasan.trim() === "" || newVars.daftarNamaPenugasan === "1. Ibnu Wazi\n2. Dr. Nofrianto, M.Ag., CM.") {
+        setVar("daftarNamaPenugasan", "1. Dr. Asep Supyadillah, M.Ag.\n2. Dr. Yulizar Djamaluddin Sanrego, M.Ec.");
+      }
+      if (!newVars.headerTtd || newVars.headerTtd.trim() === "") {
+        setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL-\nMAJELIS ULAMA INDONESIA");
+      }
+      if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+        setVar("jabatanKiri", "Ketua");
+      }
       if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
         setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
       }
-    }
-    if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaSekretaris")) {
+      if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+        setVar("jabatanKanan", "Sekretaris");
+      }
       if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
         setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+    } else if (selectedTemplate === "U-0638-UNDANGAN-BPH") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+        setVar("jabatanKiri", "Ketua");
+      }
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+        setVar("jabatanKanan", "Sekretaris");
+      }
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.namaRapat || newVars.namaRapat.trim() === "") {
+        setVar("namaRapat", "Rapat Pimpinan Badan Pengurus DSN-MUI");
+      }
+      if (!newVars.hariTanggalRapat || newVars.hariTanggalRapat.trim() === "") {
+        setVar("hariTanggalRapat", "Rabu, 5 Agustus 2026");
+      }
+      if (!newVars.waktuRapat || newVars.waktuRapat.trim() === "") {
+        setVar("waktuRapat", "13.00 – 15.00 WIB");
+      }
+      if (!newVars.tempatRapat || newVars.tempatRapat.trim() === "") {
+        setVar("tempatRapat", "Kantor DSN-MUI\nJl. Dempo No. 19, Pegangsaan, Jakarta Pusat 10320");
+      }
+      if (!newVars.agendaRapat || newVars.agendaRapat.trim() === "") {
+        setVar("agendaRapat", "Terlampir");
+      }
+      if (!newVars.daftarPenerima || newVars.daftarPenerima.trim() === "") {
+        setVar(
+          "daftarPenerima",
+          "1. Pimpinan Badan Pengurus DSN-MUI\n2. Koordinator Bidang Fatwa DSN-MUI\n3. Koordinator Bidang Layanan, Literasi, Relasi Industri dan Regulasi DSN-MUI"
+        );
+      }
+      const isBlankDaftar =
+        !newVars.daftarUndangan ||
+        newVars.daftarUndangan.trim() === "" ||
+        newVars.daftarUndangan === "<p></p>" ||
+        newVars.daftarUndangan === "<p><br></p>" ||
+        newVars.daftarUndangan.trim() === "<br>";
+      if (isBlankDaftar) {
+        setVar("daftarUndangan", DEFAULT_DAFTAR_UNDANGAN_BPH);
+      }
+      const isBlankAgenda =
+        !newVars.agendaDetail ||
+        newVars.agendaDetail.trim() === "" ||
+        newVars.agendaDetail === "<p></p>" ||
+        newVars.agendaDetail === "<p><br></p>" ||
+        newVars.agendaDetail.trim() === "<br>";
+      if (isBlankAgenda) {
+        setVar("agendaDetail", DEFAULT_AGENDA_DETAIL_BPH);
+      }
+    } else if (selectedTemplate === "U-0643-UNDANGAN-KESEKRETARISAN") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+        setVar("jabatanKiri", "Ketua");
+      }
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+        setVar("jabatanKanan", "Sekretaris");
+      }
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.namaRapat || newVars.namaRapat.trim() === "") {
+        setVar("namaRapat", "Rapat Kesekretarisan Badan Pengurus DSN-MUI");
+      }
+      if (!newVars.hariTanggalRapat || newVars.hariTanggalRapat.trim() === "") {
+        setVar("hariTanggalRapat", "Kamis, 6 Agustus 2026");
+      }
+      if (!newVars.waktuRapat || newVars.waktuRapat.trim() === "") {
+        setVar("waktuRapat", "13.00 – 14.30 WIB");
+      }
+      if (!newVars.mediaRapat || newVars.mediaRapat.trim() === "") {
+        setVar("mediaRapat", "Zoom Cloud Meeting\n(Meeting ID: 859 4470 8501 | Passcode: DSNMUI26)");
+      }
+      if (!newVars.agendaRapat || newVars.agendaRapat.trim() === "") {
+        setVar("agendaRapat", "Terlampir");
+      }
+      if (!newVars.daftarPenerima || newVars.daftarPenerima.trim() === "") {
+        setVar("daftarPenerima", "Unsur Sekretaris Badan Pengurus DSN-MUI");
+      }
+      if (!newVars.tempatPenerima || newVars.tempatPenerima.trim() === "") {
+        setVar("tempatPenerima", "TEMPAT");
+      }
+      const isBlankDaftar =
+        !newVars.daftarUndangan ||
+        newVars.daftarUndangan.trim() === "" ||
+        newVars.daftarUndangan === "<p></p>" ||
+        newVars.daftarUndangan === "<p><br></p>" ||
+        newVars.daftarUndangan.trim() === "<br>";
+      if (isBlankDaftar) {
+        setVar("daftarUndangan", DEFAULT_DAFTAR_UNDANGAN_KESEKRETARISAN);
+      }
+      const isBlankAgenda =
+        !newVars.agendaDetail ||
+        newVars.agendaDetail.trim() === "" ||
+        newVars.agendaDetail === "<p></p>" ||
+        newVars.agendaDetail === "<p><br></p>" ||
+        newVars.agendaDetail.trim() === "<br>";
+      if (isBlankAgenda) {
+        setVar("agendaDetail", DEFAULT_AGENDA_DETAIL_KESEKRETARISAN);
+      }
+    } else if (selectedTemplate === "U-0477-KONTRIBUSI-DPS") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+        setVar("jabatanKiri", "Ketua");
+      }
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+        setVar("jabatanKanan", "Sekretaris");
+      }
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.penerimaSurat || newVars.penerimaSurat.trim() === "") {
+        setVar("penerimaSurat", "Bapak/Ibu Dewan Pengawas Syariah\nK.H. Sholahudin Al Aiyub, M.Si.");
+      }
+      if (!newVars.tempatPenerima || newVars.tempatPenerima.trim() === "") {
+        setVar("tempatPenerima", "TEMPAT");
+      }
+      if (!newVars.paragrafPembuka || newVars.paragrafPembuka.trim() === "") {
+        setVar("paragrafPembuka", "Bersama ini Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) menyampaikan hal-hal berikut:");
+      }
+      const isBlankIsi =
+        !newVars.isiSurat ||
+        newVars.isiSurat.trim() === "" ||
+        newVars.isiSurat === "<p></p>" ||
+        newVars.isiSurat === "<p><br></p>" ||
+        newVars.isiSurat.trim() === "<br>";
+      if (isBlankIsi) {
+        setVar("isiSurat", DEFAULT_ISI_KONTRIBUSI_DPS);
+      }
+      if (!newVars.paragrafPenutup || newVars.paragrafPenutup.trim() === "") {
+        setVar("paragrafPenutup", "Demikian informasi ini kami sampaikan. Atas perhatian Bapak/Ibu, kami ucapkan terima kasih.");
+      }
+    } else {
+      if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKiri")) {
+        if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+          setVar("jabatanKiri", "Ketua");
+        }
+      }
+      if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKanan")) {
+        if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+          setVar("jabatanKanan", "Sekretaris");
+        }
+      }
+      if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaKetua")) {
+        if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+          setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+        }
+      }
+      if (selectedTemplateObj.variables?.some((v: any) => v.key === "namaSekretaris")) {
+        if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+          setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+        }
+      }
+    }
+
+    if (selectedTemplateObj.variables?.some((v: any) => v.key === "lampiranDisplay")) {
+      if (!newVars.lampiranDisplay) {
+        setVar("lampiranDisplay", "none");
       }
     }
 
@@ -869,9 +1578,12 @@ const CreateDocumentPage = () => {
       for (const v of selectedTemplateObj.variables) {
         if (
           v.required &&
-          !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail"].includes(v.key)
+          !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail", "lampiranDisplay"].includes(v.key)
         ) {
           if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {
+            continue;
+          }
+          if (v.key === "lampiranKonten" && templateVariables.lampiranDisplay !== "block") {
             continue;
           }
           const val = templateVariables[v.key];
@@ -1229,13 +1941,23 @@ const CreateDocumentPage = () => {
             key === "agendaRapatLampiran" ||
             key === "keteranganNarahubung" ||
             key === "keterangan" ||
-            key === "deskripsiTransaksi"
+            key === "deskripsiTransaksi" ||
+            key === "isiSurat" ||
+            key === "lampiranKonten" ||
+            key.toLowerCase().includes("lampiran") ||
+            key.toLowerCase().includes("wysiwyg") ||
+            key.toLowerCase().includes("isisurat")
           ) {
-            if (!val.includes("<p>") && !val.includes("<div>") && !val.includes("<br") && !val.includes("<ul>") && !val.includes("<ol>")) {
+            const hasHtmlTags = /<\s*(?:p|div|table|tbody|tr|td|th|ul|ol|li|br|h[1-6]|span)\b[^>]*>/i.test(val);
+            if (!hasHtmlTags) {
               val = val.replace(/\n/g, "<br>");
             } else {
-              val = val.replace(/\r?\n/g, "");
+              val = val.replace(/>\s*\r?\n\s*</g, "><");
             }
+            // Strip any accidental <br> directly inside <table>, <thead>, <tbody>, <tfoot>, <tr>
+            val = val.replace(/(<table\b[^>]*>[\s\S]*?<\/table>)/gi, (tbl: string) => {
+              return tbl.replace(/<br\s*\/?>/gi, "");
+            });
           }
           return val;
         }
@@ -1267,7 +1989,7 @@ const CreateDocumentPage = () => {
     const FOOTER_HTML = `<table class="amanah-letter-footer" style="display: table; width: 100%; border-collapse: collapse; margin-top: 20px; page-break-inside: avoid; font-family: Arial, sans-serif;">
     <tr>
       <td style="vertical-align: middle; text-align: left; padding: 4px 10px 4px 0; font-size: 7.5pt; line-height: 1.25; font-style: italic; color: #1f2937; border-top: 1px solid #e5e7eb;">
-        Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silahkan pindai QR-Code
+        Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silakan pindai QR-Code
       </td>
       <td style="vertical-align: middle; text-align: right; width: 32px; padding: 4px 0; border-top: 1px solid #e5e7eb;">
         <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle;">
@@ -2053,8 +2775,16 @@ const CreateDocumentPage = () => {
                             ).replace(
                               /\{\{(\w+)\}\}/g,
                               (_: string, key: string) => {
-                                const val = templateVariables[key];
-                                return (val !== undefined && val !== "") ? val : '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
+                                let val = templateVariables[key];
+                                if (val !== undefined && val !== "") {
+                                  if (typeof val === "string" && val.includes("<table")) {
+                                    val = val.replace(/(<table\b[^>]*>[\s\S]*?<\/table>)/gi, (tbl: string) => {
+                                      return tbl.replace(/<br\s*\/?>/gi, "");
+                                    });
+                                  }
+                                  return val;
+                                }
+                                return '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
                               }
                             ) +
                             '</div></body></html>'
@@ -2518,7 +3248,7 @@ const CreateDocumentPage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                           {selectedTemplateObj.variables
                             .filter((v: any) => {
-                              if (["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail"].includes(v.key)) {
+                              if (["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail", "lampiranDisplay"].includes(v.key)) {
                                 return false;
                               }
                               if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {
@@ -2538,8 +3268,13 @@ const CreateDocumentPage = () => {
                                 v.key === "keteranganNarahubung" ||
                                 v.key === "keterangan" ||
                                 v.key === "deskripsiTransaksi" ||
+                                v.key === "isiSurat" ||
+                                v.key === "lampiranKonten" ||
+                                v.key === "namaTim" ||
+                                v.key === "keperluan" ||
                                 v.key.toLowerCase().includes("lampiran") ||
-                                v.key.toLowerCase().includes("wysiwyg");
+                                v.key.toLowerCase().includes("wysiwyg") ||
+                                v.key.toLowerCase().includes("isisurat");
 
                               return (
                                 <div
@@ -2548,8 +3283,10 @@ const CreateDocumentPage = () => {
                                     "space-y-2",
                                     (v.key === "headerTtd" ||
                                       v.key === "daftarNamaPenugasan" ||
+                                      v.key === "jabatan" ||
                                       v.key === "tempatKegiatan" ||
                                       v.key === "keperluan" ||
+                                      v.key === "waktuTugas" ||
                                       isRichText) &&
                                       "md:col-span-2"
                                   )}
@@ -2581,28 +3318,120 @@ const CreateDocumentPage = () => {
                                       </label>
                                     </div>
                                   )}
-                                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
-                                    {v.label}
-                                    {v.required && <span className="text-red-500 ml-0.5">*</span>}
-                                  </label>
 
-                                  {isRichText ? (
-                                    <SimpleRichEditor
-                                      value={templateVariables[v.key] || ""}
-                                      placeholder={v.placeholder || `Masukkan ${v.label}`}
-                                      hasError={hasErr}
-                                      onChange={(val) => {
-                                        setTemplateVariables({ ...templateVariables, [v.key]: val });
-                                        clearFieldError(errKey);
-                                      }}
-                                    />
-                                  ) : v.type === "textarea" ? (
+                                  {v.key === "lampiranKonten" && (
+                                    <div className="flex items-center gap-2 mb-1.5 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 md:col-span-2">
+                                      <input
+                                        type="checkbox"
+                                        id="toggle-lampiran-konten"
+                                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer"
+                                        checked={templateVariables.lampiranDisplay === "block"}
+                                        onChange={(e) => {
+                                          const isChecked = e.target.checked;
+                                          setTemplateVariables({
+                                            ...templateVariables,
+                                            lampiranDisplay: isChecked ? "block" : "none",
+                                          });
+                                          if (isChecked && (!lampiran || lampiran === "-----" || lampiran === "—")) {
+                                            setLampiran("1 (satu) berkas");
+                                          } else if (!isChecked && lampiran === "1 (satu) berkas") {
+                                            setLampiran("-----");
+                                          }
+                                        }}
+                                      />
+                                      <label htmlFor="toggle-lampiran-konten" className="text-[11px] font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                        Sertakan Halaman Lampiran (Halaman Berikutnya dengan Editor WYSIWYG)
+                                      </label>
+                                    </div>
+                                  )}
+
+                                  {v.key === "lampiranKonten" && templateVariables.lampiranDisplay !== "block" ? null : (
+                                    <>
+                                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
+                                        {v.label}
+                                        {v.required && <span className="text-red-500 ml-0.5">*</span>}
+                                      </label>
+
+                                      {v.key === "waktuTugas" ? (
+                                        <div className="space-y-2">
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Tanggal Mulai:</label>
+                                              <input
+                                                type="date"
+                                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs outline-none border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary/20"
+                                                value={templateVariables.waktuTugasMulai || "2026-08-12"}
+                                                onChange={(e) => {
+                                                  const mulai = e.target.value;
+                                                  const selesai = templateVariables.waktuTugasSelesai || "2026-09-12";
+                                                  const fmtMulai = mulai ? new Date(mulai + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+                                                  const fmtSelesai = selesai ? new Date(selesai + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+                                                  const formatted = fmtMulai && fmtSelesai ? `${fmtMulai} – ${fmtSelesai}` : fmtMulai || fmtSelesai;
+                                                  setTemplateVariables({
+                                                    ...templateVariables,
+                                                    waktuTugasMulai: mulai,
+                                                    waktuTugas: formatted,
+                                                  });
+                                                  clearFieldError(errKey);
+                                                }}
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Tanggal Selesai:</label>
+                                              <input
+                                                type="date"
+                                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs outline-none border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary/20"
+                                                value={templateVariables.waktuTugasSelesai || "2026-09-12"}
+                                                onChange={(e) => {
+                                                  const selesai = e.target.value;
+                                                  const mulai = templateVariables.waktuTugasMulai || "2026-08-12";
+                                                  const fmtMulai = mulai ? new Date(mulai + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+                                                  const fmtSelesai = selesai ? new Date(selesai + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+                                                  const formatted = fmtMulai && fmtSelesai ? `${fmtMulai} – ${fmtSelesai}` : fmtMulai || fmtSelesai;
+                                                  setTemplateVariables({
+                                                    ...templateVariables,
+                                                    waktuTugasSelesai: selesai,
+                                                    waktuTugas: formatted,
+                                                  });
+                                                  clearFieldError(errKey);
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Penyajian Format di Surat:</label>
+                                            <input
+                                              type="text"
+                                              placeholder="12 Agustus 2026 – 12 September 2026"
+                                              value={templateVariables.waktuTugas || ""}
+                                              onChange={(e) => {
+                                                setTemplateVariables({ ...templateVariables, waktuTugas: e.target.value });
+                                                clearFieldError(errKey);
+                                              }}
+                                              className={cn(
+                                                "w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs outline-none border transition-all font-medium",
+                                                hasErr ? "border-red-500 focus:ring-red-200" : "border-slate-200 dark:border-slate-700 focus:ring-primary/20"
+                                              )}
+                                            />
+                                          </div>
+                                        </div>
+                                      ) : isRichText ? (
+                                        <SimpleRichEditor
+                                          value={templateVariables[v.key] || ""}
+                                          placeholder={v.placeholder || `Masukkan ${v.label}`}
+                                          hasError={hasErr}
+                                          onChange={(val) => {
+                                            setTemplateVariables({ ...templateVariables, [v.key]: val });
+                                            clearFieldError(errKey);
+                                          }}
+                                        />
+                                      ) : v.type === "textarea" ? (
                                     <textarea
                                       required={v.required}
                                       placeholder={v.placeholder || `Masukkan ${v.label}`}
                                       className={cn(
                                         "w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 transition-all text-sm resize-none",
-                                        v.key.toLowerCase().includes("lampiran") || v.key.toLowerCase().includes("undangan") || v.key.toLowerCase().includes("agenda") || v.key.toLowerCase().includes("nama") ? "h-[120px]" : "h-[80px]",
+                                        v.key.toLowerCase().includes("lampiran") || v.key.toLowerCase().includes("undangan") || v.key.toLowerCase().includes("agenda") || v.key.toLowerCase().includes("nama") || v.key.toLowerCase().includes("jabatan") ? "h-[100px]" : "h-[80px]",
                                         hasErr ? "border-2 border-red-500 focus:ring-red-200" : "border-none focus:ring-primary/20"
                                       )}
                                       value={templateVariables[v.key] || ""}
@@ -2650,6 +3479,8 @@ const CreateDocumentPage = () => {
                                       <AlertCircle size={10} />
                                       {formErrors[errKey]}
                                     </p>
+                                  )}
+                                    </>
                                   )}
                                 </div>
                               );

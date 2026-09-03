@@ -477,7 +477,7 @@ function PreviewModal({
   onClose: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(template.variables.map((v) => [v.key, v.placeholder || ""]))
+    Object.fromEntries(template.variables.map((v) => [v.key, (v as any).defaultValue || v.placeholder || ""]))
   );
   const [showForm, setShowForm] = useState(true);
 
@@ -546,8 +546,11 @@ function PreviewModal({
                   v.key === "keteranganNarahubung" ||
                   v.key === "keterangan" ||
                   v.key === "deskripsiTransaksi" ||
+                  v.key === "isiSurat" ||
+                  v.key === "lampiranKonten" ||
                   v.key.toLowerCase().includes("lampiran") ||
-                  v.key.toLowerCase().includes("wysiwyg") ? (
+                  v.key.toLowerCase().includes("wysiwyg") ||
+                  v.key.toLowerCase().includes("isisurat") ? (
                     <SimpleRichEditor
                       value={values[v.key] || ""}
                       placeholder={v.placeholder || `Isi ${v.label}`}
