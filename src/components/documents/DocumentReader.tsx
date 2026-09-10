@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { X, ExternalLink, Download, FileText, Loader2 } from "lucide-react";
+import { X, ExternalLink, Download, FileText, Loader2, Printer, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { getBaseUrl } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth.store";
 
 const HTML_PDF_PRIMARY_COLOR = '#2563eb';
 
@@ -66,21 +67,44 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const [resolvedMimeType, setResolvedMimeType] = React.useState<string | null>(null);
   const fullUrl = resolvedUrl || builtUrl;
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const storeToken = useAuthStore((state) => state.accessToken);
+  const token = storeToken || (typeof window !== 'undefined' ? (localStorage.getItem('accessToken') || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.accessToken;
+    } catch {
+      return null;
+    }
+  })()) : null);
 
   const isDetailEndpoint = builtUrl.includes('/api/documents/') && !builtUrl.endsWith('/download');
   const directUrl = isDetailEndpoint ? resolvedUrl : fullUrl;
   const effectiveUrl = directUrl || fullUrl;
-  const urlForType = safeTitle || effectiveUrl || safeFileUrl;
-  const lowerUrlForType = urlForType.toLowerCase();
+  const lowerUrl = (safeFileUrl || '').toLowerCase();
+  const lowerEffective = (effectiveUrl || '').toLowerCase();
+  const lowerTitle = (safeTitle || '').toLowerCase();
+
   const isDocx = resolvedMimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     || resolvedMimeType === 'application/msword'
-    || lowerUrlForType.endsWith('.docx')
-    || lowerUrlForType.endsWith('.doc');
+    || lowerUrl.endsWith('.docx') || lowerUrl.endsWith('.doc')
+    || lowerEffective.includes('.docx') || lowerEffective.includes('.doc')
+    || lowerTitle.endsWith('.docx') || lowerTitle.endsWith('.doc');
+
   const isHtml = resolvedMimeType === 'text/html'
-    || lowerUrlForType.endsWith('.html')
-    || lowerUrlForType.endsWith('.htm');
-  const isPdf = resolvedMimeType === 'application/pdf' || lowerUrlForType.endsWith('.pdf');
+    || lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')
+    || lowerEffective.includes('.html') || lowerEffective.includes('.htm')
+    || lowerTitle.endsWith('.html') || lowerTitle.endsWith('.htm');
+
+  const isPdf = resolvedMimeType === 'application/pdf'
+    || lowerUrl.endsWith('.pdf')
+    || lowerEffective.includes('.pdf')
+    || lowerTitle.endsWith('.pdf');
+
+  const imageRegex = /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i;
+  const isImage = imageRegex.test(lowerUrl)
+    || imageRegex.test(lowerEffective)
+    || imageRegex.test(lowerTitle)
+    || (resolvedMimeType?.startsWith('image/') ?? false);
+
   const isLocalhost = (effectiveUrl || '').includes('localhost') || (effectiveUrl || '').includes('127.0.0.1');
 
   let fullUrlWithToken = effectiveUrl;
@@ -126,10 +150,15 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   };
 
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
-  const [pdfComponents, setPdfComponents] = React.useState<{ Document?: any; Page?: any } | null>(null);
-  const [pdfNumPages, setPdfNumPages] = React.useState<number>(0);
-  const [pdfPage, setPdfPage] = React.useState<number>(1);
-  const [pdfScale, setPdfScale] = React.useState<number>(1.0);
+  const [zoom, setZoom] = React.useState<number>(100);
+  const [rotation, setRotation] = React.useState<number>(0);
+
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 25, 200));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 25, 50));
+  const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
+  const handlePrint = () => {
+    window.open(blobUrl || fullUrlWithToken, '_blank')?.print();
+  };
   const [signatureRows, setSignatureRows] = React.useState<Array<{
     id: string;
     userId: string;
@@ -786,7 +815,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     };
   }, [isOpen, isDocx, directUrl, token]);
 
-  // Fetch PDF as blob when protected by auth or to avoid CORS issues; create object URL for iframe
+  // Fetch PDF as blob when protected by auth or to avoid CORS issues; create object URL for object/iframe
   React.useEffect(() => {
     if (!(isOpen && isPdf && directUrl)) return undefined;
 
@@ -805,20 +834,13 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       })
       .then(blob => {
         if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
+        const pdfBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdfBlob);
         setBlobUrl(objectUrl);
-        // dynamic import react-pdf and set worker
-        import('react-pdf').then((m) => {
-          try {
-            // set worker to CDN fallback
-            m.pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@latest/build/pdf.worker.min.js';
-          } catch (e) {}
-          setPdfComponents({ Document: m.Document, Page: m.Page });
-        }).catch(err => {
-          console.warn('react-pdf not available, falling back to iframe', err);
-        });
       })
-      .catch(err => console.error("Failed to load PDF:", err));
+      .catch(err => {
+        console.warn("Failed to load PDF blob, native viewer will use direct URL fallback:", err);
+      });
 
     return () => {
       cancelled = true;
@@ -836,9 +858,6 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const viewerUrl = isDocx
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrlWithToken)}`
     : fullUrlWithToken;
-
-  const PdfDoc = pdfComponents?.Document;
-  const PdfPage = pdfComponents?.Page;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 sm:p-4 md:p-8">
@@ -863,25 +882,66 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {isImage && (
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mr-1">
+                <button
+                  type="button"
+                  onClick={handleZoomOut}
+                  className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                  title="Zoom Out"
+                >
+                  <ZoomOut size={16} />
+                </button>
+                <span className="text-[11px] font-bold px-1.5 text-slate-700 dark:text-slate-200">
+                  {zoom}%
+                </span>
+                <button
+                  type="button"
+                  onClick={handleZoomIn}
+                  className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                  title="Zoom In"
+                >
+                  <ZoomIn size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRotate}
+                  className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                  title="Putar Gambar"
+                >
+                  <RotateCw size={16} />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+              title="Cetak Dokumen"
+            >
+              <Printer size={18} />
+            </button>
             <a
-              href={fullUrlWithToken}
+              href={blobUrl || fullUrlWithToken}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-              title="Open in new tab"
+              title="Buka di tab baru"
             >
-              <ExternalLink size={20} />
+              <ExternalLink size={18} />
             </a>
             <button
+              type="button"
               onClick={() => handleDownload(downloadUrl, downloadFileName)}
               className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
               title={isHtml ? 'Download HTML sebagai PDF' : 'Download file'}
             >
-              <Download size={20} />
+              <Download size={18} />
             </button>
             <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
             <button
+              type="button"
               onClick={onClose}
               className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
             >
@@ -942,7 +1002,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             </div>
           ) : (
             <>
-              {((isHtml && htmlContent === null) || (isPdf && blobUrl === null) || (isDetailEndpoint && !directUrl)) && (
+              {((isHtml && htmlContent === null) || (isDetailEndpoint && !directUrl)) && (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none">
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 size={32} className="animate-spin text-primary/30" />
@@ -950,36 +1010,51 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
                   </div>
                 </div>
               )}
-              {isPdf && PdfDoc && PdfPage && blobUrl ? (
-                <div className="w-full h-full relative z-10 bg-white flex flex-col">
-                  <div className="flex items-center justify-end gap-2 p-2 z-20">
-                    <button
-                      onClick={() => setPdfPage(p => Math.max(1, p - 1))}
-                      className="px-3 py-1 bg-slate-100 rounded"
-                      title="Prev page"
-                    >◀</button>
-                    <div className="text-xs font-bold px-2">{pdfPage} / {pdfNumPages || '?'}</div>
-                    <button
-                      onClick={() => setPdfPage(p => Math.min(pdfNumPages || p + 1, p + 1))}
-                      className="px-3 py-1 bg-slate-100 rounded"
-                      title="Next page"
-                    >▶</button>
-                    <div className="w-px h-6 bg-slate-100 mx-1" />
-                    <button onClick={() => setPdfScale(s => Math.max(0.25, s - 0.25))} className="px-2 py-1 bg-slate-100 rounded" title="Zoom out">-</button>
-                    <div className="text-xs px-2">{Math.round(pdfScale * 100)}%</div>
-                    <button onClick={() => setPdfScale(s => Math.min(4, s + 0.25))} className="px-2 py-1 bg-slate-100 rounded" title="Zoom in">+</button>
-                  </div>
-                  <div className="flex-1 overflow-auto flex items-center justify-center p-4">
-                    <PdfDoc file={blobUrl} onLoadSuccess={(d:any) => { setPdfNumPages(d.numPages); setPdfPage(1); }}>
-                      <PdfPage pageNumber={pdfPage} scale={pdfScale} />
-                    </PdfDoc>
-                  </div>
+              {isPdf ? (
+                <div className="w-full h-full relative z-10 bg-white flex flex-col min-h-[65vh]">
+                  <object
+                    data={blobUrl || fullUrlWithToken}
+                    type="application/pdf"
+                    className="w-full h-full border-none rounded-b-none sm:rounded-b-[32px] bg-white min-h-[65vh]"
+                  >
+                    <iframe
+                      src={blobUrl || fullUrlWithToken}
+                      className="w-full h-full border-none rounded-b-none sm:rounded-b-[32px] bg-white min-h-[65vh]"
+                      title={safeTitle}
+                    >
+                      <div className="p-8 text-center space-y-3">
+                        <p className="text-xs text-slate-500">
+                          Browser tidak dapat menampilkan pratinjau PDF langsung.
+                        </p>
+                        <a
+                          href={fullUrlWithToken}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl shadow"
+                        >
+                          <ExternalLink size={14} /> Buka Berkas di Tab Baru
+                        </a>
+                      </div>
+                    </iframe>
+                  </object>
+                </div>
+              ) : isImage ? (
+                <div className="w-full h-full overflow-auto flex items-center justify-center p-4 sm:p-6 bg-slate-900/5 dark:bg-slate-950/40">
+                  <img
+                    src={blobUrl || fullUrlWithToken}
+                    alt={safeTitle}
+                    style={{
+                      transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                      transition: 'transform 0.2s ease',
+                    }}
+                    className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 bg-white"
+                  />
                 </div>
               ) : (
                 <iframe
                   key={htmlContentWithSignatures || htmlContent || 'loading'}
                   id="document-iframe"
-                  src={isHtml ? undefined : (isPdf ? (blobUrl || viewerUrl) : viewerUrl)}
+                  src={isHtml ? undefined : viewerUrl}
                   srcDoc={isHtml ? (htmlContentWithSignatures || htmlContent || "") : undefined}
                   className="w-full h-full border-none relative z-10 bg-white"
                   title={title}

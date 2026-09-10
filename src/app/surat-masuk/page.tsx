@@ -1344,42 +1344,15 @@ const DocumentsPage = () => {
   }, [selectedDocId]);
 
   const handleViewDocument = (doc: any) => {
-    setSidebarTab('detail');
-    setSidebarIsCreatingMeeting(false);
-    const currentVersion = doc.versions?.[doc.versions.length - 1];
-    const isTemplate = currentVersion?.fileName?.endsWith('.html') || currentVersion?.mimeType === 'text/html';
-
-    if (isTemplate) {
-      router.push(`/${doc.documentType === 'INCOMING' ? 'surat-masuk' : 'surat-keluar'}/${doc.id}`);
-    } else {
-      setSelectedDocId(doc.id);
-    }
+    router.push(`/surat-masuk/${doc.id}`);
   };
 
   const handleAddAgendaFromTable = (doc: any) => {
-    setSidebarTab('agenda');
-    setSidebarIsCreatingMeeting(true);
-    const currentVersion = doc.versions?.[doc.versions.length - 1];
-    const isTemplate = currentVersion?.fileName?.endsWith('.html') || currentVersion?.mimeType === 'text/html';
-
-    if (isTemplate) {
-      router.push(`/${doc.documentType === 'INCOMING' ? 'surat-masuk' : 'surat-keluar'}/${doc.id}`);
-    } else {
-      setSelectedDocId(doc.id);
-    }
+    router.push(`/surat-masuk/${doc.id}?tab=agenda&create=true`);
   };
 
   const handleAddEvidenceFromTable = (doc: any) => {
-    setSidebarTab('evidence');
-    setSidebarIsCreatingMeeting(false);
-    const currentVersion = doc.versions?.[doc.versions.length - 1];
-    const isTemplate = currentVersion?.fileName?.endsWith('.html') || currentVersion?.mimeType === 'text/html';
-
-    if (isTemplate) {
-      router.push(`/${doc.documentType === 'INCOMING' ? 'surat-masuk' : 'surat-keluar'}/${doc.id}`);
-    } else {
-      setSelectedDocId(doc.id);
-    }
+    router.push(`/surat-masuk/${doc.id}?tab=evidence`);
   };
 
   const fetchData = async () => {
