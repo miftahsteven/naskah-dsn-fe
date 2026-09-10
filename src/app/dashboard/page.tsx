@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   FileCheck,
@@ -52,6 +53,7 @@ const StatCard = ({ icon: Icon, label, value, trend, color, code }: any) => (
 );
 
 const DashboardPage = () => {
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const [statsData, setStatsData] = useState<any>(null);
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
@@ -226,7 +228,7 @@ const DashboardPage = () => {
                         recentDocs.map((doc) => (
                           <tr
                             key={doc.id}
-                            onClick={() => window.location.href = doc.documentType === 'INCOMING' ? `/surat-masuk/${doc.id}` : `/surat-keluar/${doc.id}`}
+                            onClick={() => router.push(doc.documentType === 'INCOMING' ? `/surat-masuk/${doc.id}` : `/surat-keluar/${doc.id}`)}
                             className="hover:bg-slate-50/70 dark:hover:bg-slate-800/20 transition-all cursor-pointer group"
                           >
                             <td className="py-3.5 px-5">

@@ -67,7 +67,8 @@ api.interceptors.response.use(
           
           // Force redirect to login immediately
           if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+            const loginPath = window.location.pathname.startsWith('/office') ? '/office/login' : '/login';
+            window.location.href = loginPath;
           }
           
           // Return a pending promise to prevent throwing an error to the caller while navigating away
@@ -76,7 +77,8 @@ api.interceptors.response.use(
       } else {
         useAuthStore.getState().logout();
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          const loginPath = window.location.pathname.startsWith('/office') ? '/office/login' : '/login';
+          window.location.href = loginPath;
         }
         return new Promise(() => {});
       }
