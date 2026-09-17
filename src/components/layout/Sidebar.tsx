@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import logoDsn from "../../../public/images/logo-dsn.png";
 import { usePathname } from "next/navigation";
 import {
   Home,
@@ -171,12 +172,12 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#006633] flex items-center justify-center shadow-md shadow-[#006633]/15 shrink-0 overflow-hidden p-1">
               <Image
-                src="/images/logo-dsn.png"
+                src={logoDsn}
                 alt="Logo DSN-MUI"
                 width={32}
                 height={32}
-                className="object-contain brightness-0 invert"
-                style={{ width: 'auto', height: 'auto' }}
+                className="w-8 h-8 object-contain brightness-0 invert"
+                priority
               />
             </div>
             <div className="flex-1 min-w-0">

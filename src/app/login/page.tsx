@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import loginBg from "../../../public/images/login-bg-real-hijab.png";
 import {
   Mail,
   Lock,
@@ -397,7 +398,7 @@ const LoginPage = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <Image
-            src="/images/login-bg-real-hijab.png"
+            src={loginBg}
             alt="MUI Digital Organization Realistic Workspace"
             fill
             priority

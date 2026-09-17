@@ -1,8 +1,25 @@
 import type { NextConfig } from "next";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH !== undefined
+  ? process.env.NEXT_PUBLIC_BASE_PATH
+  : '/office';
+
 const nextConfig: NextConfig = {
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '/office',
+  basePath: basePath || undefined,
   skipTrailingSlashRedirect: true,
+  async redirects() {
+    if (basePath) {
+      return [
+        {
+          source: '/',
+          destination: basePath,
+          basePath: false,
+          permanent: false,
+        },
+      ];
+    }
+    return [];
+  },
 };
 
 export default nextConfig;

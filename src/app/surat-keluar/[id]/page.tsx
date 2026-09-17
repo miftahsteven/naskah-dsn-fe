@@ -22,10 +22,12 @@ import {
   X,
   Send,
   Eye,
-  FileCheck
+  FileCheck,
+  Pencil,
+  Lock
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, isSignedByFinalSignatory } from "@/lib/utils";
 import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
 import Can from "@/components/auth/Can";
@@ -500,6 +502,18 @@ const DocumentDetailPage = () => {
         .replace(/<\/td>\s*<\/tr>\s*<\/tbody>\s*<tfoot>[\s\S]*?<\/tfoot>\s*<\/table>/gi, '');
     }
 
+    // Auto-wrap body in letter-body-wrapper if not already present
+    if (!bodyInner.includes('letter-body-wrapper')) {
+      const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
+      const bismillahMatch = bismillahEndRegex.exec(bodyInner);
+      if (bismillahMatch) {
+        const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
+        const headerPart = bodyInner.substring(0, cutIndex);
+        const restPart = bodyInner.substring(cutIndex);
+        bodyInner = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+      }
+    }
+
     const printHtml = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -511,10 +525,10 @@ const DocumentDetailPage = () => {
   <style>
     @page {
       size: A4;
-      margin-top: 20mm !important;
+      margin-top: 10mm !important;
       margin-bottom: 12mm !important;
-      margin-left: 25mm !important;
-      margin-right: 20mm !important;
+      margin-left: 10mm !important;
+      margin-right: 10mm !important;
     }
     @media print {
       .print-btn-bar { display: none !important; }
@@ -546,6 +560,12 @@ const DocumentDetailPage = () => {
       print-color-adjust: exact !important;
     }
 
+    /* Wrapper to keep 25mm left & 20mm right body margins while Kop Surat uses full 190mm */
+    .letter-body-wrapper {
+      margin-left: 15mm !important;
+      margin-right: 10mm !important;
+    }
+
     /* Master Print Layout Table */
     table.master-page-table {
       width: 100% !important;
@@ -573,9 +593,10 @@ const DocumentDetailPage = () => {
         align-items: center !important;
       }
       .master-page-table {
-        max-width: 750px !important;
+        max-width: 794px !important;
+        width: 100% !important;
         margin: 0 auto !important;
-        padding: 20px 30px !important;
+        padding: 10mm 10mm 12mm 10mm !important;
         background: #ffffff !important;
         box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         box-sizing: border-box !important;
@@ -585,9 +606,9 @@ const DocumentDetailPage = () => {
         display: table !important;
         order: 2 !important;
         width: 100% !important;
-        max-width: 750px !important;
+        max-width: 794px !important;
         margin: 16px auto 20px auto !important;
-        padding: 0 30px !important;
+        padding: 0 10mm !important;
         box-sizing: border-box !important;
       }
     }
@@ -840,6 +861,37 @@ const DocumentDetailPage = () => {
         </button>
         <div className="flex items-center gap-3">
           <Can perform="DOC_EDIT">
+            {(() => {
+              const latestVer = doc.versions?.[0];
+              const isTemplate = latestVer?.fileName?.endsWith('.html') || latestVer?.fileUrl?.endsWith('.html') || latestVer?.mimeType === 'text/html';
+              if (!isTemplate) return null;
+              const isFinalSigned = isSignedByFinalSignatory(doc);
+
+              return (
+                <button
+                  disabled={isFinalSigned}
+                  onClick={() => {
+                    if (isFinalSigned) return;
+                    router.push(`/surat-keluar/edit/${doc.id}`);
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm",
+                    isFinalSigned
+                      ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 cursor-not-allowed opacity-60"
+                      : "bg-[#006633] text-white hover:bg-[#00552b] active:scale-[0.98] cursor-pointer shadow-[#006633]/20"
+                  )}
+                  title={
+                    isFinalSigned
+                      ? "Surat keluar ini sudah ditandatangani oleh penandatangan akhir (tidak dapat diedit)"
+                      : "Edit Surat Keluar dengan Template"
+                  }
+                >
+                  {isFinalSigned ? <Lock size={16} /> : <Pencil size={16} />}
+                  <span>{isFinalSigned ? "Terkunci" : "Edit Surat"}</span>
+                </button>
+              );
+            })()}
+
             {doc.status === 'REVISION' && (
               <button
                 onClick={() => setIsRevisionModalOpen(true)}

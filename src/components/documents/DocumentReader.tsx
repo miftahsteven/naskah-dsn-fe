@@ -3,6 +3,7 @@
 import React from "react";
 import { X, ExternalLink, Download, FileText, Loader2, Printer, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { getBaseUrl } from "@/lib/api";
+import { getAssetUrl } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
 const HTML_PDF_PRIMARY_COLOR = '#2563eb';
@@ -23,10 +24,14 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const [bismillahBase64, setBismillahBase64] = React.useState<string>("");
   const [logoBase64, setLogoBase64] = React.useState<string>("");
   const [wqaUkasBase64, setWqaUkasBase64] = React.useState<string>("");
+  const [certBgBase64, setCertBgBase64] = React.useState<string>("");
+  const [stempelBase64, setStempelBase64] = React.useState<string>("");
+  const [bismillahCertBase64, setBismillahCertBase64] = React.useState<string>("");
+  const [logoCertBase64, setLogoCertBase64] = React.useState<string>("");
 
   React.useEffect(() => {
     const toDataURL = (url: string): Promise<string> =>
-      fetch(url)
+      fetch(getAssetUrl(url))
         .then((response) => {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           return response.blob();
@@ -53,6 +58,18 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     toDataURL("/images/wqa-ukas.png")
       .then(b64 => setWqaUkasBase64(b64))
       .catch(err => console.warn("Failed to convert wqa-ukas to base64", err));
+    toDataURL("/images/cert-ks-rs-bg.jpg")
+      .then(b64 => setCertBgBase64(b64))
+      .catch(err => console.warn("Failed to convert cert-ks-rs-bg to base64", err));
+    toDataURL("/images/stempel-dsn.png")
+      .then(b64 => setStempelBase64(b64))
+      .catch(err => console.warn("Failed to convert stempel-dsn to base64", err));
+    toDataURL("/images/bismillah-cert.png")
+      .then(b64 => setBismillahCertBase64(b64))
+      .catch(err => console.warn("Failed to convert bismillah-cert to base64", err));
+    toDataURL("/images/logo-dsn-cert.png")
+      .then(b64 => setLogoCertBase64(b64))
+      .catch(err => console.warn("Failed to convert logo-dsn-cert to base64", err));
   }, []);
 
   // Safely check properties to avoid errors when closed with empty props
@@ -520,6 +537,17 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     // Inject CSS rules to scale down large logo images in the letterhead and guarantee QR code display
     const imageStyle = `
       <style id="amanah-kop-styles">
+        @page {
+          size: A4;
+          margin-top: 10mm !important;
+          margin-bottom: 12mm !important;
+          margin-left: 10mm !important;
+          margin-right: 10mm !important;
+        }
+        .letter-body-wrapper {
+          margin-left: 15mm !important;
+          margin-right: 10mm !important;
+        }
         .kop-surat img:not(.kop-surat-img):not([alt*="Kop Surat"]):not([alt*="Bismillah"]):not([src*="bismillah"]):not(.bismillah-img), 
         td img:not(.qr-signature-img):not(.kop-surat-img):not([alt*="Kop Surat"]):not([alt*="Bismillah"]):not([src*="bismillah"]):not(.bismillah-img) {
           max-width: 75px !important;
@@ -531,7 +559,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
         .kop-surat-img, img[alt*="Kop Surat"] {
           width: 100% !important;
-          max-width: 750px !important;
+          max-width: 100% !important;
           height: auto !important;
           display: block !important;
           margin: 0 auto !important;
@@ -599,9 +627,10 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             align-items: center !important;
           }
           .master-page-table {
-            max-width: 750px !important;
+            max-width: 794px !important;
+            width: 100% !important;
             margin: 0 auto !important;
-            padding: 20px 30px !important;
+            padding: 10mm 10mm 12mm 10mm !important;
             background: #ffffff !important;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
             box-sizing: border-box !important;
@@ -611,9 +640,9 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             display: table !important;
             order: 2 !important;
             width: 100% !important;
-            max-width: 750px !important;
+            max-width: 794px !important;
             margin: 16px auto 20px auto !important;
-            padding: 0 30px !important;
+            padding: 0 10mm !important;
             box-sizing: border-box !important;
           }
         }
@@ -644,10 +673,12 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
       </style>
     `;
-    if (enhanced.includes('</head>')) {
-      enhanced = enhanced.replace('</head>', `${imageStyle}\n</head>`);
-    } else {
-      enhanced = `<head>${imageStyle}</head>${enhanced}`;
+    if (!enhanced.includes('certificate-sheet') && !enhanced.includes('cert-page')) {
+      if (enhanced.includes('</head>')) {
+        enhanced = enhanced.replace('</head>', `${imageStyle}\n</head>`);
+      } else {
+        enhanced = `<head>${imageStyle}</head>${enhanced}`;
+      }
     }
 
     setHtmlContentWithSignatures(enhanced);
@@ -700,7 +731,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
   </div>
   <div style="text-align: center; margin-top: 8px; margin-bottom: 14px;">
-    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
+    <img src="${bismillahBase64 || getAssetUrl('/images/bismillah.svg')}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
   </div>`);
           }
           processed = processed.replace(/border-top:\s*1px\s*solid\s*#000000;?/gi, 'border-top: none;');
@@ -731,6 +762,97 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           );
           processed = processed.replace(/font-size:\s*11pt/gi, 'font-size: 10.5pt');
 
+          const isCert = processed.includes('certificate-sheet') || processed.includes('cert-page') || /size:\s*A4\s*landscape/i.test(processed);
+          if (isCert) {
+            if (certBgBase64) {
+              processed = processed
+                .replace(/(\\?\${CERT_KS_RS_BG}|\${CERT_KS_RS_BG})/g, certBgBase64)
+                .replace(/url\(['"]?[^'"]*cert-ks-rs-bg\.jpg['"]?\)/gi, `url('${certBgBase64}')`)
+                .replace(/src=["'][^"']*cert-ks-rs-bg\.jpg["']/gi, 'src="' + certBgBase64 + '"');
+            } else {
+              processed = processed.replace(/\/images\/cert-ks-rs-bg\.jpg/g, getAssetUrl('/images/cert-ks-rs-bg.jpg'));
+            }
+            if (bismillahCertBase64) {
+              processed = processed.replace(/src=["'][^"']*bismillah-cert\.png["']/gi, `src="${bismillahCertBase64}"`);
+            } else {
+              processed = processed.replace(/\/images\/bismillah-cert\.png/g, getAssetUrl('/images/bismillah-cert.png'));
+            }
+            if (logoCertBase64) {
+              processed = processed.replace(/src=["'][^"']*logo-dsn-cert\.png["']/gi, `src="${logoCertBase64}"`);
+            } else {
+              processed = processed.replace(/\/images\/logo-dsn-cert\.png/g, getAssetUrl('/images/logo-dsn-cert.png'));
+            }
+            // Ensure stempel is removed from certificate
+            processed = processed
+              .replace(/src=["'][^"']*stempel-dsn\.png["']/gi, '')
+              .replace(/<img[^>]*stempel-dsn[^>]*>/gi, '');
+
+            const certFitInjection = `
+<style>
+  @media screen {
+    html, body {
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background-color: transparent !important;
+    }
+    .cert-page {
+      margin: 0 auto !important;
+      transform-origin: center center !important;
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+      flex-shrink: 0 !important;
+    }
+  }
+  @media print {
+    html, body {
+      width: 297mm !important;
+      height: 210mm !important;
+      overflow: hidden !important;
+      display: block !important;
+      background: transparent !important;
+    }
+    .cert-page {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+</style>
+<script>
+  function autoFitCertificate() {
+    const cert = document.querySelector('.cert-page');
+    if (!cert) return;
+    const certW = 1122.52; // 297mm at 96dpi
+    const certH = 793.70;  // 210mm at 96dpi
+    const padding = 28;
+    const availW = Math.max(100, window.innerWidth - padding);
+    const availH = Math.max(100, window.innerHeight - padding);
+    const scale = Math.min(availW / certW, availH / certH);
+    cert.style.transform = 'scale(' + scale + ')';
+    cert.style.transformOrigin = 'center center';
+  }
+  window.addEventListener('resize', autoFitCertificate);
+  window.addEventListener('load', autoFitCertificate);
+  document.addEventListener('DOMContentLoaded', autoFitCertificate);
+  setTimeout(autoFitCertificate, 30);
+  setTimeout(autoFitCertificate, 100);
+  setTimeout(autoFitCertificate, 300);
+</script>
+`;
+            if (processed.includes('</head>')) {
+              processed = processed.replace('</head>', `${certFitInjection}\n</head>`);
+            } else {
+              processed = `${certFitInjection}\n${processed}`;
+            }
+
+            setHtmlContent(processed);
+            return;
+          }
+
           // Extract body content and wrap in master-page-table
           let headPart = '';
           let bodyInner = processed;
@@ -746,6 +868,18 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             bodyInner = bodyInner
               .replace(/<table class="master-page-table"[\s\S]*?<tbody>\s*<tr>\s*<td>/gi, '')
               .replace(/<\/td>\s*<\/tr>\s*<\/tbody>\s*<tfoot>[\s\S]*?<\/tfoot>\s*<\/table>/gi, '');
+          }
+
+          // Auto-wrap body in letter-body-wrapper if not already present
+          if (!bodyInner.includes('letter-body-wrapper')) {
+            const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
+            const bismillahMatch = bismillahEndRegex.exec(bodyInner);
+            if (bismillahMatch) {
+              const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
+              const headerPart = bodyInner.substring(0, cutIndex);
+              const restPart = bodyInner.substring(cutIndex);
+              bodyInner = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+            }
           }
 
           const wrappedBody = `

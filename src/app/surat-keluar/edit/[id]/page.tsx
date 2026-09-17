@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 import api from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, getAssetUrl, isSignedByFinalSignatory } from "@/lib/utils";
 import SimpleRichEditor from "@/components/SimpleRichEditor";
 
 // List of available templates
@@ -600,7 +600,7 @@ const getDefaultTemplateBody = (id: string): string => {
 };
 
 const toDataURL = (url: string): Promise<string> => 
-  fetch(url)
+  fetch(getAssetUrl(url))
     .then(response => response.blob())
     .then(blob => new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -618,6 +618,9 @@ const EditTemplateLetterPage = () => {
   const [kopSuratBase64, setKopSuratBase64] = useState<string>("");
   const [bismillahBase64, setBismillahBase64] = useState<string>("");
   const [wqaUkasBase64, setWqaUkasBase64] = useState<string>("");
+  const [certBgBase64, setCertBgBase64] = useState<string>("");
+  const [bismillahCertBase64, setBismillahCertBase64] = useState<string>("");
+  const [logoCertBase64, setLogoCertBase64] = useState<string>("");
 
   useEffect(() => {
     toDataURL("/images/logo-dsn.png")
@@ -632,6 +635,15 @@ const EditTemplateLetterPage = () => {
     toDataURL("/images/wqa-ukas.png")
       .then(base64 => setWqaUkasBase64(base64))
       .catch(err => console.warn("Failed to convert wqa-ukas to base64", err));
+    toDataURL("/images/cert-ks-rs-bg.jpg")
+      .then(base64 => setCertBgBase64(base64))
+      .catch(err => console.warn("Failed to convert cert-ks-rs-bg to base64", err));
+    toDataURL("/images/bismillah-cert.png")
+      .then(base64 => setBismillahCertBase64(base64))
+      .catch(err => console.warn("Failed to convert bismillah-cert to base64", err));
+    toDataURL("/images/logo-dsn-cert.png")
+      .then(base64 => setLogoCertBase64(base64))
+      .catch(err => console.warn("Failed to convert logo-dsn-cert to base64", err));
   }, []);
 
   // Metadata Configurations
@@ -644,6 +656,7 @@ const EditTemplateLetterPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [isFinalSigned, setIsFinalSigned] = useState(false);
 
   // Form Fields
   const [categoryId, setCategoryId] = useState("");
@@ -686,6 +699,12 @@ const EditTemplateLetterPage = () => {
     };
   }, [dbTemplates, selectedTemplate]);
   const isEditorMode = selectedTemplateObj ? EDITOR_TEMPLATES.includes(selectedTemplateObj.code) : true;
+  const isCert = React.useMemo(() => {
+    return selectedTemplate === "SERTIFIKAT-KS-RS" ||
+      selectedTemplateObj?.code === "SERTIFIKAT-KS-RS" ||
+      Boolean(selectedTemplateObj?.htmlContent?.includes("certificate-sheet")) ||
+      Boolean(selectedTemplateObj?.htmlContent?.includes("cert-page"));
+  }, [selectedTemplate, selectedTemplateObj]);
 
   const [tempatDibuat, setTempatDibuat] = useState("Jakarta");
   const [tanggalMasehi, setTanggalMasehi] = useState(() => {
@@ -855,42 +874,77 @@ const EditTemplateLetterPage = () => {
           console.error("Gagal memuat workflow steps:", wfErr);
         }
 
+        // Check if signed by final signatory
+        const signedByFinal = isSignedByFinalSignatory(doc);
+        setIsFinalSigned(signedByFinal);
+
         // 4. Download and parse the HTML content of the latest version
         if (doc.versions && doc.versions.length > 0) {
           const latestVer = [...doc.versions].sort((a, b) => b.versionNum - a.versionNum)[0];
           try {
-            const token = localStorage.getItem("accessToken");
-            const fileRes = await fetch(latestVer.fileUrl, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            const htmlText = await fileRes.text();
+            let htmlText = "";
+            try {
+              const renderRes = await api.get(`/documents/${params.id}/render`, {
+                responseType: "text",
+                headers: { Accept: "text/html" }
+              });
+              htmlText = typeof renderRes.data === "string" ? renderRes.data : JSON.stringify(renderRes.data);
+            } catch (renderErr) {
+              console.warn("Fallback to /download?preview=html:", renderErr);
+              const dlRes = await api.get(`/documents/${params.id}/download?preview=html`, {
+                responseType: "text",
+                headers: { Accept: "text/html" }
+              });
+              htmlText = typeof dlRes.data === "string" ? dlRes.data : JSON.stringify(dlRes.data);
+            }
 
             // Try to parse from embedded JSON metadata script
-            const matchJson = htmlText.match(/<script id="template-metadata" type="application\/json">([\s\S]*?)<\/script>/);
+            const matchJson = htmlText.match(/<script id="template-metadata" type="application\/json">\s*([\s\S]*?)\s*<\/script>/);
             if (matchJson) {
               try {
                 const meta = JSON.parse(matchJson[1]);
-                setSelectedTemplate(meta.selectedTemplate || "SK-RUTIN");
-                setTempatDibuat(meta.tempatDibuat || "Jakarta");
-                setTanggalMasehi(meta.tanggalMasehi || "");
-                setTanggalHijriah(meta.tanggalHijriah || "");
-                setLampiran(meta.lampiran || "");
-                setCatatan(meta.catatan || "");
-                setInitialBodyHtml(meta.bodyHtml || "");
-                setSubCategory(meta.subCategory || "");
-                setTemplateVariables(meta.templateVariables || {});
+                if (meta.selectedTemplate) setSelectedTemplate(meta.selectedTemplate);
+                if (meta.tempatDibuat) setTempatDibuat(meta.tempatDibuat);
+                if (meta.tanggalMasehi) setTanggalMasehi(meta.tanggalMasehi);
+                if (meta.tanggalHijriah) setTanggalHijriah(meta.tanggalHijriah);
+                if (meta.lampiran !== undefined) setLampiran(meta.lampiran);
+                if (meta.catatan !== undefined) setCatatan(meta.catatan);
+                if (meta.bodyHtml) setInitialBodyHtml(meta.bodyHtml);
+                if (meta.subCategory) setSubCategory(meta.subCategory);
+                if (meta.categoryId) setCategoryId(meta.categoryId);
+                if (meta.classificationId) setClassificationId(meta.classificationId);
+                if (meta.perihal) setPerihal(meta.perihal);
+                if (meta.documentNumber) setGeneratedDocNumber(meta.documentNumber);
+
+                if (meta.templateVariables && typeof meta.templateVariables === "object") {
+                  setTemplateVariables(meta.templateVariables);
+                }
 
                 if (meta.pemparafList || meta.approverList || meta.penandatanganList) {
                   setPemparafList(meta.pemparafList || []);
                   setApproverList(meta.approverList || []);
                   setPenandatanganList(meta.penandatanganList?.length > 0 ? meta.penandatanganList : [{ userId: "" }]);
+                } else if (Array.isArray(meta.steps) && meta.steps.length > 0) {
+                  const pList: any[] = [];
+                  const aList: any[] = [];
+                  const sList: any[] = [];
+                  meta.steps.forEach((s: any) => {
+                    const role = s.roleId || s.role;
+                    if (role === "PEMPARAF") pList.push({ userId: s.userId });
+                    else if (role === "APPROVER") aList.push({ userId: s.userId });
+                    else sList.push({ userId: s.userId });
+                  });
+                  setPemparafList(pList);
+                  setApproverList(aList);
+                  setPenandatanganList(sList.length > 0 ? sList : [{ userId: "" }]);
                 } else if (fetchedWfSteps.length > 0) {
                   const pList: any[] = [];
                   const aList: any[] = [];
                   const sList: any[] = [];
                   fetchedWfSteps.forEach((s: any) => {
-                    if (s.role === "PEMPARAF") pList.push({ userId: s.userId, status: s.status });
-                    else if (s.role === "APPROVER") aList.push({ userId: s.userId, status: s.status });
+                    const role = s.roleId || s.role;
+                    if (role === "PEMPARAF") pList.push({ userId: s.userId, status: s.status });
+                    else if (role === "APPROVER") aList.push({ userId: s.userId, status: s.status });
                     else sList.push({ userId: s.userId, status: s.status });
                   });
                   setPemparafList(pList);
@@ -907,7 +961,11 @@ const EditTemplateLetterPage = () => {
             } else {
               // HTML Fallback for older documents
               if (fetchedWfSteps.length > 0) {
-                setPenandatanganList(fetchedWfSteps.map((s: any) => ({ userId: s.userId, status: s.status })));
+                const sList: any[] = [];
+                fetchedWfSteps.forEach((s: any) => {
+                  sList.push({ userId: s.userId, status: s.status });
+                });
+                setPenandatanganList(sList.length > 0 ? sList : [{ userId: "" }]);
               }
               const matchBody = htmlText.match(/<div class="letter-body">([\s\S]*?)<\/div>/);
               if (matchBody) {
@@ -1444,9 +1502,9 @@ const EditTemplateLetterPage = () => {
     tanggalHijriah,
   ]);
 
-  // Auto-select category based on template category
+  // Auto-select category based on template category if not already populated
   useEffect(() => {
-    if (selectedTemplateObj && selectedTemplateObj.category && categories.length > 0) {
+    if (selectedTemplateObj && selectedTemplateObj.category && categories.length > 0 && !categoryId) {
       const matchedCat = categories.find(
         (c: any) => c.name.toLowerCase() === selectedTemplateObj.category.toLowerCase()
       );
@@ -1454,7 +1512,7 @@ const EditTemplateLetterPage = () => {
         setCategoryId(matchedCat.id);
       }
     }
-  }, [selectedTemplateObj, categories]);
+  }, [selectedTemplateObj, categories, categoryId]);
 
   // Date Change Handler
   const handleDateChange = (val: string) => {
@@ -1592,6 +1650,10 @@ const EditTemplateLetterPage = () => {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isFinalSigned) {
+      setError("Surat keluar ini sudah ditandatangani oleh penandatangan akhir dan tidak dapat diedit.");
+      return;
+    }
     if (!validateTemplateForm()) {
       return;
     }
@@ -1797,7 +1859,7 @@ const EditTemplateLetterPage = () => {
           <table style="width: 100%; border-collapse: collapse; border-bottom: 3px double #000000; padding-bottom: 8px; margin-bottom: 12px;">
             <tr>
               <td style="width: 65px; vertical-align: middle; padding: 0 8px 0 0;">
-                <img src="${logoBase64 || (window.location.origin + '/images/logo-dsn.png')}" alt="Logo DSN-MUI" style="width: 55px; height: 55px; object-fit: contain;" />
+                <img src="${logoBase64 || (window.location.origin + getAssetUrl('/images/logo-dsn.png'))}" alt="Logo DSN-MUI" style="width: 55px; height: 55px; object-fit: contain;" />
               </td>
               <td style="text-align: left; vertical-align: middle; padding: 0;">
                 <div style="font-family: Arial, Helvetica, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #111827; letter-spacing: -0.2px; margin-bottom: 1px; line-height: 1.2; white-space: nowrap;">
@@ -1970,7 +2032,7 @@ const EditTemplateLetterPage = () => {
     <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
   </div>
   <div style="text-align: center; margin-top: 8px; margin-bottom: 14px;">
-    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
+    <img src="${bismillahBase64 || getAssetUrl('/images/bismillah.svg')}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
   </div>`);
     }
     finalHtml = finalHtml.replace(/(\\?\${FOOTER_HTML}|\${FOOTER_HTML})/g, FOOTER_HTML);
@@ -1982,6 +2044,18 @@ const EditTemplateLetterPage = () => {
     }
     if (wqaUkasBase64) {
       finalHtml = finalHtml.replace(/src=["'][^"']*wqa-ukas\.png["']/gi, `src="${wqaUkasBase64}"`);
+    }
+
+    // Auto-wrap body in letter-body-wrapper if not already present
+    if (!finalHtml.includes('letter-body-wrapper')) {
+      const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
+      const bismillahMatch = bismillahEndRegex.exec(finalHtml);
+      if (bismillahMatch) {
+        const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
+        const headerPart = finalHtml.substring(0, cutIndex);
+        const restPart = finalHtml.substring(cutIndex);
+        finalHtml = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+      }
     }
 
     // Convert HTML string to File object
@@ -2088,16 +2162,24 @@ const EditTemplateLetterPage = () => {
         {/* TOP SECTION: A4 Live Letter Preview & Editor */}
         <div className="flex flex-col min-h-0 bg-slate-100 dark:bg-slate-800/40 p-4 sm:p-6 rounded-[32px] border border-slate-200/60 dark:border-slate-800/80 shadow-inner">
           <div className="flex items-center justify-between shrink-0 mb-3 px-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">A4 Live Letter Preview & Editor</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              {isCert ? "Sertifikat Live Preview" : "A4 Live Letter Preview & Editor"}
+            </span>
             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full uppercase tracking-tight flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span>Real-time Binding (A4 Format)</span>
+              <span>{isCert ? "Real-time Binding (A4 Landscape)" : "Real-time Binding (A4 Format)"}</span>
             </span>
           </div>
 
-          {/* Scrollable container with half-screen height */}
-          <div className="h-[450px] overflow-y-auto custom-scrollbar p-4 flex justify-center">
-            <div className="w-full max-w-[950px]">
+          {/* Scrollable container with responsive height */}
+          <div className={cn(
+            "overflow-y-auto custom-scrollbar p-2 sm:p-4 flex justify-center transition-all",
+            isCert ? "h-[580px] sm:h-[680px] lg:h-[760px]" : "h-[450px]"
+          )}>
+            <div className={cn(
+              "w-full transition-all",
+              isCert ? "max-w-[1240px]" : "max-w-[950px]"
+            )}>
               {isEditorMode ? (
                 <>
                   {/* Editor Formatting Controls */}
@@ -2178,7 +2260,7 @@ const EditTemplateLetterPage = () => {
                         fontSize: "10.5pt",
                         fontFamily: "Arial, sans-serif",
                         lineHeight: "1.45",
-                        padding: "20mm 20mm 20mm 20mm",
+                        padding: "10mm 10mm 20mm 10mm",
                         boxSizing: "border-box"
                       }}
                     >
@@ -2186,7 +2268,7 @@ const EditTemplateLetterPage = () => {
                       {/* Kop Surat Header */}
                       <div className="mb-2">
                         <img
-                          src="/images/kop-surat.png"
+                          src={getAssetUrl("/images/kop-surat.png")}
                           alt="Kop Surat DSN-MUI"
                           className="w-full h-auto block"
                         />
@@ -2195,7 +2277,7 @@ const EditTemplateLetterPage = () => {
                       {/* Bismillah Calligraphy */}
                       <div className="flex justify-center mb-4 mt-2">
                         <img 
-                          src={bismillahBase64 || "/images/bismillah.svg"} 
+                          src={bismillahBase64 || getAssetUrl("/images/bismillah.svg")} 
                           alt="Bismillah" 
                           style={{ 
                             width: "260px", 
@@ -2210,147 +2292,279 @@ const EditTemplateLetterPage = () => {
                         />
                       </div>
 
-                    {/* Letter Title */}
-                    <div className="text-center font-extrabold underline uppercase tracking-wide text-slate-900 mb-6" style={{ fontSize: "12pt" }}>
-                      {selectedTemplateObj?.name || "Surat Keluar"}
-                    </div>
+                    {/* Letter Body Wrapper to preserve 15mm left & 10mm right margins */}
+                    <div style={{ marginLeft: "15mm", marginRight: "10mm" }}>
+                      {/* Letter Title */}
+                      <div className="text-center font-extrabold underline uppercase tracking-wide text-slate-900 mb-6" style={{ fontSize: "12pt" }}>
+                        {selectedTemplateObj?.name || "Surat Keluar"}
+                      </div>
 
-                    {/* Letter Metadata Info block */}
-                    <div className="flex justify-between items-start mb-6 text-slate-700" style={{ fontSize: "10.5pt" }}>
-                      <div className="space-y-1">
-                        <div className="flex gap-2">
-                          <span className="font-bold w-[75px]">Nomor</span>
-                          <span className={generatedDocNumber ? 'font-medium text-slate-900' : 'italic text-slate-400'}>: {generatedDocNumber || '[Nomor Resmi]'}</span>
+                      {/* Letter Metadata Info block */}
+                      <div className="flex justify-between items-start mb-6 text-slate-700" style={{ fontSize: "10.5pt" }}>
+                        <div className="space-y-1">
+                          <div className="flex gap-2">
+                            <span className="font-bold w-[75px]">Nomor</span>
+                            <span className={generatedDocNumber ? 'font-medium text-slate-900' : 'italic text-slate-400'}>: {generatedDocNumber || '[Nomor Resmi]'}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="font-bold w-[75px]">Lampiran</span>
+                            <span>: {lampiran || "—"}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="font-bold w-[75px]">Perihal</span>
+                            <span className="font-medium text-slate-900">: {perihal || "—"}</span>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <span className="font-bold w-[75px]">Lampiran</span>
-                          <span>: {lampiran || "—"}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="font-bold w-[75px]">Perihal</span>
-                          <span className="font-medium text-slate-900">: {perihal || "—"}</span>
+                        <div className="text-right flex flex-col items-end">
+                          <p>{tempatDibuat}, {new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</p>
+                          <p className="font-mono text-[10px] text-slate-500">{tanggalHijriah || "— H"}</p>
                         </div>
                       </div>
-                      <div className="text-right flex flex-col items-end">
-                        <p>{tempatDibuat}, {new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</p>
-                        <p className="font-mono text-[10px] text-slate-500">{tanggalHijriah || "— H"}</p>
+
+                      {/* Recipient Address */}
+                      <div className="mb-6 text-slate-700 space-y-1" style={{ fontSize: "10.5pt" }}>
+                        <p>Kepada Yang Terhormat,</p>
+                        <p className="font-bold text-slate-900">Pimpinan / Anggota Organisasi</p>
+                        <p>di — Tempat</p>
                       </div>
-                    </div>
 
-                    {/* Recipient Address */}
-                    <div className="mb-6 text-slate-700 space-y-1" style={{ fontSize: "10.5pt" }}>
-                      <p>Kepada Yang Terhormat,</p>
-                      <p className="font-bold text-slate-900">Pimpinan / Anggota Organisasi</p>
-                      <p>di — Tempat</p>
-                    </div>
+                      {/* Rich text Body editor */}
+                      <div className="flex-1 text-slate-850 pr-2">
+                        <div
+                          ref={editorRef}
+                          contentEditable
+                          suppressContentEditableWarning
+                          className="outline-none min-h-[300px] border-none py-1 focus:ring-1 focus:ring-primary/20 rounded-xl px-2 transition-all"
+                          style={{ fontSize: "10.5pt", fontFamily: "Arial, sans-serif", lineHeight: "1.5" }}
+                        />
+                      </div>
 
-                    {/* Rich text Body editor */}
-                    <div className="flex-1 text-slate-850 pr-2">
-                      <div
-                        ref={editorRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        className="outline-none min-h-[300px] border-none py-1 focus:ring-1 focus:ring-primary/20 rounded-xl px-2 transition-all"
-                        style={{ fontSize: "10.5pt", fontFamily: "Arial, sans-serif", lineHeight: "1.5" }}
-                      />
-                    </div>
+                      {/* Signature workflow names visual display */}
+                      {(() => {
+                        const validSteps = getAllWorkflowSteps();
+                        if (validSteps.length === 0) return null;
 
-                    {/* Signature workflow names visual display */}
-                    {(() => {
-                      const validSteps = getAllWorkflowSteps();
-                      if (validSteps.length === 0) return null;
+                        const renderSigner = (step: { userId: string }, idx: number, total: number) => {
+                          const u = users.find(user => user.id === step.userId);
+                          if (!u) return null;
+                          
+                          let label = "Mengetahui,";
+                          if (total === 1) label = "Menyetujui,";
+                          else if (idx === total - 1) label = "Menyetujui,";
+                          
+                          return (
+                            <div key={idx} className="min-w-[150px] text-slate-800 animate-in fade-in duration-300 text-center">
+                              <p className="font-bold uppercase tracking-widest mb-16 text-slate-500" style={{ fontSize: "10pt" }}>
+                                {label}
+                              </p>
+                              <p className="font-extrabold underline text-slate-900" style={{ fontSize: "10.5pt" }}>{u.fullName}</p>
+                              <p className="font-semibold text-slate-500" style={{ fontSize: "10pt" }}>{u.jobTitle || u.role?.name || "Pejabat Organisasi"}</p>
+                            </div>
+                          );
+                        };
 
-                      const renderSigner = (step: { userId: string }, idx: number, total: number) => {
-                        const u = users.find(user => user.id === step.userId);
-                        if (!u) return null;
-                        
-                        let label = "Mengetahui,";
-                        if (total === 1) label = "Menyetujui,";
-                        else if (idx === total - 1) label = "Menyetujui,";
-                        
                         return (
-                          <div key={idx} className="min-w-[150px] text-slate-800 animate-in fade-in duration-300 text-center">
-                            <p className="font-bold uppercase tracking-widest mb-16 text-slate-500" style={{ fontSize: "10pt" }}>
-                              {label}
-                            </p>
-                            <p className="font-extrabold underline text-slate-900" style={{ fontSize: "10.5pt" }}>{u.fullName}</p>
-                            <p className="font-semibold text-slate-500" style={{ fontSize: "10pt" }}>{u.jobTitle || u.role?.name || "Pejabat Organisasi"}</p>
+                          <div className="mt-16 pt-8 mb-12 border-t border-dashed border-slate-100">
+                            {validSteps.length === 1 && (
+                              <div className="flex justify-end">
+                                {renderSigner(validSteps[0], 0, 1)}
+                              </div>
+                            )}
+                            {validSteps.length >= 2 && (
+                              <div className="grid grid-cols-2 gap-y-12 gap-x-8">
+                                {validSteps.map((step, idx) => {
+                                  const isLastOdd = idx === validSteps.length - 1 && validSteps.length % 2 !== 0;
+                                  return (
+                                    <div key={idx} className={cn(
+                                      isLastOdd ? "col-span-2 flex justify-center" : (idx % 2 === 0 ? "flex justify-start" : "flex justify-end")
+                                    )}>
+                                      {renderSigner(step, idx, validSteps.length)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
-                      };
-
-                      return (
-                        <div className="mt-16 pt-8 mb-12 border-t border-dashed border-slate-100">
-                          {validSteps.length === 1 && (
-                            <div className="flex justify-end">
-                              {renderSigner(validSteps[0], 0, 1)}
-                            </div>
-                          )}
-                          {validSteps.length >= 2 && (
-                            <div className="grid grid-cols-2 gap-y-12 gap-x-8">
-                              {validSteps.map((step, idx) => {
-                                const isLastOdd = idx === validSteps.length - 1 && validSteps.length % 2 !== 0;
-                                return (
-                                  <div key={idx} className={cn(
-                                    isLastOdd ? "col-span-2 flex justify-center" : (idx % 2 === 0 ? "flex justify-start" : "flex justify-end")
-                                  )}>
-                                    {renderSigner(step, idx, validSteps.length)}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                      })()}
+                    </div>
 
                           </div>
                         </div>
                       </>
                     ) : (
                     /* iframe dynamic preview mode for DB templates */
-                    <div className="bg-slate-100 dark:bg-slate-900/60 p-2 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-center overflow-x-auto">
-                      <iframe
-                        srcDoc={selectedTemplateObj ? (
-                          '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-                          '<style>' +
-                          '* { box-sizing: border-box; }' +
-                          'html, body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, sans-serif; color: #111827; -webkit-font-smoothing: antialiased; }' +
-                          'body { padding: 16px 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }' +
-                          '.a4-page-sheet { width: 794px; max-width: 100%; min-height: 1123px; background: #ffffff; padding: 20mm 20mm 20mm 20mm; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04); border-radius: 3px; box-sizing: border-box; font-size: 10.5pt; line-height: 1.45; position: relative; }' +
-                          '.kop-surat-img, img[alt*="Kop Surat"] { width: 100% !important; max-width: 100% !important; height: auto !important; display: block !important; margin: 0 auto 6px auto !important; }' +
-                          'img[src*="bismillah"], img[alt*="Bismillah"], .bismillah-img { width: 260px !important; max-width: 45% !important; height: auto !important; max-height: 48px !important; display: block !important; margin: 8px auto 14px auto !important; object-fit: contain !important; filter: brightness(0) !important; }' +
-                          'p, td, li, span { font-size: 10.5pt; line-height: 1.45; }' +
-                          'table { font-size: 10.5pt; }' +
-                          'table td { vertical-align: top; }' +
-                          '.page-break { page-break-before: always; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1; position: relative; }' +
-                          '.page-break::before { content: "📄 HALAMAN BERIKUTNYA (LAMPIRAN)"; display: block; text-align: center; font-size: 9pt; font-weight: bold; color: #64748b; margin-bottom: 20px; letter-spacing: 0.5px; }' +
-                          '</style></head><body><div class="a4-page-sheet">' +
-                          (bismillahBase64
-                            ? (selectedTemplateObj.htmlContent || '')
-                                .replace(/src=["'][^"']*bismillah\.svg["']/gi, 'src="' + bismillahBase64 + '"')
-                                .replace(/src=["']data:image\/svg\+xml;base64,[^"']*["']/gi, 'src="' + bismillahBase64 + '"')
-                            : (selectedTemplateObj.htmlContent || '')
-                          ).replace(
-                            /\{\{(\w+)\}\}/g,
-                            (_: string, key: string) => {
-                              let val = templateVariables[key];
-                              if (val !== undefined && val !== "") {
-                                if (typeof val === "string" && val.includes("<table")) {
-                                  val = val.replace(/(<table\b[^>]*>[\s\S]*?<\/table>)/gi, (tbl: string) => {
-                                    return tbl.replace(/<br\s*\/?>/gi, "");
-                                  });
+                    <div className={cn(
+                      "p-2 sm:p-4 rounded-2xl border flex justify-center items-center overflow-x-auto transition-all",
+                      isCert
+                        ? "bg-slate-200/80 dark:bg-slate-950/80 border-slate-300 dark:border-slate-800 shadow-inner min-h-[520px] sm:min-h-[620px] lg:min-h-[700px]"
+                        : "bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800"
+                    )}>
+                      {(() => {
+                        const renderDocHtml = () => {
+                          if (!selectedTemplateObj) return "";
+                          if (isCert) {
+                            let certHtml = selectedTemplateObj.htmlContent || "";
+                            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                            const bgUrl = certBgBase64 || (origin + getAssetUrl('/images/cert-ks-rs-bg.jpg'));
+                            const bisUrl = bismillahCertBase64 || (origin + getAssetUrl('/images/bismillah-cert.png'));
+                            const logUrl = logoCertBase64 || (origin + getAssetUrl('/images/logo-dsn-cert.png'));
+
+                            certHtml = certHtml
+                              .replace(/url\(['"]?[^'"]*cert-ks-rs-bg\.jpg['"]?\)/gi, `url('${bgUrl}')`)
+                              .replace(/src=["'][^"']*cert-ks-rs-bg\.jpg["']/gi, `src="${bgUrl}"`)
+                              .replace(/(\\?\${CERT_KS_RS_BG}|\${CERT_KS_RS_BG})/g, bgUrl)
+                              .replace(/url\(['"]?[^'"]*bismillah-cert\.png['"]?\)/gi, `url('${bisUrl}')`)
+                              .replace(/src=["'][^"']*bismillah-cert\.png["']/gi, `src="${bisUrl}"`)
+                              .replace(/url\(['"]?[^'"]*logo-dsn-cert\.png['"]?\)/gi, `url('${logUrl}')`)
+                              .replace(/src=["'][^"']*logo-dsn-cert\.png["']/gi, `src="${logUrl}"`)
+                              .replace(/src=["'][^"']*stempel-dsn\.png["']/gi, '')
+                              .replace(/(\\?\${STEMPEL_DSN}|\${STEMPEL_DSN})/g, '')
+                              .replace(/<img[^>]*stempel-dsn[^>]*>/gi, '')
+                              .replace(
+                                /\{\{(\w+)\}\}/g,
+                                (_: string, key: string) => {
+                                  let val = templateVariables[key];
+                                  if (val !== undefined && val !== "") {
+                                    return val;
+                                  }
+                                  return '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
                                 }
-                                return val;
-                              }
-                              return '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
+                              );
+
+                            const certFitInjection = `
+<style>
+  @media screen {
+    html, body {
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background-color: transparent !important;
+    }
+    .cert-page {
+      background-color: #ffffff !important;
+      margin: 0 auto !important;
+      transform-origin: center center !important;
+      box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+      flex-shrink: 0 !important;
+    }
+  }
+  @media print {
+    html, body {
+      width: 297mm !important;
+      height: 210mm !important;
+      overflow: hidden !important;
+      display: block !important;
+      background: transparent !important;
+    }
+    .cert-page {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+</style>
+<script>
+  function autoFitCertificate() {
+    const cert = document.querySelector('.cert-page');
+    if (!cert) return;
+    const certW = 1122.52;
+    const certH = 793.70;
+    const padding = 24;
+    const availW = Math.max(100, window.innerWidth - padding);
+    const availH = Math.max(100, window.innerHeight - padding);
+    const scale = Math.min(availW / certW, availH / certH);
+    cert.style.transform = 'scale(' + scale + ')';
+    cert.style.transformOrigin = 'center center';
+  }
+  window.addEventListener('resize', autoFitCertificate);
+  window.addEventListener('load', autoFitCertificate);
+  document.addEventListener('DOMContentLoaded', autoFitCertificate);
+  setTimeout(autoFitCertificate, 30);
+  setTimeout(autoFitCertificate, 100);
+  setTimeout(autoFitCertificate, 300);
+  setTimeout(autoFitCertificate, 600);
+</script>
+`;
+
+                            if (certHtml.includes('</head>')) {
+                              certHtml = certHtml.replace('</head>', `${certFitInjection}\n</head>`);
+                            } else {
+                              certHtml = `${certFitInjection}\n${certHtml}`;
                             }
-                          ) +
-                          '</div></body></html>'
-                        ) : ""}
-                        className="w-full min-h-[1150px] border-0 rounded-2xl bg-transparent"
-                        title="preview"
-                      />
+
+                            return certHtml;
+                          }
+
+                          return (
+                            '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+                            '<style>' +
+                            '* { box-sizing: border-box; }' +
+                            'html, body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, sans-serif; color: #111827; -webkit-font-smoothing: antialiased; }' +
+                            'body { padding: 16px 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }' +
+                            '.a4-page-sheet { width: 794px; max-width: 100%; min-height: 1123px; background: #ffffff; padding: 10mm 10mm 20mm 10mm; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04); border-radius: 3px; box-sizing: border-box; font-size: 10.5pt; line-height: 1.45; position: relative; }' +
+                            '.letter-body-wrapper { margin-left: 15mm !important; margin-right: 10mm !important; }' +
+                            '.kop-surat-img, img[alt*="Kop Surat"] { width: 100% !important; max-width: 100% !important; height: auto !important; display: block !important; margin: 0 auto 6px auto !important; }' +
+                            'img[src*="bismillah"], img[alt*="Bismillah"], .bismillah-img { width: 260px !important; max-width: 45% !important; height: auto !important; max-height: 48px !important; display: block !important; margin: 8px auto 14px auto !important; object-fit: contain !important; filter: brightness(0) !important; }' +
+                            'p, td, li, span { font-size: 10.5pt; line-height: 1.45; }' +
+                            'table { font-size: 10.5pt; }' +
+                            'table td { vertical-align: top; }' +
+                            '.page-break { page-break-before: always; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1; position: relative; }' +
+                            '.page-break::before { content: "📄 HALAMAN BERIKUTNYA (LAMPIRAN)"; display: block; text-align: center; font-size: 9pt; font-weight: bold; color: #64748b; margin-bottom: 20px; letter-spacing: 0.5px; }' +
+                            '</style></head><body><div class="a4-page-sheet">' +
+                            (() => {
+                              let baseHtml = selectedTemplateObj.htmlContent || '';
+                              if (kopSuratBase64) {
+                                baseHtml = baseHtml.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
+                                baseHtml = baseHtml.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 4px; margin-left: 0; margin-right: 0; padding-top: 0;">
+                                  <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+                                </div>
+                                <div style="text-align: center; margin-top: 8px; margin-bottom: 14px;">
+                                  <img src="${bismillahBase64 || getAssetUrl('/images/bismillah.svg')}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
+                                </div>`);
+                              }
+                              if (bismillahBase64) {
+                                baseHtml = baseHtml
+                                  .replace(/src=["'][^"']*bismillah\.svg["']/gi, 'src="' + bismillahBase64 + '"')
+                                  .replace(/src=["']data:image\/svg\+xml;base64,[^"']*["']/gi, 'src="' + bismillahBase64 + '"');
+                              }
+                              return baseHtml;
+                            })().replace(
+                              /\{\{(\w+)\}\}/g,
+                              (_: string, key: string) => {
+                                let val = templateVariables[key];
+                                if (val !== undefined && val !== "") {
+                                  if (typeof val === "string" && val.includes("<table")) {
+                                    val = val.replace(/(<table\b[^>]*>[\s\S]*?<\/table>)/gi, (tbl: string) => {
+                                      return tbl.replace(/<br\s*\/?>/gi, "");
+                                    });
+                                  }
+                                  return val;
+                                }
+                                return '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
+                              }
+                            ) +
+                            '</div></body></html>'
+                          );
+                        };
+
+                        return (
+                          <iframe
+                            srcDoc={renderDocHtml()}
+                            className={cn(
+                              "border-0 rounded-2xl bg-transparent transition-all",
+                              isCert
+                                ? "w-full max-w-[1200px] h-[520px] sm:h-[620px] lg:h-[710px]"
+                                : "w-full min-h-[1150px]"
+                            )}
+                            title="preview"
+                          />
+                        );
+                      })()}
                     </div>
                   )}
             </div>
@@ -2361,10 +2575,31 @@ const EditTemplateLetterPage = () => {
         <div>
           <form onSubmit={handleUpdate} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 shadow-md rounded-[28px] p-6 space-y-6">
             
+            {isFinalSigned && (
+              <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">Surat Tidak Dapat Diedit (Telah Ditandatangani Akhir)</h4>
+                    <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                      Surat keluar ini telah ditandatangani oleh penandatangan akhir. Sesuai aturan dokumen resmi, surat yang telah ditandatangani akhir tidak dapat diubah kembali.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/surat-keluar/${params.id}`)}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all shrink-0 shadow-sm"
+                >
+                  Kembali ke Detail Surat
+                </button>
+              </div>
+            )}
+
             <div className="border-b border-slate-100 dark:border-slate-800 pb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Formulir Pembuatan Surat</h3>
-                <p className="text-xs text-slate-400 mt-1">Lengkapi data di bawah ini untuk mengisi surat di atas.</p>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Formulir Edit Surat Keluar</h3>
+                <p className="text-xs text-slate-400 mt-1">Ubah dan sesuaikan data surat keluar berbasis template di bawah ini.</p>
               </div>
 
               {/* Tabs Navigation */}
@@ -2399,7 +2634,7 @@ const EditTemplateLetterPage = () => {
             </div>
 
             {/* Tab Content Panel */}
-            <div className="min-h-[220px]">
+            <fieldset disabled={isFinalSigned} className="min-h-[220px] border-none p-0 m-0 disabled:opacity-85">
               {activeTab === "info" && (
                 <div className="space-y-4 animate-in fade-in duration-200">
                   {/* Row 1: Nomor Surat & Template selector */}
@@ -3280,19 +3515,29 @@ const EditTemplateLetterPage = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </fieldset>
 
             {/* Action buttons */}
             <div className="flex items-center gap-3 border-t border-slate-100 dark:border-slate-800 pt-5">
               <button
                 type="submit"
-                disabled={submitting || success}
-                className="flex-1 gradient-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                disabled={submitting || success || isFinalSigned}
+                className={cn(
+                  "flex-1 text-white py-4 rounded-2xl font-bold shadow-lg transition-all flex items-center justify-center gap-2",
+                  isFinalSigned
+                    ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none border border-slate-200 dark:border-slate-700"
+                    : "gradient-primary shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+                )}
               >
                 {submitting ? (
                   <>
                     <Loader2 className="animate-spin" size={18} />
                     <span>Menyimpan...</span>
+                  </>
+                ) : isFinalSigned ? (
+                  <>
+                    <Lock size={18} />
+                    <span>Surat Telah Ditandatangani Akhir (Terkunci)</span>
                   </>
                 ) : (
                   <>
@@ -3303,10 +3548,10 @@ const EditTemplateLetterPage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => router.back()}
-                className="px-6 py-4 text-slate-500 font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-800"
+                onClick={() => router.push(`/surat-keluar/${params.id}`)}
+                className="px-6 py-4 text-slate-500 font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-800 cursor-pointer"
               >
-                Batal
+                {isFinalSigned ? "Kembali" : "Batal"}
               </button>
             </div>
 

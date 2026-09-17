@@ -30,9 +30,10 @@ import {
   ExternalLink,
   ShieldCheck,
   History,
+  Maximize2,
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, getAssetUrl, isSignedByFinalSignatory } from "@/lib/utils";
 import Can from "@/components/auth/Can";
 import DocumentReader from "@/components/documents/DocumentReader";
 
@@ -400,7 +401,7 @@ const RevisionModal = ({
 };
 
 const toDataURL = (url: string): Promise<string> =>
-  fetch(url)
+  fetch(getAssetUrl(url))
     .then((response) => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.blob();
@@ -423,6 +424,9 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
   const [bismillahBase64, setBismillahBase64] = useState<string>("");
   const [logoBase64, setLogoBase64] = useState<string>("");
   const [wqaUkasBase64, setWqaUkasBase64] = useState<string>("");
+  const [certBgBase64, setCertBgBase64] = useState<string>("");
+  const [bismillahCertBase64, setBismillahCertBase64] = useState<string>("");
+  const [logoCertBase64, setLogoCertBase64] = useState<string>("");
 
   useEffect(() => {
     toDataURL("/images/kop-surat.png")
@@ -437,6 +441,15 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
     toDataURL("/images/wqa-ukas.png")
       .then(b64 => setWqaUkasBase64(b64))
       .catch(err => console.warn("Failed to convert wqa-ukas to base64", err));
+    toDataURL("/images/cert-ks-rs-bg.jpg")
+      .then(b64 => setCertBgBase64(b64))
+      .catch(err => console.warn("Failed to convert cert-ks-rs-bg to base64", err));
+    toDataURL("/images/bismillah-cert.png")
+      .then(b64 => setBismillahCertBase64(b64))
+      .catch(err => console.warn("Failed to convert bismillah-cert to base64", err));
+    toDataURL("/images/logo-dsn-cert.png")
+      .then(b64 => setLogoCertBase64(b64))
+      .catch(err => console.warn("Failed to convert logo-dsn-cert to base64", err));
   }, []);
 
   const BASE_URL = getBaseUrl();
@@ -503,13 +516,100 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
   </table>`;
 
           let processed = text;
+          const isLandscape = /landscape|\.certificate-sheet|\.cert-page|size:\s*A4\s*landscape/i.test(processed)
+            || (title && title.toLowerCase().includes('sertifikat'));
+
+          if (isLandscape) {
+            if (certBgBase64) {
+              processed = processed
+                .replace(/(\\?\${CERT_KS_RS_BG}|\${CERT_KS_RS_BG})/g, certBgBase64)
+                .replace(/url\(['"]?[^'"]*cert-ks-rs-bg\.jpg['"]?\)/gi, `url('${certBgBase64}')`)
+                .replace(/src=["'][^"']*cert-ks-rs-bg\.jpg["']/gi, 'src="' + certBgBase64 + '"');
+            }
+            if (bismillahCertBase64) {
+              processed = processed.replace(/src=["'][^"']*bismillah-cert\.png["']/gi, `src="${bismillahCertBase64}"`);
+            }
+            if (logoCertBase64) {
+              processed = processed.replace(/src=["'][^"']*logo-dsn-cert\.png["']/gi, `src="${logoCertBase64}"`);
+            }
+            // Stamp must stay removed
+            processed = processed
+              .replace(/src=["'][^"']*stempel-dsn\.png["']/gi, '')
+              .replace(/<img[^>]*stempel-dsn[^>]*>/gi, '');
+
+            const certFitInjection = `
+<style>
+  @media screen {
+    html, body {
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background-color: transparent !important;
+    }
+    .cert-page {
+      margin: 0 auto !important;
+      transform-origin: center center !important;
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+      flex-shrink: 0 !important;
+    }
+  }
+  @media print {
+    html, body {
+      width: 297mm !important;
+      height: 210mm !important;
+      overflow: hidden !important;
+      display: block !important;
+      background: transparent !important;
+    }
+    .cert-page {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+</style>
+<script>
+  function autoFitCertificate() {
+    const cert = document.querySelector('.cert-page');
+    if (!cert) return;
+    const certW = 1122.52; // 297mm at 96dpi
+    const certH = 793.70;  // 210mm at 96dpi
+    const padding = 20;
+    const availW = Math.max(100, window.innerWidth - padding);
+    const availH = Math.max(100, window.innerHeight - padding);
+    const scale = Math.min(availW / certW, availH / certH);
+    cert.style.transform = 'scale(' + scale + ')';
+    cert.style.transformOrigin = 'center center';
+  }
+  window.addEventListener('resize', autoFitCertificate);
+  window.addEventListener('load', autoFitCertificate);
+  document.addEventListener('DOMContentLoaded', autoFitCertificate);
+  setTimeout(autoFitCertificate, 30);
+  setTimeout(autoFitCertificate, 100);
+  setTimeout(autoFitCertificate, 300);
+</script>
+`;
+            if (processed.includes('</head>')) {
+              processed = processed.replace('</head>', `${certFitInjection}\n</head>`);
+            } else {
+              processed = `${certFitInjection}\n${processed}`;
+            }
+
+            setHtmlContent(processed);
+            return;
+          }
+
           if (kopSuratBase64) {
             processed = processed.replace(/src=["'][^"']*kop-surat\.png["']/gi, `src="${kopSuratBase64}" class="kop-surat-img"`);
             processed = processed.replace(/(\\?\${HEADER_HTML}|\${HEADER_HTML})/g, `<div style="text-align: center; margin-bottom: 4px; margin-left: 0; margin-right: 0; padding-top: 0;">
     <img src="${kopSuratBase64}" alt="Kop Surat DSN-MUI" class="kop-surat-img" style="width: 100%; max-width: 100%; height: auto; display: block; margin: 0 auto;" />
   </div>
   <div style="text-align: center; margin-top: 8px; margin-bottom: 14px;">
-    <img src="${bismillahBase64 || '/images/bismillah.svg'}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
+    <img src="${bismillahBase64 || getAssetUrl('/images/bismillah.svg')}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 8px auto 14px auto;" />
   </div>`);
           }
           processed = processed.replace(/border-top:\s*1px\s*solid\s*#000000;?/gi, 'border-top: none;');
@@ -546,7 +646,7 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
           setFetchError(err.message || "Gagal memuat pratinjau dokumen.");
         });
     }
-  }, [isHtml, fullUrlWithToken, docId, safeFileUrl, fullUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64]);
+  }, [isHtml, fullUrlWithToken, docId, safeFileUrl, fullUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64, certBgBase64, bismillahCertBase64, logoCertBase64]);
 
   const viewerUrl = isDocx 
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrlWithToken)}` 
@@ -571,6 +671,24 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
         </div>
       );
     }
+
+    const isLandscape = /landscape|\.certificate-sheet|\.cert-page|size:\s*A4\s*landscape/i.test(htmlContent || '')
+      || (title && title.toLowerCase().includes('sertifikat'));
+
+    if (isLandscape) {
+      return (
+        <div className="absolute inset-0 bg-[#e5e7eb] dark:bg-slate-950 p-2 sm:p-4 flex items-center justify-center overflow-hidden">
+          <div className="w-full h-full max-w-[1350px] flex items-center justify-center relative">
+            <iframe
+              srcDoc={htmlContent}
+              className="w-full h-full border-none bg-transparent"
+              title={title}
+            />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="absolute inset-0 overflow-y-auto bg-[#e5e7eb] dark:bg-slate-950 p-2 md:p-6 lg:p-8 flex justify-center scrollbar-thin">
          <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl ring-1 ring-black/5 relative flex-shrink-0">
@@ -708,6 +826,18 @@ const DocumentsPage = () => {
         .replace(/<\/td>\s*<\/tr>\s*<\/tbody>\s*<tfoot>[\s\S]*?<\/tfoot>\s*<\/table>/gi, '');
     }
 
+    // Auto-wrap body in letter-body-wrapper if not already present
+    if (!bodyInner.includes('letter-body-wrapper')) {
+      const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
+      const bismillahMatch = bismillahEndRegex.exec(bodyInner);
+      if (bismillahMatch) {
+        const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
+        const headerPart = bodyInner.substring(0, cutIndex);
+        const restPart = bodyInner.substring(cutIndex);
+        bodyInner = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+      }
+    }
+
     const printHtml = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -719,10 +849,10 @@ const DocumentsPage = () => {
   <style>
     @page {
       size: A4;
-      margin-top: 20mm !important;
+      margin-top: 10mm !important;
       margin-bottom: 12mm !important;
-      margin-left: 25mm !important;
-      margin-right: 20mm !important;
+      margin-left: 10mm !important;
+      margin-right: 10mm !important;
     }
     @media print {
       .print-btn-bar { display: none !important; }
@@ -754,6 +884,12 @@ const DocumentsPage = () => {
       print-color-adjust: exact !important;
     }
 
+    /* Wrapper to keep 25mm left & 20mm right body margins while Kop Surat uses full 190mm */
+    .letter-body-wrapper {
+      margin-left: 15mm !important;
+      margin-right: 10mm !important;
+    }
+
     /* Master Print Layout Table */
     table.master-page-table {
       width: 100% !important;
@@ -781,9 +917,10 @@ const DocumentsPage = () => {
         align-items: center !important;
       }
       .master-page-table {
-        max-width: 750px !important;
+        max-width: 794px !important;
+        width: 100% !important;
         margin: 0 auto !important;
-        padding: 20px 30px !important;
+        padding: 10mm 10mm 12mm 10mm !important;
         background: #ffffff !important;
         box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         box-sizing: border-box !important;
@@ -793,9 +930,9 @@ const DocumentsPage = () => {
         display: table !important;
         order: 2 !important;
         width: 100% !important;
-        max-width: 750px !important;
+        max-width: 794px !important;
         margin: 16px auto 20px auto !important;
-        padding: 0 30px !important;
+        padding: 0 10mm !important;
         box-sizing: border-box !important;
       }
     }
@@ -1757,22 +1894,40 @@ const DocumentsPage = () => {
                                     <Download size={14} />
                                   </button>
                                   <Can perform="DOC_EDIT">
-                                    <button
-                                      onClick={() => {
-                                        const latestVersion = getLatestVersion(doc);
-                                        const isTemplate = latestVersion?.fileName?.endsWith('.html') || latestVersion?.mimeType === 'text/html';
-                                        if (isTemplate) {
-                                          router.push(`/surat-keluar/edit/${doc.id}`);
-                                        } else {
-                                          setSelectedDoc(doc);
-                                          setIsEditModalOpen(true);
-                                        }
-                                      }}
-                                      className="p-1.5 rounded-lg text-[#006633] bg-[#006633]/10 hover:bg-[#006633]/20 dark:bg-[#006633]/20 dark:hover:bg-[#006633]/30 transition-colors"
-                                      title={doc.status === 'REVISION' ? "Upload Revisi Baru" : "Edit Dokumen"}
-                                    >
-                                      {doc.status === 'REVISION' ? <FileUp size={14} /> : <Pencil size={14} />}
-                                    </button>
+                                    {(() => {
+                                      const isFinalSigned = isSignedByFinalSignatory(doc);
+                                      return (
+                                        <button
+                                          disabled={isFinalSigned}
+                                          onClick={() => {
+                                            if (isFinalSigned) return;
+                                            const latestVersion = getLatestVersion(doc);
+                                            const isTemplate = latestVersion?.fileName?.endsWith('.html') || latestVersion?.fileUrl?.endsWith('.html') || latestVersion?.mimeType === 'text/html';
+                                            if (isTemplate) {
+                                              router.push(`/surat-keluar/edit/${doc.id}`);
+                                            } else {
+                                              setSelectedDoc(doc);
+                                              setIsEditModalOpen(true);
+                                            }
+                                          }}
+                                          className={cn(
+                                            "p-1.5 rounded-lg transition-colors",
+                                            isFinalSigned
+                                              ? "text-slate-400 bg-slate-100 dark:bg-slate-800 cursor-not-allowed opacity-50"
+                                              : "text-[#006633] bg-[#006633]/10 hover:bg-[#006633]/20 dark:bg-[#006633]/20 dark:hover:bg-[#006633]/30 cursor-pointer"
+                                          )}
+                                          title={
+                                            isFinalSigned
+                                              ? "Surat sudah ditandatangani oleh penandatangan akhir (tidak dapat diedit)"
+                                              : doc.status === 'REVISION'
+                                                ? "Upload Revisi Baru"
+                                                : "Edit Dokumen"
+                                          }
+                                        >
+                                          {doc.status === 'REVISION' ? <FileUp size={14} /> : <Pencil size={14} />}
+                                        </button>
+                                      );
+                                    })()}
                                   </Can>
                                   <button onClick={() => { setSelectedDoc(doc); setIsFlowModalOpen(true); }} className="p-1.5 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-405 dark:hover:bg-amber-900/30 transition-colors" title="Cek Flow Persetujuan">
                                     <Activity size={14} />
@@ -1858,21 +2013,38 @@ const DocumentsPage = () => {
                             <Download size={14} /> Unduh
                           </button>
                           <Can perform="DOC_EDIT">
-                              <button
-                                onClick={() => {
-                                  const latestVersion = getLatestVersion(doc);
-                                  const isTemplate = latestVersion?.fileName?.endsWith('.html') || latestVersion?.mimeType === 'text/html';
-                                  if (isTemplate) {
-                                    router.push(`/surat-keluar/edit/${doc.id}`);
-                                  } else {
-                                    setSelectedDoc(doc);
-                                    setIsEditModalOpen(true);
+                            {(() => {
+                              const isFinalSigned = isSignedByFinalSignatory(doc);
+                              return (
+                                <button
+                                  disabled={isFinalSigned}
+                                  onClick={() => {
+                                    if (isFinalSigned) return;
+                                    const latestVersion = getLatestVersion(doc);
+                                    const isTemplate = latestVersion?.fileName?.endsWith('.html') || latestVersion?.fileUrl?.endsWith('.html') || latestVersion?.mimeType === 'text/html';
+                                    if (isTemplate) {
+                                      router.push(`/surat-keluar/edit/${doc.id}`);
+                                    } else {
+                                      setSelectedDoc(doc);
+                                      setIsEditModalOpen(true);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold transition-all whitespace-nowrap",
+                                    isFinalSigned
+                                      ? "bg-slate-50 text-slate-400 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 cursor-not-allowed opacity-50"
+                                      : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#006633] hover:bg-slate-200 cursor-pointer"
+                                  )}
+                                  title={
+                                    isFinalSigned
+                                      ? "Surat sudah ditandatangani oleh penandatangan akhir (tidak dapat diedit)"
+                                      : "Edit"
                                   }
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-[#006633] hover:bg-slate-200 transition-all whitespace-nowrap"
-                              >
-                                {doc.status === 'REVISION' ? <><FileUp size={14} /> Upload Revisi</> : <><Pencil size={14} /> Edit</>}
-                              </button>
+                                >
+                                  {doc.status === 'REVISION' ? <><FileUp size={14} /> Upload Revisi</> : <><Pencil size={14} /> Edit</>}
+                                </button>
+                              );
+                            })()}
                           </Can>
                           <button onClick={() => { setSelectedDoc(doc); setIsFlowModalOpen(true); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-amber-600 hover:bg-slate-200 transition-all whitespace-nowrap">
                             <Activity size={14} /> Flow
@@ -1982,43 +2154,71 @@ const DocumentsPage = () => {
           </div>
         </div>
       {/* Split Detail Modal */}
-      {selectedDocId && sidebarDoc && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6 lg:p-8">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedDocId(null)} />
-          <div className="relative bg-white dark:bg-slate-900 w-full h-full max-w-[1400px] md:rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 flex flex-col md:flex-row">
-            
-            {/* Left: Document View */}
-            <div className="w-full md:w-[60%] lg:w-[65%] h-[50vh] md:h-full bg-slate-100 dark:bg-slate-950 flex flex-col border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 relative z-10">
-              <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center shrink-0">
-                <div className="flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                     <FileText size={16} />
-                   </div>
-                   <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{sidebarDoc.title}</h3>
+      {selectedDocId && sidebarDoc && (() => {
+        const isLandscapeDoc = sidebarDoc.category === 'Sertifikat Kesesuaian Syariah' 
+          || (sidebarDoc.title && sidebarDoc.title.toLowerCase().includes('sertifikat'))
+          || (sidebarDoc.classification?.name && sidebarDoc.classification.name.toLowerCase().includes('sertifikat'));
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6 lg:p-8">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedDocId(null)} />
+            <div className={cn(
+              "relative bg-white dark:bg-slate-900 w-full h-full md:rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 flex flex-col md:flex-row transition-all",
+              isLandscapeDoc ? "max-w-[1560px]" : "max-w-[1400px]"
+            )}>
+              
+              {/* Left: Document View */}
+              <div className={cn(
+                "h-[50vh] md:h-full bg-slate-100 dark:bg-slate-950 flex flex-col border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 relative z-10 transition-all duration-300",
+                isLandscapeDoc ? "w-full md:w-[68%] lg:w-[72%]" : "w-full md:w-[60%] lg:w-[65%]"
+              )}>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center shrink-0">
+                  <div className="flex items-center gap-3">
+                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                       <FileText size={16} />
+                     </div>
+                     <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{sidebarDoc.title}</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <button
+                       onClick={() => {
+                         const latestVersion = getLatestVersion(sidebarDoc);
+                         const isTemplate = latestVersion?.fileName?.toLowerCase().endsWith('.html') || latestVersion?.mimeType === 'text/html';
+                         setReaderDoc({
+                           title: sidebarDoc.title,
+                           fileUrl: isTemplate ? `/api/documents/${sidebarDoc.id}/download` : (latestVersion?.fileUrl || ''),
+                           id: sidebarDoc.id,
+                         });
+                       }}
+                       className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all"
+                       title="Buka Layar Penuh"
+                     >
+                       <Maximize2 size={18} />
+                     </button>
+                     <button onClick={() => handleDownloadDocument(sidebarDoc)} className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Unduh">
+                       <Download size={18} />
+                     </button>
+                     <button className="p-2 md:hidden text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all" onClick={() => setSelectedDocId(null)}>
+                       <X size={18} />
+                     </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                   <button onClick={() => handleDownloadDocument(sidebarDoc)} className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Unduh">
-                     <Download size={18} />
-                   </button>
-                   <button className="p-2 md:hidden text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all" onClick={() => setSelectedDocId(null)}>
-                     <X size={18} />
-                   </button>
+                <div className="flex-1 relative bg-slate-100 dark:bg-slate-950 overflow-hidden">
+                   {(() => {
+                      const latestVersion = getLatestVersion(sidebarDoc);
+                      if (!latestVersion) {
+                         return <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-bold">Tidak ada file</div>;
+                      }
+                      const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
+                      return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} docId={sidebarDoc.id} />;
+                   })()}
                 </div>
               </div>
-              <div className="flex-1 relative bg-slate-100 dark:bg-slate-950 overflow-hidden">
-                 {(() => {
-                    const latestVersion = getLatestVersion(sidebarDoc);
-                    if (!latestVersion) {
-                       return <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-bold">Tidak ada file</div>;
-                    }
-                    const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-                    return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} docId={sidebarDoc.id} />;
-                 })()}
-              </div>
-            </div>
 
-            {/* Right: Details & Flow */}
-            <div className="w-full md:w-[40%] lg:w-[35%] h-[50vh] md:h-full overflow-y-auto bg-white dark:bg-slate-900 flex flex-col relative z-20">
+              {/* Right: Details & Flow */}
+              <div className={cn(
+                "h-[50vh] md:h-full overflow-y-auto bg-white dark:bg-slate-900 flex flex-col relative z-20 transition-all duration-300",
+                isLandscapeDoc ? "w-full md:w-[32%] lg:w-[28%]" : "w-full md:w-[40%] lg:w-[35%]"
+              )}>
                <div className="sticky top-0 p-4 border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-30 flex justify-between items-center hidden md:flex">
                   <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                      <FileBadge size={18} className="text-primary" /> Informasi Dokumen
@@ -2058,20 +2258,37 @@ const DocumentsPage = () => {
                         <span>Mulai Workflow</span>
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        const isTemplate = sidebarDoc.versions?.[0]?.fileName?.endsWith('.html') || sidebarDoc.versions?.[0]?.mimeType === 'text/html';
-                        if (isTemplate) router.push(`/surat-keluar/edit/${sidebarDoc.id}`);
-                        else {
-                          setSelectedDoc(sidebarDoc);
-                          setIsEditModalOpen(true);
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                    >
-                      <Pencil size={13} />
-                      <span>Edit Info</span>
-                    </button>
+                    {(() => {
+                      const isFinalSigned = isSignedByFinalSignatory(sidebarDoc);
+                      return (
+                        <button
+                          disabled={isFinalSigned}
+                          onClick={() => {
+                            if (isFinalSigned) return;
+                            const isTemplate = sidebarDoc.versions?.[0]?.fileName?.endsWith('.html') || sidebarDoc.versions?.[0]?.fileUrl?.endsWith('.html') || sidebarDoc.versions?.[0]?.mimeType === 'text/html';
+                            if (isTemplate) router.push(`/surat-keluar/edit/${sidebarDoc.id}`);
+                            else {
+                              setSelectedDoc(sidebarDoc);
+                              setIsEditModalOpen(true);
+                            }
+                          }}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border font-bold rounded-xl text-xs transition-all",
+                            isFinalSigned
+                              ? "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 text-slate-400 cursor-not-allowed opacity-50"
+                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                          )}
+                          title={
+                            isFinalSigned
+                              ? "Surat sudah ditandatangani oleh penandatangan akhir (tidak dapat diedit)"
+                              : "Edit Dokumen"
+                          }
+                        >
+                          <Pencil size={13} />
+                          <span>{isFinalSigned ? "Terkunci" : "Edit Info"}</span>
+                        </button>
+                      );
+                    })()}
                   </div>
 
                   {/* Workflow Stepper Timeline */}
@@ -2222,7 +2439,8 @@ const DocumentsPage = () => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Modals placed optimally outside layout flows */}
       {isEditModalOpen && selectedDoc && <EditDocumentModal doc={selectedDoc} />}
