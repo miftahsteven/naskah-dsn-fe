@@ -44,12 +44,16 @@ import {
   Mail,
   Printer,
   Video,
+  Timer,
+  HeartPulse,
+  FileBadge,
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
 import Can from "@/components/auth/Can";
+import { calculateSlaStatus } from "@/lib/business-days";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4002/api').replace('/api', '');
 
@@ -488,7 +492,7 @@ const ValidationModal: React.FC<ValidationModalProps> = ({
   );
 };
 
-// ── MODAL BUAT SURAT UNDANGAN WAWANCARA CALON DPS (DILUAR AGENDA RAPAT) ──
+// ── MODAL BUAT SURAT UNDANGAN WAWANCARA (MULTI-PUTARAN, RS & DPS) ──
 interface CreateInterviewInvitationModalProps {
   documentId: string;
   submissionNumber?: string;
@@ -496,6 +500,8 @@ interface CreateInterviewInvitationModalProps {
   companyLetterNumber?: string;
   candidatesList: any[];
   existingInvitation?: any;
+  round?: number;
+  isHospital?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -507,9 +513,13 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
   companyLetterNumber,
   candidatesList,
   existingInvitation,
+  round,
+  isHospital,
   onClose,
   onSuccess,
 }) => {
+  const activeRound = round || existingInvitation?.round || 1;
+
   const [invitationNumber, setInvitationNumber] = useState<string>(
     existingInvitation?.invitationNumber ||
       `UND-WW/DSN-MUI/IX/2026/${Math.floor(100 + Math.random() * 900)}`
@@ -536,7 +546,9 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
   const [zoomPasscode, setZoomPasscode] = useState<string>(existingInvitation?.zoomPasscode || '');
   const [subject, setSubject] = useState<string>(
     existingInvitation?.subject ||
-      `Undangan Wawancara Uji Kepatutan dan Kelayakan Calon Anggota DPS Terkait Surat No. ${companyLetterNumber || submissionNumber || '-'}`
+      (isHospital
+        ? `Undangan Wawancara & Asesmen Sertifikasi Syariah Rumah Sakit (Putaran Ke-${activeRound}) Terkait Surat No. ${companyLetterNumber || submissionNumber || '-'}`
+        : `Undangan Wawancara Uji Kepatutan dan Kelayakan Calon Anggota DPS (Putaran Ke-${activeRound}) Terkait Surat No. ${companyLetterNumber || submissionNumber || '-'}`)
   );
 
   const initialCandidates = useMemo(() => {
@@ -546,8 +558,10 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
     if (candidatesList.length > 0) {
       return candidatesList.map((c: any) => c.name || `Calon #${c.id}`);
     }
-    return ['Calon Anggota Dewan Pengawas Syariah'];
-  }, [existingInvitation, candidatesList]);
+    return isHospital
+      ? ['Direksi & Manajemen Rumah Sakit', 'Calon Dewan Pengawas Syariah']
+      : ['Calon Anggota Dewan Pengawas Syariah'];
+  }, [existingInvitation, candidatesList, isHospital]);
 
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>(initialCandidates);
   const [candidateInput, setCandidateInput] = useState<string>('');
@@ -557,13 +571,15 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
   );
   const [requirements, setRequirements] = useState<string>(
     existingInvitation?.requirements ||
-      'Membawa berkas fisik asli, portofolio riwayat hidup, serta bahan pemaparan kesiapan kepengawasan syariah.'
+      (isHospital
+        ? 'Membawa berkas fisik legalitas RS, sertifikat MUKISI, kesiapan operasional syariah, serta dokumen calon DPS.'
+        : 'Membawa berkas fisik asli, portofolio riwayat hidup, serta bahan pemaparan kesiapan kepengawasan syariah.')
   );
   const [contactPerson, setContactPerson] = useState<string>(
     existingInvitation?.contactPerson || 'Sekretariat DSN-MUI (021-3904141 / WhatsApp: 0812-3456-7890)'
   );
   const [notes, setNotes] = useState<string>(
-    existingInvitation?.notes || 'Calon DPS dimohon hadir 15 menit sebelum waktu wawancara dimulai.'
+    existingInvitation?.notes || 'Peserta dimohon hadir 15 menit sebelum waktu wawancara dimulai.'
   );
   const [signatoryName, setSignatoryName] = useState<string>(
     existingInvitation?.signatoryName || 'Prof. Dr. KH. Hasanuddin, M.Ag'
@@ -584,7 +600,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
     }
   };
 
-  const handleAddCustomCandidate = () => {
+  const handleAddCandidate = () => {
     if (candidateInput.trim() && !selectedCandidates.includes(candidateInput.trim())) {
       setSelectedCandidates([...selectedCandidates, candidateInput.trim()]);
       setCandidateInput('');
@@ -603,6 +619,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
 
     try {
       await api.post(`/documents/${documentId}/interview-invitation`, {
+        round: activeRound,
         invitationNumber: invitationNumber.trim(),
         invitationDate: invitationDate.trim(),
         interviewDayDate: interviewDayDate.trim(),
@@ -620,6 +637,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
         notes: notes.trim() || undefined,
         signatoryName: signatoryName.trim(),
         signatoryRole: signatoryRole.trim(),
+        syncMeetingAgenda: true,
       });
       onSuccess();
     } catch (err: any) {
@@ -637,25 +655,30 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 flex items-center justify-center font-black">
+            <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 flex items-center justify-center font-black">
               <CalendarCheck size={22} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
-                  Buat Surat Undangan Wawancara Calon DPS
+                  {isHospital
+                    ? `Buat Surat Undangan Wawancara RS (Putaran Ke-${activeRound})`
+                    : `Buat Surat Undangan Wawancara DPS (Putaran Ke-${activeRound})`}
                 </h3>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  Agenda Khusus
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 border border-amber-300 dark:border-amber-800">
+                  Putaran Ke-{activeRound}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {submissionNumber ? `Tiket: ${submissionNumber}` : 'Surat Masuk Permohonan'} {companyName ? `• ${companyName}` : ''}
+                Penerbitan surat undangan resmi DSN-MUI lengkap dengan jadwal, tautan Zoom & agenda rapat
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400">
-            <X size={20} />
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+          >
+            <X size={16} />
           </button>
         </div>
 
@@ -670,7 +693,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
           {/* Section: Identitas Surat Undangan */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              <FileText size={15} className="text-blue-600" />
+              <FileText size={15} className="text-amber-600" />
               1. Identitas Surat Undangan Resmi
             </div>
 
@@ -685,7 +708,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                   value={invitationNumber}
                   onChange={(e) => setInvitationNumber(e.target.value)}
                   placeholder="Contoh: UND-WW/DSN-MUI/IX/2026/012"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
 
@@ -699,7 +722,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                   value={invitationDate}
                   onChange={(e) => setInvitationDate(e.target.value)}
                   placeholder="Contoh: 10 September 2026"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
 
@@ -712,17 +735,17 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                   required
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
             </div>
           </div>
 
-          {/* Section: Jadwal & Lokasi Wawancara */}
+          {/* Section: Waktu & Lokasi Pelaksanaan */}
           <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              <Calendar size={15} className="text-blue-600" />
-              2. Jadwal & Tempat Pelaksanaan Wawancara
+              <Calendar size={15} className="text-amber-600" />
+              2. Jadwal & Lokasi Pelaksanaan
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -736,46 +759,46 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                   value={interviewDayDate}
                   onChange={(e) => setInterviewDayDate(e.target.value)}
                   placeholder="Contoh: Kamis, 17 September 2026"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Waktu / Jam Pelaksanaan *
+                  Waktu Pelaksanaan (WIB) *
                 </label>
                 <input
                   type="text"
                   required
                   value={interviewTime}
                   onChange={(e) => setInterviewTime(e.target.value)}
-                  placeholder="Contoh: 09:30 - 12:00 WIB"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="Contoh: 09:30 - 12:00"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
 
               <div className="sm:col-span-2 space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Format Wawancara *
+                  Format Pelaksanaan Wawancara *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2.5">
                   {[
                     { key: 'OFFLINE', label: 'Tatap Muka (Offline)' },
-                    { key: 'ONLINE', label: 'Daring (Zoom Online)' },
-                    { key: 'HYBRID', label: 'Hybrid' },
-                  ].map((fmt) => (
+                    { key: 'ONLINE', label: 'Daring (Zoom / Online)' },
+                    { key: 'HYBRID', label: 'Hybrid (Campuran)' },
+                  ].map((f) => (
                     <button
+                      key={f.key}
                       type="button"
-                      key={fmt.key}
-                      onClick={() => setFormat(fmt.key as any)}
+                      onClick={() => setFormat(f.key as any)}
                       className={cn(
-                        "py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center",
-                        format === fmt.key
-                          ? "bg-blue-50 border-blue-600 text-blue-700 dark:bg-blue-950/40 dark:border-blue-400 dark:text-blue-200 shadow-xs"
-                          : "border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50"
+                        "py-2 px-3 rounded-xl border text-xs font-bold transition-all",
+                        format === f.key
+                          ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                          : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
                       )}
                     >
-                      {fmt.label}
+                      {f.label}
                     </button>
                   ))}
                 </div>
@@ -785,13 +808,13 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Tempat / Ruangan Pelaksanaan *
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   required
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
-                  placeholder="Nama ruangan, lantai, gedung, dan alamat"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="Contoh: Ruang Rapat Pleno DSN-MUI Lt. 3, Gedung MUI Pusat..."
+                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/20 resize-none font-medium"
                 />
               </div>
 
@@ -806,7 +829,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                       value={zoomUrl}
                       onChange={(e) => setZoomUrl(e.target.value)}
                       placeholder="https://zoom.us/j/..."
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500/20"
                     />
                   </div>
 
@@ -819,7 +842,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                       value={zoomMeetingId}
                       onChange={(e) => setZoomMeetingId(e.target.value)}
                       placeholder="Contoh: 891 2345 6789"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500/20"
                     />
                   </div>
 
@@ -832,7 +855,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                       value={zoomPasscode}
                       onChange={(e) => setZoomPasscode(e.target.value)}
                       placeholder="Contoh: DSN2026"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500/20"
                     />
                   </div>
                 </>
@@ -840,12 +863,12 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
             </div>
           </div>
 
-          {/* Section: Calon DPS yang Diundang */}
+          {/* Section: Peserta yang Diundang */}
           <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                <Users size={15} className="text-blue-600" />
-                3. Calon DPS yang Diundang Wawancara
+                <Users size={15} className="text-amber-600" />
+                3. Peserta yang Diundang Wawancara
               </div>
               <span className="text-[10px] font-bold text-slate-500">
                 {selectedCandidates.length} Terpilih
@@ -858,91 +881,65 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                 const isChecked = selectedCandidates.includes(name);
                 return (
                   <label
-                    key={c.id || idx}
+                    key={idx}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                      "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-medium cursor-pointer transition-all",
                       isChecked
-                        ? "bg-blue-50/70 border-blue-300 dark:bg-blue-950/30 dark:border-blue-700"
-                        : "border-slate-200 dark:border-slate-700 opacity-60"
+                        ? "bg-amber-50/60 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200"
+                        : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500"
                     )}
                   >
                     <input
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => handleToggleCandidate(name)}
-                      className="w-4 h-4 accent-blue-600 cursor-pointer"
+                      className="w-4 h-4 rounded text-amber-600 accent-amber-600 cursor-pointer"
                     />
-                    <div className="text-xs font-bold text-slate-900 dark:text-white">
-                      {name}
-                      {c.nik && <span className="ml-2 font-mono font-normal text-slate-500">({c.nik})</span>}
-                    </div>
+                    <span className="font-bold flex-1">{name}</span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      Calon #{idx + 1}
+                    </span>
                   </label>
                 );
               })}
+            </div>
 
-              {/* Freeform input candidate if not in list */}
-              {candidatesList.length === 0 && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={candidateInput}
-                    onChange={(e) => setCandidateInput(e.target.value)}
-                    placeholder="Ketik nama calon DPS..."
-                    className="flex-1 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomCandidate}
-                    className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700"
-                  >
-                    + Tambah
-                  </button>
-                </div>
-              )}
+            {/* Input Tambah Peserta Custom */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={candidateInput}
+                onChange={(e) => setCandidateInput(e.target.value)}
+                placeholder="Tambah nama peserta lain (contoh: Direktur RS)..."
+                className="flex-1 px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/20"
+              />
+              <button
+                type="button"
+                onClick={handleAddCandidate}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+              >
+                + Tambah
+              </button>
             </div>
           </div>
 
-          {/* Section: Ketentuan & Narahubung */}
+          {/* Section: Penandatangan Undangan */}
           <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              <ShieldCheck size={15} className="text-blue-600" />
-              4. Ketentuan, Penandatangan & Narahubung
+              <ShieldCheck size={15} className="text-amber-600" />
+              4. Penandatangan Surat Undangan Resmi
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Ketentuan Busana / Dresscode
-                </label>
-                <input
-                  type="text"
-                  value={dresscode}
-                  onChange={(e) => setDresscode(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Narahubung / Kontak Sekretariat
-                </label>
-                <input
-                  type="text"
-                  value={contactPerson}
-                  onChange={(e) => setContactPerson(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Nama Pejabat Penandatangan
+                  Nama Pejabat DSN-MUI
                 </label>
                 <input
                   type="text"
                   value={signatoryName}
                   onChange={(e) => setSignatoryName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
 
@@ -954,20 +951,20 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                   type="text"
                   value={signatoryRole}
                   onChange={(e) => setSignatoryRole(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
             </div>
           </div>
 
           {/* Workflow Impact Notice */}
-          <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 space-y-1 leading-relaxed">
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1 leading-relaxed">
             <div className="font-bold flex items-center gap-1.5">
-              <CalendarCheck size={14} className="text-blue-600" />
-              Perubahan Alur Status Permohonan:
+              <CalendarCheck size={14} className="text-amber-600" />
+              Sinkronisasi Agenda Rapat & Notifikasi Pemohon:
             </div>
             <p>
-              Menerbitkan surat undangan wawancara ini akan <strong>secara resmi mengalihkan status tahapan di sistem dan web-public menjadi "Wawancara" (Tahap 3)</strong>. Pemohon akan menerima notifikasi dan kartu surat undangan resmi di portal web public.
+              Menerbitkan surat undangan ini akan <strong>mencatat jadwal ke tab Agenda Rapat internal</strong> dan mengirimkan undangan resmi beserta tautan Zoom ke dashboard pemohon web-public.
             </p>
           </div>
 
@@ -990,7 +987,519 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                 <Loader2 size={16} className="animate-spin" />
               ) : (
                 <>
-                  <CalendarCheck size={16} /> Terbitkan Undangan & Alihkan ke Tahap Wawancara
+                  <CalendarCheck size={16} /> Terbitkan Undangan Putaran Ke-{activeRound}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ── MODAL INPUT PENILAIAN WAWANCARA (ASESMEN, DITERIMA / PERLU ULANG) ──
+interface InterviewAssessmentModalProps {
+  documentId: string;
+  round?: number;
+  totalRounds?: number;
+  candidatesList: any[];
+  isHospital?: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const InterviewAssessmentModal: React.FC<InterviewAssessmentModalProps> = ({
+  documentId,
+  round = 1,
+  totalRounds = 1,
+  candidatesList,
+  isHospital,
+  onClose,
+  onSuccess,
+}) => {
+  const [selectedRound, setSelectedRound] = useState<number>(round);
+  const [assessedByName, setAssessedByName] = useState<string>('Tim Asesor & Penguji DSN-MUI');
+  const [score, setScore] = useState<number>(85);
+  const [decision, setDecision] = useState<'DITERIMA' | 'DITOLAK'>('DITERIMA');
+  const [notes, setNotes] = useState<string>(
+    isHospital
+      ? 'Kesiapan fasilitas, dokumen standar operasional syariah RS, komitmen direksi, dan pemahaman calon DPS dinyatakan memenuhi kualifikasi kesesuaian syariah DSN-MUI.'
+      : 'Calon Dewan Pengawas Syariah menguasai materi fikih muamalah, regulasi industri, dan memiliki integritas pengawasan syariah yang baik.'
+  );
+  const [improvementNotes, setImprovementNotes] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      await api.post(`/documents/${documentId}/interview-assessment`, {
+        round: selectedRound,
+        assessedByName: assessedByName.trim(),
+        score,
+        decision,
+        notes: notes.trim(),
+        improvementNotes: decision === 'DITOLAK' ? improvementNotes.trim() : null,
+      });
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan penilaian wawancara.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[165] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 animate-in zoom-in-95 duration-200 space-y-6 custom-scrollbar">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center justify-center font-black">
+              <Award size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
+                  Penilaian Hasil Wawancara (Asesmen)
+                </h3>
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800">
+                  Putaran Ke-{selectedRound}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Input evaluasi penguji, penetapan skor nilai, dan keputusan kelulusan / pengulangan
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {errorMessage && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <div className="flex-1">{errorMessage}</div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Radio Keputusan */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Keputusan Hasil Wawancara *
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label
+                className={cn(
+                  "p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2",
+                  decision === 'DITERIMA'
+                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-600 shadow-sm"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60"
+                )}
+                onClick={() => setDecision('DITERIMA')}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                    <CheckCircle2 size={16} className="text-emerald-600" />
+                    DITERIMA / LULUS
+                  </span>
+                  <input
+                    type="radio"
+                    name="decision"
+                    checked={decision === 'DITERIMA'}
+                    onChange={() => setDecision('DITERIMA')}
+                    className="accent-emerald-600"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Lulus wawancara. Tahapan berlanjut ke Proses Internal & Persiapan Sertifikat.
+                </p>
+              </label>
+
+              <label
+                className={cn(
+                  "p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2",
+                  decision === 'DITOLAK'
+                    ? "bg-rose-50 dark:bg-rose-950/40 border-rose-600 shadow-sm"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60"
+                )}
+                onClick={() => setDecision('DITOLAK')}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-rose-800 dark:text-rose-200 flex items-center gap-1.5">
+                    <AlertTriangle size={16} className="text-rose-600" />
+                    DITOLAK / PERLU ULANG
+                  </span>
+                  <input
+                    type="radio"
+                    name="decision"
+                    checked={decision === 'DITOLAK'}
+                    onChange={() => setDecision('DITOLAK')}
+                    className="accent-rose-600"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Belum memenuhi standar. DSN dapat membuat jadwal wawancara ulang tanpa batasan.
+                </p>
+              </label>
+            </div>
+          </div>
+
+          {/* Tim Penilai & Skor */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Nama Asesor / Tim Penguji *
+              </label>
+              <input
+                type="text"
+                required
+                value={assessedByName}
+                onChange={(e) => setAssessedByName(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Nilai / Skor Wawancara (0 - 100) *
+                </label>
+                <span className="text-xs font-mono font-black text-emerald-700 dark:text-emerald-400">
+                  {score} / 100
+                </span>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                required
+                value={score}
+                onChange={(e) => setScore(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-black outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+          </div>
+
+          {/* Catatan Evaluasi */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Catatan Evaluasi Wawancara *
+            </label>
+            <textarea
+              rows={3}
+              required
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Tuliskan catatan evaluasi hasil wawancara..."
+              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none font-medium"
+            />
+          </div>
+
+          {/* Jika Ditolak: Catatan Perbaikan / Arahan Wawancara Ulang */}
+          {decision === 'DITOLAK' && (
+            <div className="space-y-1.5 animate-in fade-in duration-200">
+              <label className="text-xs font-bold text-rose-700 dark:text-rose-400">
+                Arahan & Catatan Perbaikan untuk Wawancara Ulang
+              </label>
+              <textarea
+                rows={2}
+                value={improvementNotes}
+                onChange={(e) => setImprovementNotes(e.target.value)}
+                placeholder="Contoh: Pemohon diminta mempelajari kembali Fatwa DSN No. 107 tentang Rumah Sakit Syariah dan melengkapi struktur komite etik..."
+                className="w-full px-3.5 py-2.5 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500/20 resize-none font-medium"
+              />
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition-all"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-[2] py-3 text-xs font-bold text-white rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{
+                background:
+                  decision === 'DITERIMA'
+                    ? 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)'
+                    : 'linear-gradient(135deg, #be123c 0%, #e11d48 100%)',
+              }}
+            >
+              {isSubmitting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <>
+                  <Award size={16} /> Simpan Penilaian ({decision})
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ── MODAL UPLOAD SERTIFIKAT YANG SUDAH SIAP (PENYELESAIAN PROSES & HITUNG SLA) ──
+interface UploadReadyCertificateModalProps {
+  documentId: string;
+  defaultCertNumber?: string;
+  defaultTitle?: string;
+  isHospital?: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const UploadReadyCertificateModal: React.FC<UploadReadyCertificateModalProps> = ({
+  documentId,
+  defaultCertNumber,
+  defaultTitle,
+  isHospital,
+  onClose,
+  onSuccess,
+}) => {
+  const [certificateNumber, setCertificateNumber] = useState<string>(
+    defaultCertNumber ||
+      (isHospital
+        ? `DSN-MUI/KS-RS/2026/${Math.floor(100 + Math.random() * 900)}`
+        : `DSN-MUI/DPS/2026/${Math.floor(100 + Math.random() * 900)}`)
+  );
+  const [title, setTitle] = useState<string>(
+    defaultTitle ||
+      (isHospital
+        ? 'Sertifikat Kesesuaian Syariah Rumah Sakit'
+        : 'Surat Rekomendasi Dewan Pengawas Syariah DSN-MUI')
+  );
+  const [issueDate, setIssueDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [validUntil, setValidUntil] = useState<string>(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 3);
+    return d.toISOString().slice(0, 10);
+  });
+  const [notes, setNotes] = useState<string>('Sertifikat resmi bertanda tangan sah pimpinan DSN-MUI.');
+  const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) {
+      setErrorMessage('Berkas PDF sertifikat resmi wajib dipilih.');
+      return;
+    }
+    if (!certificateNumber.trim() || !title.trim()) {
+      setErrorMessage('Nomor sertifikat dan judul sertifikat wajib diisi.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('certificateNumber', certificateNumber.trim());
+      formData.append('title', title.trim());
+      formData.append('issueDate', issueDate);
+      formData.append('validUntil', validUntil);
+      formData.append('notes', notes.trim());
+
+      await api.post(`/documents/${documentId}/upload-certificate`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.response?.data?.message || 'Gagal mengunggah sertifikat resmi.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[165] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 animate-in zoom-in-95 duration-200 space-y-6 custom-scrollbar">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center justify-center font-black">
+              <FileBadge size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
+                  Upload Sertifikat yang Sudah Siap (PDF)
+                </h3>
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800">
+                  Tahap Akhir (Selesai)
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Penandatanganan terjadi di luar sistem. Unggah PDF final untuk menuntaskan SLA dan menerbitkan sertifikat ke portal pemohon.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {errorMessage && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <div className="flex-1">{errorMessage}</div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* File Picker */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              File PDF Sertifikat Bertanda Tangan Sah *
+            </label>
+            <div className="p-4 rounded-2xl border-2 border-dashed border-emerald-300 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/20 text-center space-y-2">
+              <input
+                type="file"
+                accept="application/pdf"
+                required
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="hidden"
+                id="cert-file-upload"
+              />
+              <label htmlFor="cert-file-upload" className="cursor-pointer block space-y-1">
+                <UploadCloud className="mx-auto text-emerald-600" size={32} />
+                <p className="text-xs font-bold text-slate-800 dark:text-white">
+                  {file ? file.name : 'Klik untuk memilih file PDF sertifikat'}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB • Terpilih` : 'Format PDF maksimal 15MB'}
+                </p>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Nomor Sertifikat Resmi *
+              </label>
+              <input
+                type="text"
+                required
+                value={certificateNumber}
+                onChange={(e) => setCertificateNumber(e.target.value)}
+                placeholder="Contoh: DSN-MUI/KS-RS/2026/0019"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Judul Sertifikat *
+              </label>
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Tanggal Terbit *
+              </label>
+              <input
+                type="date"
+                required
+                value={issueDate}
+                onChange={(e) => setIssueDate(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Masa Berlaku Hingga *
+              </label>
+              <input
+                type="date"
+                required
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Catatan Tambahan Penerbitan
+            </label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          {/* Workflow Impact Notice */}
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-900 dark:text-emerald-200 space-y-1 leading-relaxed">
+            <div className="font-bold flex items-center gap-1.5">
+              <Sparkles size={14} className="text-emerald-600" />
+              Penyelesaian Permohonan & Kepatuhan SLA:
+            </div>
+            <p>
+              Mengunggah sertifikat akan <strong>menuntaskan status pengajuan menjadi SELESAI</strong>, mencatat tanggal penyelesaian riil, menghitung kepatuhan SLA 14 hari kerja, serta langsung menerbitkan tombol unduh sertifikat resmi di portal pemohon.
+            </p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition-all"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-[2] py-3 text-xs font-bold text-white rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{ background: 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)' }}
+            >
+              {isSubmitting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <>
+                  <FileBadge size={16} /> Terbitkan & Selesaikan Pengajuan
                 </>
               )}
             </button>
@@ -1307,6 +1816,9 @@ const DocumentDetailPage: React.FC = () => {
   // Modals
   const [isValidationModalOpen, setIsValidationModalOpen] = useState<boolean>(false);
   const [isInterviewModalOpen, setIsInterviewModalOpen] = useState<boolean>(false);
+  const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState<boolean>(false);
+  const [isUploadCertModalOpen, setIsUploadCertModalOpen] = useState<boolean>(false);
+  const [interviewRoundToSchedule, setInterviewRoundToSchedule] = useState<number | null>(null);
   const [isCreateMeetingModalOpen, setIsCreateMeetingModalOpen] = useState<boolean>(initialCreateParam);
   const [readerDoc, setReaderDoc] = useState<{ title: string; fileUrl: string } | null>(null);
 
@@ -1355,13 +1867,28 @@ const DocumentDetailPage: React.FC = () => {
   }
 
   const publicSub = doc.publicSubmissions?.[0];
+  const isRsDoc = Boolean(
+    doc.subCategory?.toLowerCase().includes('rumah sakit') ||
+    publicSub?.submissionTypeName?.toLowerCase().includes('rumah sakit') ||
+    doc.title?.toLowerCase().includes('rumah sakit') ||
+    doc.category?.name?.toLowerCase().includes('rumah sakit')
+  );
+
   const isDpsDoc = Boolean(
+    !isRsDoc &&
     publicSub &&
       (publicSub.dpsStage ||
         publicSub.submissionTypeName?.toLowerCase().includes('dps') ||
         publicSub.submissionTypeName?.toLowerCase().includes('pengawas syariah') ||
         (publicSub.candidates && publicSub.candidates.length > 0))
   );
+
+  const isDpsOrRsDoc = isDpsDoc || isRsDoc;
+
+  // 14 Working Days SLA Calculation (Senin - Jumat)
+  const slaDateStart = publicSub?.submittedAt || doc.receivedDate || doc.createdAt;
+  const slaDateEnd = publicSub?.completedAt || (doc.status === 'SELESAI' ? (publicSub?.updatedAt || doc.updatedAt) : null);
+  const slaStatus = calculateSlaStatus(slaDateStart, slaDateEnd, 14);
 
   let candidatesList: any[] = [];
   if (publicSub?.candidates) {
@@ -1384,6 +1911,15 @@ const DocumentDetailPage: React.FC = () => {
     { key: 'LULUS', step: 5, label: '5. Lulus (Rekomendasi)' },
   ];
 
+  const rsStages = [
+    { key: 'PROSES_PENGAJUAN', step: 1, label: '1. Pengajuan RS' },
+    { key: 'VALIDASI_DOKUMEN', step: 2, label: '2. Validasi Dokumen & SOP' },
+    { key: 'WAWANCARA', step: 3, label: '3. Wawancara Asesmen' },
+    { key: 'PROSES_INTERNAL', step: 4, label: '4. Proses Internal' },
+    { key: 'LULUS', step: 5, label: '5. Selesai (Sertifikat)' },
+  ];
+
+  const flowStages = isRsDoc ? rsStages : dpsStages;
   const currentDpsStage = publicSub?.dpsStage || 'PROSES_PENGAJUAN';
   const getDpsStageIndex = (st: string) => {
     switch (st) {
@@ -1470,16 +2006,41 @@ const DocumentDetailPage: React.FC = () => {
         </button>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Days Elapsed Counter Badge */}
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-xs">
-            <Clock size={15} className="text-amber-600 animate-pulse" />
-            <span className="text-xs font-black">
-              {daysElapsed === 0 ? 'Hari Pertama Diterima' : `⏱️ ${daysElapsed} Hari Proses Berjalan`}
-            </span>
-          </div>
+          {/* SLA 14 Working Days Countdown Tracker Badge */}
+          {slaStatus.hasSla ? (
+            <div
+              className={cn(
+                "flex items-center gap-2 px-3.5 py-1.5 rounded-xl border shadow-xs text-xs font-black",
+                slaStatus.isCompleted
+                  ? slaStatus.badgeVariant === 'success'
+                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200"
+                    : "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+                  : slaStatus.isOverdue
+                  ? "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 animate-pulse"
+                  : "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200"
+              )}
+              title={slaStatus.subLabel}
+            >
+              <Timer size={15} className={slaStatus.isOverdue ? "text-rose-600" : "text-emerald-600"} />
+              <span>
+                {slaStatus.isCompleted
+                  ? `✓ Selesai ${slaStatus.workingDaysElapsed} Hari Kerja (SLA 14 Hari)`
+                  : slaStatus.isOverdue
+                  ? `⚠️ Terlewat ${slaStatus.overdueDays} Hari Kerja`
+                  : `⏱️ Sisa ${slaStatus.remainingWorkingDays} Hari Kerja (SLA 14 Hari)`}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-xs">
+              <Clock size={15} className="text-amber-600 animate-pulse" />
+              <span className="text-xs font-black">
+                {daysElapsed === 0 ? 'Hari Pertama Diterima' : `⏱️ ${daysElapsed} Hari Proses Berjalan`}
+              </span>
+            </div>
+          )}
 
           {/* Quick Validate Button (Button 1) */}
-          {isDpsDoc && (
+          {isDpsOrRsDoc && (
             <button
               onClick={() => setIsValidationModalOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold text-white shadow-md hover:opacity-95 transition-all"
@@ -1489,23 +2050,58 @@ const DocumentDetailPage: React.FC = () => {
               <span>
                 {publicSub?.validationType
                   ? `✓ Validasi (${publicSub.validationType})`
-                  : 'Validasi Dokumen (3 Opsi)'}
+                  : '1. Validasi Dokumen'}
               </span>
             </button>
           )}
 
-          {/* Quick Interview Invitation Button (Button 2: di luar agenda rapat) */}
-          {isDpsDoc && (
+          {/* Quick Interview Invitation Button (Button 2) */}
+          {isDpsOrRsDoc && (
             <button
-              onClick={() => setIsInterviewModalOpen(true)}
+              onClick={() => {
+                setInterviewRoundToSchedule(null);
+                setIsInterviewModalOpen(true);
+              }}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold text-white shadow-md hover:opacity-95 transition-all"
               style={{ background: 'linear-gradient(135deg, #996515 0%, #B8860B 45%, #D4AF37 100%)' }}
             >
               <CalendarCheck size={16} />
               <span>
                 {publicSub?.interviewInvitation
-                  ? 'Ubah Undangan Wawancara'
-                  : 'Buat Undangan Wawancara'}
+                  ? `2. Undangan Wawancara (P-${publicSub.interviewInvitation.round || 1})`
+                  : '2. Buat Undangan Wawancara'}
+              </span>
+            </button>
+          )}
+
+          {/* Quick Assessment Button (Button 3) */}
+          {isDpsOrRsDoc && publicSub?.interviewInvitation && (
+            <button
+              onClick={() => setIsAssessmentModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold text-white shadow-md hover:opacity-95 transition-all"
+              style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' }}
+            >
+              <Award size={16} />
+              <span>
+                {publicSub?.interviewInvitation?.assessment
+                  ? `3. Nilai: ${publicSub.interviewInvitation.assessment.score} (${publicSub.interviewInvitation.assessment.decision})`
+                  : '3. Input Nilai Wawancara'}
+              </span>
+            </button>
+          )}
+
+          {/* Quick Upload Certificate Button (Button 4) */}
+          {isDpsOrRsDoc && (
+            <button
+              onClick={() => setIsUploadCertModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold text-white shadow-md hover:opacity-95 transition-all"
+              style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
+            >
+              <FileBadge size={16} />
+              <span>
+                {doc.shariaCertificate || doc.status === 'SELESAI'
+                  ? '4. Sertifikat Telah Terbit'
+                  : '4. Upload Sertifikat Siap'}
               </span>
             </button>
           )}
@@ -1666,14 +2262,164 @@ const DocumentDetailPage: React.FC = () => {
       ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'permohonan' && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* 5-Stage Stepper Roadmap for DPS */}
-          {isDpsDoc && (
-            <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[32px] border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
+          {/* ── CARD SERTIFIKAT KESESUAIAN SYARIAH RESMI (SELESAI) ── */}
+          {(doc.shariaCertificate || doc.status === 'SELESAI') && (
+            <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 text-white p-6 sm:p-8 rounded-[32px] shadow-xl border border-emerald-700/60 relative overflow-hidden space-y-5">
+              <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-700/50 pb-5">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center font-black text-white shadow-inner">
+                    <FileBadge size={26} className="text-emerald-300" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+                        Tahap Akhir • Selesai
+                      </span>
+                      <span className="font-mono text-xs font-bold text-emerald-200 bg-white/10 px-2 py-0.5 rounded-lg border border-white/15">
+                        {doc.shariaCertificate?.certificateNumber || 'Sertifikat Resmi Terbit'}
+                      </span>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black text-white mt-1">
+                      {doc.shariaCertificate?.title || (isRsDoc ? 'Sertifikat Kesesuaian Syariah Rumah Sakit' : 'Surat Rekomendasi Dewan Pengawas Syariah')}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {doc.shariaCertificate?.fileUrl && (
+                    <a
+                      href={getFileDownloadUrl(doc.shariaCertificate.fileUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-emerald-900 text-xs font-extrabold shadow-lg hover:bg-emerald-50 transition-all cursor-pointer"
+                    >
+                      <Download size={15} /> Unduh Berkas PDF Sertifikat
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setIsUploadCertModalOpen(true)}
+                    className="px-3.5 py-2.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 text-white text-xs font-bold border border-white/20 transition-all"
+                  >
+                    Update Sertifikat
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs relative z-10">
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-emerald-300 font-bold block text-[11px]">Tanggal Penerbitan:</span>
+                  <p className="font-extrabold text-white">
+                    {doc.shariaCertificate?.issueDate
+                      ? new Date(doc.shariaCertificate.issueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                      : new Date(doc.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-emerald-300 font-bold block text-[11px]">Masa Berlaku Hingga:</span>
+                  <p className="font-extrabold text-white">
+                    {doc.shariaCertificate?.validUntil
+                      ? new Date(doc.shariaCertificate.validUntil).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                      : '3 Tahun Sejak Penerbitan'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-emerald-300 font-bold block text-[11px]">Realisasi Kepatuhan SLA:</span>
+                  <p className="font-extrabold text-white flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-300" />
+                    {slaStatus.workingDaysElapsed} Hari Kerja (Target: 14 Hari Kerja)
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── 5-STAGE STEPPER ROADMAP (DPS & RUMAH SAKIT) ── */}
+          {isDpsOrRsDoc && (
+            <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[32px] border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-5">
+              {/* SLA 14 Working Days Progress Banner */}
+              {slaStatus.hasSla && (
+                <div
+                  className={cn(
+                    "p-4 sm:p-5 rounded-2xl border shadow-xs space-y-3 transition-all",
+                    slaStatus.isCompleted
+                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100"
+                      : slaStatus.isOverdue
+                      ? "bg-rose-50/70 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-100"
+                      : "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100"
+                  )}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-xs shrink-0",
+                        slaStatus.isCompleted
+                          ? "bg-emerald-600"
+                          : slaStatus.isOverdue
+                          ? "bg-rose-600"
+                          : "bg-emerald-600"
+                      )}>
+                        <Timer size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-black uppercase tracking-wider">
+                            Monitor SLA 14 Hari Kerja DSN-MUI
+                          </h4>
+                          <span className={cn(
+                            "text-[10px] font-black uppercase px-2 py-0.5 rounded-full border",
+                            slaStatus.isCompleted
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950"
+                              : slaStatus.isOverdue
+                              ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 animate-pulse"
+                              : "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950"
+                          )}>
+                            {slaStatus.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] opacity-75 mt-0.5">
+                          {slaStatus.subLabel} (Hari kerja: Senin s.d. Jumat)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-mono font-black">
+                        {slaStatus.isCompleted
+                          ? `Total ${slaStatus.workingDaysElapsed} Hari Kerja`
+                          : `${slaStatus.workingDaysElapsed} dari 14 Hari Kerja`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-200 dark:bg-slate-700/60 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all duration-500 rounded-full",
+                        slaStatus.isCompleted
+                          ? "bg-emerald-600"
+                          : slaStatus.isOverdue
+                          ? "bg-rose-600"
+                          : slaStatus.percentUsed > 75
+                          ? "bg-amber-500"
+                          : "bg-emerald-600"
+                      )}
+                      style={{ width: `${Math.min(100, slaStatus.percentUsed)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                     <ShieldCheck size={18} className="text-emerald-600" />
-                    Alur 5 Tahapan Permohonan Rekomendasi DPS
+                    {isRsDoc
+                      ? 'Alur 5 Tahapan Sertifikasi Kesesuaian Syariah Rumah Sakit'
+                      : 'Alur 5 Tahapan Permohonan Rekomendasi DPS'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Proses verifikasi resmi oleh Sekretariat & Dewan Syariah Nasional MUI
@@ -1689,14 +2435,14 @@ const DocumentDetailPage: React.FC = () => {
                       ? 'bg-rose-500 text-white'
                       : 'bg-primary text-white'
                   }`}>
-                    {dpsStages.find((s) => s.key === currentDpsStage)?.label || currentDpsStage}
+                    {flowStages.find((s) => s.key === currentDpsStage)?.label || currentDpsStage}
                   </span>
                 </div>
               </div>
 
               {/* Stepper Track */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                {dpsStages.map((stage, idx) => {
+                {flowStages.map((stage, idx) => {
                   const isPast = idx < activeDpsStageIdx;
                   const isCurrent = idx === activeDpsStageIdx;
 
@@ -1726,50 +2472,87 @@ const DocumentDetailPage: React.FC = () => {
                 })}
               </div>
 
-              {/* Action bar for 2 Buttons: Validasi Dokumen & Buatkan Undangan Wawancara */}
-              <div className="pt-2 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {/* Action bar for 4 sequential workflow buttons */}
+              <div className="pt-2 flex flex-col lg:flex-row items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex-1">
                   {currentDpsStage === 'VALIDASI_DOKUMEN' ? (
                     <span>
-                      Berkas persyaratan telah divalidasi sebagai <strong>{publicSub?.validationType || 'Lengkap & Valid'}</strong>. Status pengajuan saat ini <strong>tetap pada tahap Validasi Dokumen (aktif)</strong>. Gunakan tombol "Buat Undangan Wawancara" untuk menjadwalkan fit & proper test calon DPS dan beralih ke tahap Wawancara.
+                      Berkas persyaratan telah divalidasi sebagai <strong>{publicSub?.validationType || 'Lengkap & Valid'}</strong>. Klik <strong>"2. Buat Undangan Wawancara"</strong> untuk menerbitkan jadwal wawancara bagi pemohon.
                     </span>
                   ) : currentDpsStage === 'WAWANCARA' ? (
                     <span>
-                      Tahap saat ini adalah <strong>Wawancara</strong>. Surat Undangan Wawancara resmi telah diterbitkan untuk calon DPS.
+                      Tahap saat ini adalah <strong>Wawancara</strong>. Setelah pelaksanaan wawancara, klik <strong>"3. Input Penilaian Wawancara"</strong> untuk menetapkan hasil (Lulus / Ulang).
+                    </span>
+                  ) : currentDpsStage === 'PROSES_INTERNAL' || currentDpsStage === 'LULUS' ? (
+                    <span>
+                      Tahap akhir. Hasil wawancara diterima. Klik <strong>"4. Upload Sertifikat yang Sudah Siap"</strong> setelah dokumen sertifikat fisik ditandatangani basah oleh pimpinan.
                     </span>
                   ) : (
                     <span>
-                      Lakukan validasi keabsahan dokumen untuk mengonfirmasi kelayakan kualifikasi (Baru / PAW / Penetapan Keberlanjutan), kemudian buat undangan wawancara calon DPS.
+                      Mulai proses dengan memvalidasi keabsahan dokumen persyaratan pemohon, kemudian lanjutkan ke tahapan wawancara.
                     </span>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
                   {/* Button 1: Validasi Dokumen */}
                   <button
                     onClick={() => setIsValidationModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all shrink-0 flex items-center gap-2"
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all flex items-center gap-1.5"
                     style={{ background: 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)' }}
                   >
-                    <ShieldCheck size={16} />
+                    <ShieldCheck size={15} />
                     <span>
                       {publicSub?.validationType
-                        ? `Ubah Validasi (${publicSub.validationType})`
-                        : '1. Validasi Dokumen (3 Opsi)'}
+                        ? `1. Ubah Validasi (${publicSub.validationType})`
+                        : '1. Validasi Dokumen'}
                     </span>
                   </button>
 
-                  {/* Button 2: Buatkan Undangan Wawancara (diluar agenda rapat) */}
+                  {/* Button 2: Buat Undangan Wawancara */}
                   <button
-                    onClick={() => setIsInterviewModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all shrink-0 flex items-center gap-2"
+                    onClick={() => {
+                      setInterviewRoundToSchedule(null);
+                      setIsInterviewModalOpen(true);
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all flex items-center gap-1.5"
                     style={{ background: 'linear-gradient(135deg, #996515 0%, #B8860B 45%, #D4AF37 100%)' }}
                   >
-                    <CalendarCheck size={16} />
+                    <CalendarCheck size={15} />
                     <span>
                       {publicSub?.interviewInvitation
-                        ? '2. Ubah Undangan Wawancara'
-                        : '2. Buat Undangan Wawancara'}
+                        ? `2. Undangan (P-${publicSub.interviewInvitation.round || 1})`
+                        : '2. Buat Undangan'}
+                    </span>
+                  </button>
+
+                  {/* Button 3: Input Penilaian Wawancara */}
+                  {publicSub?.interviewInvitation && (
+                    <button
+                      onClick={() => setIsAssessmentModalOpen(true)}
+                      className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all flex items-center gap-1.5"
+                      style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' }}
+                    >
+                      <Award size={15} />
+                      <span>
+                        {publicSub.interviewInvitation.assessment
+                          ? `3. Nilai: ${publicSub.interviewInvitation.assessment.score}`
+                          : '3. Input Penilaian'}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Button 4: Upload Sertifikat yang Sudah Siap */}
+                  <button
+                    onClick={() => setIsUploadCertModalOpen(true)}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all flex items-center gap-1.5"
+                    style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
+                  >
+                    <FileBadge size={15} />
+                    <span>
+                      {doc.shariaCertificate || doc.status === 'SELESAI'
+                        ? '4. Sertifikat Siap'
+                        : '4. Upload Sertifikat Siap'}
                     </span>
                   </button>
                 </div>
@@ -1777,38 +2560,54 @@ const DocumentDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* ── CARD KHUSUS: SURAT UNDANGAN WAWANCARA RESMI (DILUAR AGENDA RAPAT) ── */}
+          {/* ── CARD KHUSUS: SURAT UNDANGAN WAWANCARA RESMI (MULTI-PUTARAN & ASESMEN) ── */}
           {publicSub?.interviewInvitation && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-[32px] border-2 border-amber-500/70 shadow-sm space-y-4 relative overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-xs flex items-center gap-1">
                       <CalendarCheck size={12} />
-                      Agenda Khusus Wawancara Calon DPS (Diluar Agenda Rapat)
+                      {isRsDoc ? 'Wawancara & Asesmen Rumah Sakit Syariah' : 'Wawancara Calon Dewan Pengawas Syariah'}
+                    </span>
+                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 border border-amber-300 dark:border-amber-800">
+                      Putaran Ke-{publicSub.interviewInvitation.round || 1}
                     </span>
                     <span className="font-mono text-xs font-bold text-amber-900 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800">
                       {publicSub.interviewInvitation.invitationNumber}
                     </span>
                   </div>
                   <h3 className="text-sm font-extrabold text-slate-900 dark:text-white pt-1">
-                    Surat Undangan Wawancara Calon Dewan Pengawas Syariah Telah Diterbitkan
+                    {isRsDoc
+                      ? 'Surat Undangan Wawancara & Uji Asesmen Rumah Sakit Syariah'
+                      : 'Surat Undangan Wawancara Calon Dewan Pengawas Syariah'}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Sesuai Surat Permohonan Perusahaan No. <strong className="text-slate-700 dark:text-slate-300 font-mono">{publicSub.companyLetterNumber || doc.documentNumber}</strong>
+                    Sesuai Surat Permohonan No. <strong className="text-slate-700 dark:text-slate-300 font-mono">{publicSub.companyLetterNumber || doc.documentNumber}</strong>
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => setIsInterviewModalOpen(true)}
+                    onClick={() => {
+                      setInterviewRoundToSchedule(null);
+                      setIsInterviewModalOpen(true);
+                    }}
                     className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-all"
                   >
                     Ubah Data Undangan
                   </button>
+                  <button
+                    onClick={() => setIsAssessmentModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-primary text-white shadow-md hover:opacity-90 transition-all flex items-center gap-1.5"
+                  >
+                    <Award size={14} />
+                    <span>{publicSub.interviewInvitation.assessment ? 'Ubah Penilaian' : 'Input Penilaian'}</span>
+                  </button>
                 </div>
               </div>
 
+              {/* Detail Jadwal & Lokasi */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
                   <div className="text-slate-500 font-bold flex items-center gap-1.5">
@@ -1833,7 +2632,7 @@ const DocumentDetailPage: React.FC = () => {
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1 sm:col-span-2">
                   <div className="text-slate-500 font-bold flex items-center gap-1.5">
                     <MapPin size={14} className="text-amber-600" />
-                    Tempat / Ruangan Wawancara
+                    Tempat / Ruangan ({publicSub.interviewInvitation.format || 'OFFLINE'})
                   </div>
                   <p className="font-bold text-slate-900 dark:text-white truncate">
                     {publicSub.interviewInvitation.venue}
@@ -1841,19 +2640,154 @@ const DocumentDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <span className="text-slate-500 font-bold mr-2">Calon DPS yang Diundang:</span>
-                  <span className="font-black text-amber-950 dark:text-amber-200">
-                    {Array.isArray(publicSub.interviewInvitation.candidates)
-                      ? publicSub.interviewInvitation.candidates.join(', ')
-                      : publicSub.interviewInvitation.candidates}
-                  </span>
+              {/* Online Zoom details if applicable */}
+              {publicSub.interviewInvitation.zoomUrl && (
+                <div className="p-3.5 rounded-2xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2 font-bold text-sky-900 dark:text-sky-200">
+                      <Video size={15} className="text-sky-600" />
+                      <span>Tautan Zoom Meeting Virtual:</span>
+                    </div>
+                    <p className="text-[11px] text-sky-700 dark:text-sky-300 font-mono break-all">
+                      {publicSub.interviewInvitation.zoomUrl}
+                    </p>
+                    {(publicSub.interviewInvitation.zoomMeetingId || publicSub.interviewInvitation.zoomPasscode) && (
+                      <p className="text-[10px] text-sky-600 dark:text-sky-400 font-mono">
+                        Meeting ID: {publicSub.interviewInvitation.zoomMeetingId || '-'} • Passcode: {publicSub.interviewInvitation.zoomPasscode || '-'}
+                      </p>
+                    )}
+                  </div>
+                  <a
+                    href={publicSub.interviewInvitation.zoomUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shrink-0 transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <ExternalLink size={13} /> Buka Ruang Zoom
+                  </a>
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Narahubung: {publicSub.interviewInvitation.contactPerson}
+              )}
+
+              {/* Assessment Outcome Box */}
+              {publicSub.interviewInvitation.assessment ? (
+                <div
+                  className={cn(
+                    "p-4 rounded-2xl border space-y-2.5",
+                    publicSub.interviewInvitation.assessment.decision === 'DITERIMA'
+                      ? "bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100"
+                      : "bg-rose-50/80 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-100"
+                  )}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-current/15 pb-2">
+                    <div className="flex items-center gap-2">
+                      {publicSub.interviewInvitation.assessment.decision === 'DITERIMA' ? (
+                        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                      ) : (
+                        <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+                      )}
+                      <span className="font-extrabold text-xs uppercase tracking-wide">
+                        Hasil Penilaian Wawancara Putaran Ke-{publicSub.interviewInvitation.round || 1}: {publicSub.interviewInvitation.assessment.decision === 'DITERIMA' ? 'DITERIMA / LULUS' : 'DITOLAK / PERLU WAWANCARA ULANG'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-md bg-white/60 dark:bg-black/20 border border-current/20">
+                        Skor: {publicSub.interviewInvitation.assessment.score} / 100
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs space-y-1">
+                    <p className="leading-relaxed">
+                      <strong>Catatan Asesor ({publicSub.interviewInvitation.assessment.assessedByName}):</strong> {publicSub.interviewInvitation.assessment.notes}
+                    </p>
+                    {publicSub.interviewInvitation.assessment.improvementNotes && (
+                      <div className="p-3 rounded-xl bg-white/70 dark:bg-black/30 border border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-200 text-xs mt-2">
+                        <strong>Arahan Perbaikan untuk Wawancara Ulang:</strong>
+                        <p className="mt-0.5 leading-relaxed">{publicSub.interviewInvitation.assessment.improvementNotes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action if Rejected: Repeat interview without limit */}
+                  {publicSub.interviewInvitation.assessment.decision === 'DITOLAK' && (
+                    <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-rose-200 dark:border-rose-800">
+                      <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                        ⚡ Sesuai ketentuan, DSN dapat menjadwalkan wawancara ulang tanpa batasan frekuensi pengulangan.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setInterviewRoundToSchedule((publicSub.interviewInvitation.round || 1) + 1);
+                          setIsInterviewModalOpen(true);
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-95 transition-all flex items-center gap-1.5 shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #be123c 0%, #e11d48 100%)' }}
+                      >
+                        <RefreshCw size={14} /> Jadwalkan Wawancara Ulang (Putaran Ke-{(publicSub.interviewInvitation.round || 1) + 1})
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span>Menunggu pelaksanaan wawancara dan input penilaian dari tim penguji / asesor DSN-MUI.</span>
+                  <button
+                    onClick={() => setIsAssessmentModalOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 transition-all flex items-center gap-1"
+                  >
+                    <Award size={13} /> Input Penilaian Sekarang
+                  </button>
+                </div>
+              )}
+
+              {/* Multi-round history log */}
+              {publicSub.interviewHistory && Array.isArray(publicSub.interviewHistory) && publicSub.interviewHistory.length > 1 && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <History size={14} className="text-amber-600" />
+                    <span>Riwayat Seluruh Putaran Wawancara ({publicSub.interviewHistory.length} Putaran Dilaksanakan):</span>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {publicSub.interviewHistory.map((hist: any, hIdx: number) => (
+                      <div
+                        key={hIdx}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-xs flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-slate-900 dark:text-white">
+                              Putaran Ke-{hist.round || hIdx + 1}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {hist.interviewDayDate || hist.invitationDate}
+                            </span>
+                          </div>
+                          {hist.assessment && (
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate mt-0.5">
+                              Skor: {hist.assessment.score} • {hist.assessment.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          {hist.assessment ? (
+                            <span
+                              className={cn(
+                                "text-[10px] font-black px-2.5 py-0.5 rounded-full",
+                                hist.assessment.decision === 'DITERIMA'
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 text-emerald-300"
+                                  : "bg-rose-100 text-rose-800 dark:bg-rose-950 text-rose-300"
+                              )}
+                            >
+                              {hist.assessment.decision}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-400">Menunggu Penilaian</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2025,6 +2959,75 @@ const DocumentDetailPage: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Dokumen Persyaratan Khusus Rumah Sakit Syariah */}
+          {isRsDoc && publicSub?.documents && publicSub.documents.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[32px] border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="space-y-0.5">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <HeartPulse className="text-emerald-600" size={18} />
+                    Dokumen Berkas Persyaratan Rumah Sakit Syariah
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Berkas legalitas instansi, standar operasional prosedur, komite etik, dan sertifikasi pendukung RS
+                  </p>
+                </div>
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60">
+                  Total {publicSub.documents.length} Dokumen Terlampir
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {publicSub.documents.map((pDoc: any, dIdx: number) => (
+                  <div
+                    key={pDoc.id || dIdx}
+                    className="p-4 rounded-2xl bg-slate-50/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex flex-col justify-between gap-3 shadow-xs"
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 flex items-center justify-center text-[10px] font-black shrink-0">
+                          {dIdx + 1}
+                        </span>
+                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate" title={pDoc.requirementName || pDoc.fileName}>
+                          {pDoc.requirementName || pDoc.fileName}
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-mono truncate pl-7">
+                        {pDoc.fileName || 'berkas.pdf'}
+                        {pDoc.fileSize && ` • ${(pDoc.fileSize / 1024 / 1024).toFixed(2)} MB`}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReaderDoc({
+                            title: pDoc.requirementName || pDoc.fileName,
+                            fileUrl: pDoc.fileUrl,
+                          })
+                        }
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-xl text-xs font-bold transition-all"
+                      >
+                        <Eye size={13} /> Lihat Berkas
+                      </button>
+                      <a
+                        href={getFileDownloadUrl(pDoc.fileUrl)}
+                        download={pDoc.fileName || 'dokumen.pdf'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 rounded-xl text-xs border border-slate-200 dark:border-slate-700 transition-all"
+                        title="Unduh"
+                      >
+                        <Download size={14} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -2488,7 +3491,7 @@ const DocumentDetailPage: React.FC = () => {
         />
       )}
 
-      {/* ── MODAL BUAT UNDANGAN WAWANCARA (AGENDA KHUSUS DILUAR AGENDA RAPAT) ── */}
+      {/* ── MODAL BUAT / UBAH UNDANGAN WAWANCARA (MULTI-PUTARAN) ── */}
       {isInterviewModalOpen && (
         <CreateInterviewInvitationModal
           documentId={doc.id}
@@ -2496,10 +3499,46 @@ const DocumentDetailPage: React.FC = () => {
           companyName={publicSub?.company?.name || publicSub?.company?.companyName}
           companyLetterNumber={publicSub?.companyLetterNumber || doc.documentNumber}
           candidatesList={candidatesList}
-          existingInvitation={publicSub?.interviewInvitation}
-          onClose={() => setIsInterviewModalOpen(false)}
+          isHospital={isRsDoc}
+          round={interviewRoundToSchedule || (publicSub?.interviewInvitation?.round || 1)}
+          existingInvitation={interviewRoundToSchedule ? undefined : publicSub?.interviewInvitation}
+          onClose={() => {
+            setIsInterviewModalOpen(false);
+            setInterviewRoundToSchedule(null);
+          }}
           onSuccess={() => {
             setIsInterviewModalOpen(false);
+            setInterviewRoundToSchedule(null);
+            fetchDetail();
+          }}
+        />
+      )}
+
+      {/* ── MODAL INPUT PENILAIAN WAWANCARA (ASESMEN) ── */}
+      {isAssessmentModalOpen && (
+        <InterviewAssessmentModal
+          documentId={doc.id}
+          round={publicSub?.interviewInvitation?.round || 1}
+          candidatesList={candidatesList}
+          isHospital={isRsDoc}
+          onClose={() => setIsAssessmentModalOpen(false)}
+          onSuccess={() => {
+            setIsAssessmentModalOpen(false);
+            fetchDetail();
+          }}
+        />
+      )}
+
+      {/* ── MODAL UPLOAD SERTIFIKAT YANG SUDAH SIAP (PENYELESAIAN PROSES) ── */}
+      {isUploadCertModalOpen && (
+        <UploadReadyCertificateModal
+          documentId={doc.id}
+          defaultCertNumber={doc.shariaCertificate?.certificateNumber}
+          defaultTitle={doc.shariaCertificate?.title}
+          isHospital={isRsDoc}
+          onClose={() => setIsUploadCertModalOpen(false)}
+          onSuccess={() => {
+            setIsUploadCertModalOpen(false);
             fetchDetail();
           }}
         />
