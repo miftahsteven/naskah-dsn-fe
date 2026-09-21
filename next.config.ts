@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
           basePath: false,
           permanent: false,
         },
+        {
+          source: '/privacy-policy-amanah-dsn-mui.html',
+          destination: `${basePath}/privacy-policy-amanah-dsn-mui.html`,
+          basePath: false,
+          permanent: false,
+        },
       ];
     }
     return [];
