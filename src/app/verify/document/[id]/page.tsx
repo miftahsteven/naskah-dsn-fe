@@ -174,37 +174,12 @@ const DocumentVerificationPage = () => {
   const isValid = data.status === "SIGNED";
 
   return (
-    <div className="min-h-screen bg-[#FBFBF8] dark:bg-[#0B140E] text-slate-800 dark:text-slate-100 flex flex-col items-center py-10 px-4 sm:px-6 relative selection:bg-[#006633]/20 selection:text-[#006633]">
+    <div className="min-h-screen bg-[#FBFBF8] dark:bg-[#0B140E] text-slate-800 dark:text-slate-100 flex flex-col items-center py-6 sm:py-8 px-4 sm:px-6 relative selection:bg-[#006633]/20 selection:text-[#006633]">
       
       {/* Background Subtle Gradient & Geometry Accent */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden print:hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-[#006633]/8 via-[#D4AF37]/5 to-transparent blur-3xl opacity-70" />
       </div>
-
-      {/* ── TOP HEADER BRAND ── */}
-      <header className="relative z-10 flex flex-col items-center mb-8 text-center max-w-xl">
-        <div className="flex items-center gap-3.5 mb-2">
-          <div className="w-13 h-13 rounded-2xl bg-white dark:bg-[#132219] p-1.5 shadow-md shadow-[#006633]/10 border border-[#006633]/20 flex items-center justify-center">
-            <img
-              src={getAssetUrl("/images/logo-dsn.png")}
-              alt="Logo DSN-MUI"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="text-left">
-            <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-[#006633] dark:text-emerald-400 uppercase leading-tight">
-              Dewan Syariah Nasional
-            </h1>
-            <p className="text-[11px] font-bold tracking-widest text-slate-600 dark:text-slate-350 uppercase -mt-0.5">
-              Majelis Ulama Indonesia
-            </p>
-          </div>
-        </div>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-[#132219]/80 backdrop-blur-sm border border-[#006633]/15 text-[10px] font-semibold text-[#006633] dark:text-emerald-300 shadow-xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#006633] animate-pulse" />
-          Layanan Verifikasi Keabsahan Tanda Tangan Elektronik (TTE)
-        </div>
-      </header>
 
       {/* ── MAIN VERIFICATION CARD ── */}
       <main className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#111C15] border border-slate-200/90 dark:border-emerald-950/60 rounded-3xl shadow-2xl shadow-[#006633]/5 overflow-hidden">
@@ -229,20 +204,38 @@ const DocumentVerificationPage = () => {
               : "bg-gradient-to-b from-amber-500/6 via-transparent to-transparent border-amber-100 dark:border-amber-900/30"
           }`}
         >
-          {/* Status Badge Emblem */}
-          <div className="flex justify-center mb-4">
+          {/* Status Badge Emblem with DSN-MUI Logo & Checked Ornament */}
+          <div className="flex justify-center mb-6">
             {isValid ? (
-              <div className="relative">
-                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#006633] to-[#004d26] text-white flex items-center justify-center shadow-xl shadow-[#006633]/25 ring-4 ring-emerald-500/20">
-                  <ShieldCheck size={42} strokeWidth={2.2} />
+              <div className="relative inline-flex flex-col items-center">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-[#132219] p-3 shadow-xl shadow-[#006633]/15 border-2 border-[#006633]/20 flex items-center justify-center ring-4 ring-emerald-500/10">
+                  <img
+                    src={getAssetUrl("/images/logo-dsn.png")}
+                    alt="Dewan Syariah Nasional MUI"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#D4AF37] text-white flex items-center justify-center shadow-md border-2 border-white dark:border-[#111C15]">
-                  <Check size={16} strokeWidth={3} />
+                {/* Checklist "Checked" ornament */}
+                <div className="absolute -bottom-2.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#006633] to-[#004d26] text-white flex items-center gap-1.5 shadow-md border-2 border-white dark:border-[#111C15]">
+                  <div className="w-4 h-4 rounded-full bg-[#D4AF37] text-white flex items-center justify-center shadow-xs">
+                    <Check size={11} strokeWidth={3.5} />
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-wider">Checked</span>
                 </div>
               </div>
             ) : (
-              <div className="w-20 h-20 rounded-3xl bg-amber-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/20 ring-4 ring-amber-500/20">
-                <XCircle size={40} />
+              <div className="relative inline-flex flex-col items-center">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-[#132219] p-3 shadow-xl shadow-amber-500/15 border-2 border-amber-500/30 flex items-center justify-center ring-4 ring-amber-500/10">
+                  <img
+                    src={getAssetUrl("/images/logo-dsn.png")}
+                    alt="Dewan Syariah Nasional MUI"
+                    className="w-full h-full object-contain grayscale opacity-60"
+                  />
+                </div>
+                <div className="absolute -bottom-2.5 px-3 py-1 rounded-full bg-amber-600 text-white flex items-center gap-1.5 shadow-md border-2 border-white dark:border-[#111C15]">
+                  <XCircle size={13} strokeWidth={2.5} />
+                  <span className="text-[11px] font-black uppercase tracking-wider">Unverified</span>
+                </div>
               </div>
             )}
           </div>
@@ -534,11 +527,7 @@ const DocumentVerificationPage = () => {
         </div>
 
         {/* ── CARD FOOTER ── */}
-        <div className="px-6 sm:px-8 py-4 bg-[#F8F9F5] dark:bg-[#0E1712] border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2 text-[10px] font-bold text-slate-400 tracking-wider">
-          <span className="flex items-center gap-1">
-            <Award size={12} className="text-[#D4AF37]" />
-            ISO 9001:2015 CERTIFIED ORGANIZATION
-          </span>
+        <div className="px-6 sm:px-8 py-3.5 bg-[#F8F9F5] dark:bg-[#0E1712] border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center text-[10px] font-bold tracking-wider">
           <span className="text-[#006633] dark:text-emerald-400">
             AMANAH • DSN-MUI DIGITAL TRUST
           </span>
@@ -550,7 +539,7 @@ const DocumentVerificationPage = () => {
         <p className="font-semibold text-slate-600 dark:text-slate-400">
           Dewan Syariah Nasional – Majelis Ulama Indonesia (DSN-MUI)
         </p>
-        <p>Gedung Majelis Ulama Indonesia, Jl. Proklamasi No. 51, Menteng, Jakarta Pusat 10320</p>
+        <p>Jl. Dempo No.19,  Pegangsaan, Kec. Menteng, Kota Jakarta Pusat, Daerah Khusus Ibukota Jakarta 10320</p>
         <p className="text-[10px] text-slate-400/80 pt-1">
           © {new Date().getFullYear()} DSN-MUI Amanah e-Office • Hak Cipta Dilindungi
         </p>
