@@ -2,8 +2,27 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, XCircle, ShieldCheck, FileText, Calendar, Building, Clock, User, Award } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  FileText,
+  Calendar,
+  Building2,
+  Clock,
+  Award,
+  Copy,
+  Check,
+  Printer,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  BadgeCheck,
+  Share2,
+  FileCheck,
+} from "lucide-react";
 import { getApiUrl } from "@/lib/api";
+import { getAssetUrl } from "@/lib/utils";
 
 interface VerificationData {
   id: string;
@@ -36,6 +55,8 @@ const DocumentVerificationPage = () => {
   const [data, setData] = useState<VerificationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   const API_BASE = getApiUrl();
 
@@ -64,26 +85,88 @@ const DocumentVerificationPage = () => {
       });
   }, [docId, API_BASE]);
 
+  const handleCopyLink = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  const handlePrint = () => {
+    if (typeof window !== "undefined") {
+      window.print();
+    }
+  };
+
+  // Helper to format role title according to DSN-MUI official appointments
+  const getOfficialRole = (fullName: string, jobTitle: string) => {
+    const lower = (fullName || "").toLowerCase();
+    if (lower.includes("cholil") || lower.includes("nafis")) {
+      return "Ketua Badan Pengurus DSN-MUI";
+    }
+    if (lower.includes("amirsyah") || lower.includes("tambunan")) {
+      return "Sekretaris Badan Pengurus DSN-MUI";
+    }
+    if (lower.includes("adiwarman")) {
+      return "Wakil Ketua Badan Pengurus DSN-MUI";
+    }
+    if (lower.includes("hasanuddin")) {
+      return "Wakil Ketua Badan Pengurus DSN-MUI";
+    }
+    if (lower.includes("anwar abbas") || lower.includes("asrori")) {
+      return "Wakil Sekretaris Badan Pengurus DSN-MUI";
+    }
+    if (jobTitle && jobTitle !== "Pejabat" && jobTitle !== "PENANDATANGAN") {
+      return jobTitle;
+    }
+    return "Pejabat Penandatangan DSN-MUI";
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
-        <div className="w-12 h-12 border-4 border-[#006633] border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-sm font-semibold text-slate-500 uppercase tracking-widest animate-pulse">Memverifikasi Dokumen...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FBFBF8] dark:bg-[#0B140E] p-6 text-center">
+        <div className="relative mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-white dark:bg-[#132219] p-2 shadow-lg border border-[#006633]/20 flex items-center justify-center">
+            <img
+              src={getAssetUrl("/images/logo-dsn.png")}
+              alt="Logo DSN-MUI"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="absolute -inset-2 border-2 border-[#006633] border-t-transparent rounded-3xl animate-spin" />
+        </div>
+        <h2 className="text-base font-bold text-slate-850 dark:text-slate-200">
+          Memverifikasi Keaslian Dokumen...
+        </h2>
+        <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+          Menghubungkan ke sistem otentikasi Tanda Tangan Elektronik Dewan Syariah Nasional MUI
+        </p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
-        <div className="w-20 h-20 bg-red-50 dark:bg-red-950/20 text-red-500 rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-red-500/10">
-          <XCircle size={40} />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FBFBF8] dark:bg-[#0B140E] p-6">
+        <div className="w-full max-w-md bg-white dark:bg-[#132219] border border-red-200/80 dark:border-red-900/50 rounded-3xl p-8 text-center shadow-xl shadow-red-500/5 relative overflow-hidden">
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-200 dark:border-red-800">
+            <XCircle size={36} />
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-[10px] font-bold tracking-widest uppercase mb-3 border border-red-200/60 dark:border-red-900/60">
+            Verifikasi Tidak Valid
+          </div>
+          <h1 className="text-xl font-extrabold text-slate-900 dark:text-white mb-2">
+            Dokumen Tidak Ditemukan
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed mb-6">
+            {error || "Dokumen ini tidak terdaftar dalam pangkalan data resmi sertifikasi digital Dewan Syariah Nasional MUI atau berkas telah mengalami perubahan."}
+          </p>
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <ShieldCheck size={14} className="text-[#006633]" />
+            DSN-MUI Amanah Digital Trust
+          </div>
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">Verifikasi Gagal</h1>
-        <p className="text-slate-500 text-sm max-w-md text-center leading-relaxed mb-6">
-          {error || "Dokumen tidak valid atau tidak terdaftar dalam sistem sertifikasi digital Amanah."}
-        </p>
-        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">DSN-MUI Amanah Digital Trust</div>
       </div>
     );
   }
@@ -91,143 +174,390 @@ const DocumentVerificationPage = () => {
   const isValid = data.status === "SIGNED";
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center py-12 px-4">
-      {/* Header Brand */}
-      <div className="flex items-center gap-2.5 mb-10">
-        <div className="w-9 h-9 bg-[#006633] rounded-xl flex items-center justify-center shadow-lg shadow-[#006633]/20">
-          <ShieldCheck size={20} className="text-white" />
-        </div>
-        <div>
-          <span className="font-extrabold text-slate-900 dark:text-white text-base tracking-tight block">AMANAH</span>
-          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block -mt-1">Digital Trust Service</span>
-        </div>
+    <div className="min-h-screen bg-[#FBFBF8] dark:bg-[#0B140E] text-slate-800 dark:text-slate-100 flex flex-col items-center py-10 px-4 sm:px-6 relative selection:bg-[#006633]/20 selection:text-[#006633]">
+      
+      {/* Background Subtle Gradient & Geometry Accent */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden print:hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-[#006633]/8 via-[#D4AF37]/5 to-transparent blur-3xl opacity-70" />
       </div>
 
-      {/* Main Card */}
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-100/50 dark:shadow-none overflow-hidden relative">
+      {/* ── TOP HEADER BRAND ── */}
+      <header className="relative z-10 flex flex-col items-center mb-8 text-center max-w-xl">
+        <div className="flex items-center gap-3.5 mb-2">
+          <div className="w-13 h-13 rounded-2xl bg-white dark:bg-[#132219] p-1.5 shadow-md shadow-[#006633]/10 border border-[#006633]/20 flex items-center justify-center">
+            <img
+              src={getAssetUrl("/images/logo-dsn.png")}
+              alt="Logo DSN-MUI"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="text-left">
+            <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-[#006633] dark:text-emerald-400 uppercase leading-tight">
+              Dewan Syariah Nasional
+            </h1>
+            <p className="text-[11px] font-bold tracking-widest text-slate-600 dark:text-slate-350 uppercase -mt-0.5">
+              Majelis Ulama Indonesia
+            </p>
+          </div>
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-[#132219]/80 backdrop-blur-sm border border-[#006633]/15 text-[10px] font-semibold text-[#006633] dark:text-emerald-300 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#006633] animate-pulse" />
+          Layanan Verifikasi Keabsahan Tanda Tangan Elektronik (TTE)
+        </div>
+      </header>
+
+      {/* ── MAIN VERIFICATION CARD ── */}
+      <main className="relative z-10 w-full max-w-2xl bg-white dark:bg-[#111C15] border border-slate-200/90 dark:border-emerald-950/60 rounded-3xl shadow-2xl shadow-[#006633]/5 overflow-hidden">
         
-        {/* Status Section */}
-        <div className={`p-8 text-center border-b border-slate-50 dark:border-slate-850 relative ${
-          isValid 
-            ? "bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/10" 
-            : "bg-gradient-to-b from-amber-50/50 to-transparent dark:from-amber-950/10"
-        }`}>
+        {/* Top Gold-Green Brand Ribbon Accent */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#006633] via-[#D4AF37] to-[#006633]" />
+
+        {/* Decorative Watermark Seal Stamp (Subtle & Authentic) */}
+        <div className="absolute top-20 right-4 pointer-events-none select-none opacity-[0.045] dark:opacity-[0.06] transform rotate-12 scale-125">
+          <img
+            src={getAssetUrl("/images/stempel-dsn.png")}
+            alt="Stempel Resmi DSN-MUI"
+            className="w-72 h-72 object-contain"
+          />
+        </div>
+
+        {/* ── STATUS HERO SECTION ── */}
+        <div
+          className={`p-6 sm:p-8 text-center border-b relative ${
+            isValid
+              ? "bg-gradient-to-b from-[#006633]/6 via-transparent to-transparent border-emerald-100 dark:border-emerald-900/30"
+              : "bg-gradient-to-b from-amber-500/6 via-transparent to-transparent border-amber-100 dark:border-amber-900/30"
+          }`}
+        >
+          {/* Status Badge Emblem */}
           <div className="flex justify-center mb-4">
             {isValid ? (
-              <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-450 rounded-2xl flex items-center justify-center shadow-md animate-pulse">
-                <CheckCircle2 size={32} />
+              <div className="relative">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#006633] to-[#004d26] text-white flex items-center justify-center shadow-xl shadow-[#006633]/25 ring-4 ring-emerald-500/20">
+                  <ShieldCheck size={42} strokeWidth={2.2} />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#D4AF37] text-white flex items-center justify-center shadow-md border-2 border-white dark:border-[#111C15]">
+                  <Check size={16} strokeWidth={3} />
+                </div>
               </div>
             ) : (
-              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-450 rounded-2xl flex items-center justify-center shadow-md">
-                <XCircle size={32} />
+              <div className="w-20 h-20 rounded-3xl bg-amber-500 text-white flex items-center justify-center shadow-xl shadow-amber-500/20 ring-4 ring-amber-500/20">
+                <XCircle size={40} />
               </div>
             )}
           </div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-            {isValid ? "Dokumen Ini Valid & Asli" : "Dokumen Dalam Proses Approval"}
+
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {isValid ? "Dokumen Sah & Terverifikasi" : "Dokumen Belum Ditandatangani Penuh"}
           </h2>
-          <p className="text-xs text-slate-400 font-medium mt-1">
-            Ditandatangani secara elektronik di bawah otoritas Dewan Syariah Nasional MUI
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-350 max-w-lg mx-auto font-normal mt-1.5 leading-relaxed">
+            {isValid
+              ? "Tanda Tangan Elektronik (TTE) pada surat ini telah tersertifikasi secara digital dan terdaftar resmi di pangkalan data Dewan Syariah Nasional - Majelis Ulama Indonesia."
+              : "Dokumen ini terdaftar dalam sistem namun masih dalam alur persetujuan internal atau revisi."}
           </p>
 
-          <div className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-750 text-[10px] font-bold text-slate-600 dark:text-slate-350 uppercase tracking-widest shadow-sm">
-            <Award size={12} className="text-[#006633]" />
-            Status: {data.status}
+          {/* Quick Meta Indicators */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold text-[#006633] dark:text-emerald-300">
+              <BadgeCheck size={14} className="text-[#006633] dark:text-emerald-400" />
+              STATUS: {data.status}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#D4AF37]/10 dark:bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[11px] font-bold text-[#997A1E] dark:text-[#E5C365]">
+              <Lock size={12} />
+              TTE Terenkripsi Amanah
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-350">
+              <Clock size={12} />
+              {new Date().toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
           </div>
         </div>
 
-        {/* Document Meta Section */}
-        <div className="p-8 space-y-6">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Detail Dokumen</h3>
+        {/* ── DOCUMENT DETAILS SECTION ── */}
+        <div className="p-6 sm:p-8 space-y-6">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-850 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <FileText size={12} /> Judul Dokumen
-              </span>
-              <p className="text-sm font-extrabold text-slate-850 dark:text-slate-200">{data.title}</p>
+          {/* Section Title */}
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2">
+              <FileCheck size={18} className="text-[#006633] dark:text-emerald-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Informasi Dokumen Resmi
+              </h3>
             </div>
+            <span className="text-[10px] font-semibold text-[#D4AF37] dark:text-[#E5C365] bg-[#D4AF37]/10 px-2 py-0.5 rounded-md border border-[#D4AF37]/20">
+              Otentikasi Sistem
+            </span>
+          </div>
+
+          {/* Grid Metadata */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Award size={12} /> Nomor Surat
+            {/* Nomor Surat Card */}
+            <div className="p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-1 md:col-span-2">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Award size={13} className="text-[#006633]" /> Nomor Dokumen / Surat
               </span>
-              <p className="text-sm font-extrabold text-[#006633]">{data.documentNumber || "—"}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-mono text-sm sm:text-base font-extrabold text-[#006633] dark:text-emerald-400 tracking-tight break-all">
+                  {data.documentNumber || "— (Nomor belum diterbitkan)"}
+                </p>
+                {data.documentNumber && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(data.documentNumber || "");
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    title="Salin Nomor Surat"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0 print:hidden"
+                  >
+                    {copied ? <Check size={14} className="text-[#006633]" /> : <Copy size={14} />}
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Building size={12} /> Instansi Penerbit
+            {/* Judul Dokumen */}
+            <div className="p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-1 md:col-span-2">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <FileText size={13} /> Perihal / Judul Naskah
               </span>
-              <p className="text-sm font-extrabold text-slate-850 dark:text-slate-200">{data.organization}</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                {data.title}
+              </p>
             </div>
 
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Calendar size={12} /> Tanggal Dibuat
+            {/* Instansi Penerbit */}
+            <div className="p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Building2 size={13} /> Instansi Penerbit
               </span>
-              <p className="text-sm font-bold text-slate-850 dark:text-slate-200">
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {data.organization}
+              </p>
+            </div>
+
+            {/* Klasifikasi & Kategori */}
+            <div className="p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Award size={13} /> Klasifikasi & Kategori
+              </span>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {data.classification} • {data.category}
+              </p>
+            </div>
+
+            {/* Tanggal Terbit */}
+            <div className="p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-1 md:col-span-2">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} /> Tanggal Dibuat / Diterbitkan
+              </span>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                 {new Date(data.createdAt).toLocaleDateString("id-ID", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
-                })} WIB
+                })}{" "}
+                WIB
               </p>
             </div>
           </div>
 
-          {/* Signatories List */}
-          <div className="space-y-4 pt-2">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Penandatangan Digital</span>
-              <span className="text-[10px] text-[#006633] bg-[#006633]/10 px-2 py-0.5 rounded-md">Verified Signatures</span>
-            </h3>
+          {/* ── SIGNATORIES SECTION ── */}
+          <div className="space-y-3 pt-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-2.5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={18} className="text-[#006633] dark:text-emerald-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Penandatangan Resmi (TTE)
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold text-[#006633] dark:text-emerald-400 bg-[#006633]/10 px-2 py-0.5 rounded-md">
+                {data.signatures.length} Pejabat Berwenang
+              </span>
+            </div>
 
             {data.signatures.length > 0 ? (
               <div className="space-y-3">
-                {data.signatures.map((sig) => (
-                  <div key={sig.userId} className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 text-[#006633] flex items-center justify-center shrink-0">
-                      <ShieldCheck size={22} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate">{sig.fullName}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide truncate">{sig.jobTitle}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg">
-                        <Clock size={10} />
-                        Signed
+                {data.signatures.map((sig, idx) => {
+                  const roleName = getOfficialRole(sig.fullName, sig.jobTitle);
+                  return (
+                    <div
+                      key={sig.userId || idx}
+                      className="p-4 sm:p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#132219] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-[#006633]/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-[#006633] dark:text-emerald-400 border border-[#006633]/20 flex items-center justify-center shrink-0">
+                          <ShieldCheck size={24} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                            {sig.fullName}
+                          </p>
+                          <p className="text-[11px] font-semibold text-[#006633] dark:text-emerald-400 uppercase tracking-wide truncate">
+                            {roleName}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {sig.email}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-[9px] text-slate-400 font-semibold mt-1">
-                        {new Date(sig.signedAt).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </p>
+
+                      <div className="flex items-center justify-between sm:flex-col sm:items-end sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+                        <div className="inline-flex items-center gap-1 text-[10px] text-[#006633] dark:text-emerald-300 font-bold bg-[#006633]/10 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-[#006633]/20">
+                          <CheckCircle2 size={12} />
+                          Ditandatangani
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium sm:mt-1">
+                          {new Date(sig.signedAt).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}{" "}
+                          WIB
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-center p-6 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs font-medium">
-                Belum ada tanda tangan digital yang tercatat untuk dokumen ini.
+              <div className="text-center p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs font-medium">
+                Belum ada penandatanganan digital yang tercatat untuk dokumen ini.
               </div>
             )}
           </div>
+
+          {/* ── AUDIT TRAIL DISCLOSURE (ALUR PERSETUJUAN & PARAF) ── */}
+          {data.workflowSteps && data.workflowSteps.length > 0 && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAuditTrail(!showAuditTrail)}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-between transition-colors print:hidden"
+              >
+                <span className="flex items-center gap-2">
+                  <Clock size={14} className="text-slate-400" />
+                  Riwayat Alur Persetujuan & Paraf ({data.workflowSteps.length} Tahapan)
+                </span>
+                {showAuditTrail ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {showAuditTrail && (
+                <div className="mt-3 p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-3">
+                  {data.workflowSteps.map((step, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800 last:border-b-0 last:pb-0"
+                    >
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold ${
+                          step.status === "APPROVED" || step.status === "SIGNED"
+                            ? "bg-emerald-100 text-[#006633] dark:bg-emerald-950/60 dark:text-emerald-400"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                            {step.fullName}
+                          </p>
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                              step.status === "APPROVED" || step.status === "SIGNED"
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {step.status}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">{step.jobTitle}</p>
+                        {step.actionedAt && (
+                          <p className="text-[9px] text-slate-400 mt-0.5">
+                            {new Date(step.actionedAt).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}{" "}
+                            WIB
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── ACTION BUTTONS ── */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 print:hidden">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="w-full sm:w-1/2 py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs"
+            >
+              {copied ? <Check size={14} className="text-[#006633]" /> : <Share2 size={14} />}
+              {copied ? "Tautan Berhasil Disalin!" : "Bagikan Tautan Verifikasi"}
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="w-full sm:w-1/2 py-2.5 px-4 rounded-xl bg-[#006633] hover:bg-[#005229] text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-[#006633]/20"
+            >
+              <Printer size={14} />
+              Cetak Bukti Verifikasi
+            </button>
+          </div>
+
+          {/* ── OFFICIAL LEGAL DISCLAIMER ── */}
+          <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+            <p className="font-semibold text-[#006633] dark:text-emerald-400 mb-1 flex items-center gap-1.5">
+              <ShieldCheck size={14} />
+              Pernyataan Keabsahan Dokumen Elektronik
+            </p>
+            Informasi di atas merupakan catatan resmi yang bersumber langsung dari sistem informasi persuratan Dewan Syariah Nasional - Majelis Ulama Indonesia. Sesuai dengan UU ITE dan regulasi persuratan DSN-MUI, tanda tangan elektronik yang tertera pada dokumen ini memiliki kekuatan hukum yang sah dan mengikat.
+          </div>
         </div>
 
-        {/* Footer Brand */}
-        <div className="px-8 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] font-bold text-slate-400 tracking-wider">
-          <span>SECURE CERTIFICATE PROTOCOL</span>
-          <span className="text-[#006633]">DSN-MUI AMANAH</span>
+        {/* ── CARD FOOTER ── */}
+        <div className="px-6 sm:px-8 py-4 bg-[#F8F9F5] dark:bg-[#0E1712] border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2 text-[10px] font-bold text-slate-400 tracking-wider">
+          <span className="flex items-center gap-1">
+            <Award size={12} className="text-[#D4AF37]" />
+            ISO 9001:2015 CERTIFIED ORGANIZATION
+          </span>
+          <span className="text-[#006633] dark:text-emerald-400">
+            AMANAH • DSN-MUI DIGITAL TRUST
+          </span>
         </div>
-      </div>
+      </main>
+
+      {/* ── INSTITUTIONAL PAGE FOOTER ── */}
+      <footer className="relative z-10 mt-8 text-center text-[11px] text-slate-400 dark:text-slate-500 max-w-lg space-y-1">
+        <p className="font-semibold text-slate-600 dark:text-slate-400">
+          Dewan Syariah Nasional – Majelis Ulama Indonesia (DSN-MUI)
+        </p>
+        <p>Gedung Majelis Ulama Indonesia, Jl. Proklamasi No. 51, Menteng, Jakarta Pusat 10320</p>
+        <p className="text-[10px] text-slate-400/80 pt-1">
+          © {new Date().getFullYear()} DSN-MUI Amanah e-Office • Hak Cipta Dilindungi
+        </p>
+      </footer>
     </div>
   );
 };
 
 export default DocumentVerificationPage;
+
