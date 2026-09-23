@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { CheckCircle2, XCircle, ShieldCheck, FileText, Calendar, Building, Clock, User, Award } from "lucide-react";
+import { getApiUrl } from "@/lib/api";
 
 interface VerificationData {
   id: string;
@@ -36,7 +37,7 @@ const DocumentVerificationPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002/api";
+  const API_BASE = getApiUrl();
 
   useEffect(() => {
     if (!docId) return;

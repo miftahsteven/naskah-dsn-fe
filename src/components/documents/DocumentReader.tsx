@@ -3,7 +3,7 @@
 import React from "react";
 import { X, ExternalLink, Download, FileText, Loader2, Printer, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { getBaseUrl } from "@/lib/api";
-import { getAssetUrl } from "@/lib/utils";
+import { getAssetUrl, getBasePath } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
 const HTML_PDF_PRIMARY_COLOR = '#2563eb';
@@ -241,6 +241,12 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           });
         });
 
+        const basePath = getBasePath();
+        const origin = typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : 'https://amanah.dsnmui.or.id';
+        const docIdentifier = docId || json?.data?.id || '';
+
         const rows: any[] = [];
 
         signatures
@@ -256,13 +262,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
                 dateStyle: 'long',
                 timeStyle: 'short',
               }),
-              payload: JSON.stringify({
-                signatureId: s.id,
-                documentId: s.documentId,
-                userId: s.userId,
-                signedAt: s.signedAt,
-                fullName: s.user?.fullName,
-              }),
+              payload: `${origin}${basePath}/verify/document/${s.documentId || docIdentifier}`,
             });
           });
 
@@ -284,13 +284,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
                     dateStyle: 'long',
                     timeStyle: 'short',
                   }),
-                  payload: JSON.stringify({
-                    signatureId: st.id,
-                    documentId: json?.data?.id,
-                    userId: st.userId,
-                    signedAt: signedDate,
-                    fullName: st.user?.fullName,
-                  }),
+                  payload: `${origin}${basePath}/verify/document/${docIdentifier}`,
                 });
               }
             }
