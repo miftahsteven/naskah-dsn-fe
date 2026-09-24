@@ -1094,28 +1094,11 @@ const DocumentsPage = () => {
   };
 
   /**
-   * For HTML template documents: calls /render to get HTML with QR injected,
-   * then opens a print window for browser-native PDF saving.
+   * For HTML template documents or documents with evidence: calls /api/documents/:id/download
+   * which generates the official PDF merged with supporting documents (dokumen pendukung).
    */
   const downloadDocumentAsPdf = async (docId: string, fileName: string) => {
-    try {
-      const BASE_URL = getBaseUrl();
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-
-      const res = await fetch(`${BASE_URL}/api/documents/${docId}/render`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status} ${res.statusText}`);
-      }
-
-      const htmlText = await res.text();
-      openPrintWindow(htmlText, fileName);
-    } catch (err) {
-      console.error('Gagal mengunduh PDF:', err);
-      alert('Gagal mengunduh PDF. Silakan coba lagi.');
-    }
+    handleDownloadFile(`/api/documents/${docId}/download`, fileName);
   };
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
@@ -1177,11 +1160,11 @@ const DocumentsPage = () => {
       return;
     }
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-    if (isTemplate) {
-      downloadDocumentAsPdf(doc.id, latestVersion.fileName);
-    } else {
-      handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
-    }
+    const targetUrl = isTemplate || (doc.evidenceFiles && doc.evidenceFiles.length > 0)
+      ? `/api/documents/${doc.id}/download`
+      : latestVersion.fileUrl;
+    const defaultName = doc.documentNumber ? `${doc.documentNumber}.pdf` : latestVersion.fileName;
+    handleDownloadFile(targetUrl, defaultName);
   };
 
   const fetchData = async () => {

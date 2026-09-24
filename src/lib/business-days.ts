@@ -78,7 +78,7 @@ export interface SlaCalculationResult {
 export function calculateSlaStatus(
   submittedAtInput?: Date | string | null,
   completedAtInput?: Date | string | null,
-  targetWorkingDays: number = 14
+  targetWorkingDays: number = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SLA_MAX_WORKING_DAYS ? parseInt(process.env.NEXT_PUBLIC_SLA_MAX_WORKING_DAYS, 10) : 14)
 ): SlaCalculationResult {
   if (!submittedAtInput) {
     return {
@@ -138,15 +138,19 @@ export function calculateSlaStatus(
   let label = '';
   let badgeVariant: 'success' | 'warning' | 'danger' = 'success';
 
+  const envWarningThreshold = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SLA_WARNING_DAYS_THRESHOLD
+    ? parseInt(process.env.NEXT_PUBLIC_SLA_WARNING_DAYS_THRESHOLD, 10)
+    : 3;
+
   if (isOverdue) {
-    label = `Terlewat ${overdueDays} Hari Kerja`;
+    label = `⚠️ Butuh Perhatian (Terlewat ${overdueDays} Hari Kerja)`;
     badgeVariant = 'danger';
   } else if (remainingWorkingDays === 0) {
-    label = `Hari Terakhir SLA (Hari ke-${workingDaysElapsed})`;
-    badgeVariant = 'warning';
-  } else if (remainingWorkingDays <= 3) {
-    label = `Sisa ${remainingWorkingDays} Hari Kerja`;
-    badgeVariant = 'warning';
+    label = `⚠️ Butuh Perhatian (Hari Terakhir SLA: Ke-${workingDaysElapsed})`;
+    badgeVariant = 'danger';
+  } else if (remainingWorkingDays <= envWarningThreshold) {
+    label = `⚠️ Butuh Perhatian (Sisa ${remainingWorkingDays} Hari Kerja)`;
+    badgeVariant = 'danger';
   } else {
     label = `Sisa ${remainingWorkingDays} Hari Kerja`;
     badgeVariant = 'success';

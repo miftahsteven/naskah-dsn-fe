@@ -103,24 +103,34 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const isDocx = resolvedMimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     || resolvedMimeType === 'application/msword'
     || lowerUrl.endsWith('.docx') || lowerUrl.endsWith('.doc')
+    || lowerUrl.includes('.docx') || lowerUrl.includes('.doc')
     || lowerEffective.includes('.docx') || lowerEffective.includes('.doc')
-    || lowerTitle.endsWith('.docx') || lowerTitle.endsWith('.doc');
+    || lowerTitle.endsWith('.docx') || lowerTitle.endsWith('.doc')
+    || lowerTitle.includes('.docx') || lowerTitle.includes('.doc');
 
-  const isHtml = resolvedMimeType === 'text/html'
+  const isHtml = !isDocx && (
+    resolvedMimeType === 'text/html'
     || lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')
     || lowerEffective.includes('.html') || lowerEffective.includes('.htm')
-    || lowerTitle.endsWith('.html') || lowerTitle.endsWith('.htm');
+    || lowerTitle.endsWith('.html') || lowerTitle.endsWith('.htm')
+  );
 
-  const isPdf = resolvedMimeType === 'application/pdf'
+  const isPdf = !isDocx && !isHtml && (
+    resolvedMimeType === 'application/pdf'
     || lowerUrl.endsWith('.pdf')
+    || lowerUrl.includes('.pdf')
     || lowerEffective.includes('.pdf')
-    || lowerTitle.endsWith('.pdf');
+    || lowerTitle.endsWith('.pdf')
+    || lowerTitle.includes('.pdf')
+  );
 
   const imageRegex = /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i;
-  const isImage = imageRegex.test(lowerUrl)
+  const isImage = !isDocx && !isHtml && !isPdf && (
+    imageRegex.test(lowerUrl)
     || imageRegex.test(lowerEffective)
     || imageRegex.test(lowerTitle)
-    || (resolvedMimeType?.startsWith('image/') ?? false);
+    || (resolvedMimeType?.startsWith('image/') ?? false)
+  );
 
   const isLocalhost = (effectiveUrl || '').includes('localhost') || (effectiveUrl || '').includes('127.0.0.1');
 
@@ -170,10 +180,29 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const [zoom, setZoom] = React.useState<number>(100);
   const [rotation, setRotation] = React.useState<number>(0);
 
+  const [docxReady, setDocxReady] = React.useState<boolean>(false);
+  const [docxLoading, setDocxLoading] = React.useState<boolean>(false);
+  const [docxError, setDocxError] = React.useState<string | null>(null);
+  const docxContainerRef = React.useRef<HTMLDivElement>(null);
+
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 25, 200));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 25, 50));
   const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
   const handlePrint = () => {
+    if (isDocx && htmlContent) {
+      const iframe = document.getElementById('docx-iframe') as HTMLIFrameElement;
+      iframe?.contentWindow?.print();
+      return;
+    }
+    if (isDocx && docxContainerRef.current) {
+      window.print();
+      return;
+    }
+    if (isHtml) {
+      const iframe = document.getElementById('document-iframe') as HTMLIFrameElement;
+      iframe?.contentWindow?.print();
+      return;
+    }
     window.open(blobUrl || fullUrlWithToken, '_blank')?.print();
   };
   const [signatureRows, setSignatureRows] = React.useState<Array<{
@@ -189,7 +218,8 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   React.useEffect(() => {
     let cancelled = false;
     async function resolveDocFileUrl() {
-      if (!builtUrl || !builtUrl.includes('/api/documents/')) return;
+      // Do not attempt to resolve if it is already a direct version download URL
+      if (!builtUrl || !builtUrl.includes('/api/documents/') || builtUrl.includes('/versions/')) return;
 
       try {
         const headers: Record<string, string> = {};
@@ -908,37 +938,118 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     }
   }, [isOpen, isHtml, htmlPreviewUrl, docId, builtUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64]);
 
-  // Try converting DOCX to HTML in-browser using mammoth (if available).
+  // Render DOCX in-browser using docx-preview (native Word layout) with mammoth HTML fallback
   React.useEffect(() => {
     if (!(isOpen && isDocx && directUrl)) return undefined;
 
     let cancelled = false;
-
+    setDocxLoading(true);
+    setDocxError(null);
+    setDocxReady(false);
     setHtmlContent(null);
 
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     fetch(directUrl, { headers })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal mengunduh berkas`);
         return res.arrayBuffer();
       })
       .then(async (arrayBuffer) => {
         if (cancelled) return;
+
+        // 1. Try docx-preview for high-fidelity native Word styling
+        try {
+          const docx = await import('docx-preview');
+          if (docxContainerRef.current) {
+            docxContainerRef.current.innerHTML = '';
+            await docx.renderAsync(arrayBuffer, docxContainerRef.current, undefined, {
+              className: 'docx-preview-root',
+              inWrapper: true,
+              ignoreWidth: false,
+              ignoreHeight: false,
+              breakPages: true,
+              renderHeaders: true,
+              renderFooters: true,
+            });
+            if (cancelled) return;
+            setDocxReady(true);
+            setDocxLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('docx-preview failed, attempting mammoth fallback:', err);
+        }
+
+        // 2. Fallback to mammoth for converting DOCX to HTML
         try {
           const mammoth = await import('mammoth');
           const result = await mammoth.convertToHtml({ arrayBuffer });
           if (cancelled) return;
-          setHtmlContent(result.value);
-        } catch (err) {
-          console.warn('DOCX conversion failed or mammoth not available, falling back to viewer:', err);
+          const styledMammothHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <style>
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                  line-height: 1.6;
+                  color: #1e293b;
+                  background-color: #f8fafc;
+                  padding: 30px 16px;
+                  margin: 0;
+                }
+                .docx-container {
+                  background: #ffffff;
+                  max-width: 850px;
+                  margin: 0 auto;
+                  padding: 48px;
+                  border-radius: 12px;
+                  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08);
+                  border: 1px solid #e2e8f0;
+                  min-height: 800px;
+                }
+                h1, h2, h3, h4, h5, h6 { color: #0f172a; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 700; }
+                p { margin-top: 0; margin-bottom: 1em; }
+                table { border-collapse: collapse; width: 100%; margin: 1.5em 0; font-size: 13px; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+                th { background-color: #f1f5f9; font-weight: 600; }
+                img { max-width: 100%; height: auto; }
+                ul, ol { padding-left: 24px; margin-bottom: 1em; }
+              </style>
+            </head>
+            <body>
+              <div class="docx-container">
+                ${result.value}
+              </div>
+            </body>
+            </html>
+          `;
+          setHtmlContent(styledMammothHtml);
+          setDocxReady(true);
+          setDocxLoading(false);
+        } catch (err2: any) {
+          if (cancelled) return;
+          console.error('All DOCX conversions failed:', err2);
+          setDocxError(err2.message || 'Gagal memproses dokumen Word');
+          setDocxLoading(false);
         }
       })
-      .catch(err => console.error('Failed to fetch DOCX for conversion:', err));
+      .catch((fetchErr: any) => {
+        if (cancelled) return;
+        console.error('Failed to fetch DOCX for preview:', fetchErr);
+        setDocxError(fetchErr.message || 'Gagal mengunduh file untuk pratinjau');
+        setDocxLoading(false);
+      });
 
     return () => {
       cancelled = true;
+      setDocxReady(false);
+      setDocxLoading(false);
+      setDocxError(null);
       setHtmlContent(null);
     };
   }, [isOpen, isDocx, directUrl, token]);
@@ -1109,24 +1220,46 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
               </div>
             </div>
           )}
-          {isDocx && isLocalhost ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900">
-              <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-3xl shadow-sm flex items-center justify-center text-blue-500 mb-6 relative overflow-hidden">
-                <FileText size={48} strokeWidth={1.5} />
-                <div className="absolute bottom-3 right-3 text-[10px] font-extrabold bg-blue-100 px-1.5 py-0.5 rounded text-blue-700">DOCX</div>
-              </div>
-              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-3">Limitasi Environment Lokal</h3>
-              <p className="text-sm text-slate-500 max-w-md mb-8 leading-relaxed">
-                Server simulasi lokal (<strong>localhost</strong>) tidak dapat diakses oleh layanan Microsoft Word Viewer secara langsung dari internet. File PDF dapat dilihat, namun file Microsoft Word sementara akan diunduh terlebih dahulu pada mode pengembang.
-              </p>
-              <a
-                href={effectiveUrl}
-                download
-                className="flex items-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <Download size={20} />
-                Unduh Dokumen Berformat DOCX
-              </a>
+          {isDocx ? (
+            <div className="w-full h-full relative z-10 bg-slate-100 dark:bg-slate-900 flex flex-col min-h-[65vh] overflow-hidden">
+              {docxLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 z-20">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 size={36} className="animate-spin text-emerald-600" />
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Menyiapkan pratinjau dokumen Word (DOCX)...
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {docxError ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-slate-900 z-10">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+                    <FileText size={32} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Pratinjau DOCX</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mb-6">{docxError}</p>
+                  <button
+                    onClick={() => handleDownload(downloadUrl, downloadFileName)}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-xl shadow-md hover:opacity-90"
+                  >
+                    <Download size={16} /> Unduh File Dokumen
+                  </button>
+                </div>
+              ) : htmlContent ? (
+                <iframe
+                  id="docx-iframe"
+                  srcDoc={htmlContent}
+                  className="w-full h-full border-none bg-white flex-1"
+                  title={safeTitle}
+                />
+              ) : (
+                <div
+                  ref={docxContainerRef}
+                  className="w-full h-full overflow-y-auto p-4 sm:p-8 flex justify-center bg-slate-200 dark:bg-slate-800"
+                />
+              )}
             </div>
           ) : (
             <>
@@ -1140,6 +1273,16 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
               )}
               {isPdf ? (
                 <div className="w-full h-full relative z-10 bg-white flex flex-col min-h-[65vh]">
+                  {!blobUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 z-20">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 size={36} className="animate-spin text-emerald-600" />
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                          Memuat pratinjau PDF...
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <object
                     data={blobUrl || fullUrlWithToken}
                     type="application/pdf"

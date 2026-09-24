@@ -3488,7 +3488,7 @@ const CreateDocumentPage = () => {
 
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
-                              Dokumen Pendukung <span className="text-slate-400 font-normal lowercase">(upload opsional)</span>
+                              Dokumen Pendukung <span className="text-slate-400 font-normal lowercase">(hanya PDF, upload opsional)</span>
                             </label>
                             <div className={cn(
                               "border border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all cursor-pointer relative h-[162px]",
@@ -3497,10 +3497,22 @@ const CreateDocumentPage = () => {
                               <input
                                 type="file"
                                 className="absolute inset-0 opacity-0 cursor-pointer"
-                                accept=".pdf,.doc,.docx"
+                                accept=".pdf,application/pdf"
                                 onChange={(e) => {
                                   if (e.target.files && e.target.files[0]) {
-                                    setDokumenPendukung(e.target.files[0]);
+                                    const file = e.target.files[0];
+                                    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+                                    if (!isPdf) {
+                                      alert('Dokumen pendukung wajib berupa berkas PDF. Format selain PDF tidak diperbolehkan.');
+                                      e.target.value = '';
+                                      return;
+                                    }
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      alert('Ukuran berkas PDF maksimal 10MB.');
+                                      e.target.value = '';
+                                      return;
+                                    }
+                                    setDokumenPendukung(file);
                                   }
                                 }}
                               />
@@ -3508,6 +3520,8 @@ const CreateDocumentPage = () => {
                                 <div className="flex flex-col items-center text-center animate-in zoom-in duration-200">
                                   <Check className="text-primary mb-1" size={20} />
                                   <p className="text-xs font-bold text-slate-800 dark:text-white max-w-[200px] truncate">{dokumenPendukung.name}</p>
+                                  <p className="text-[10px] text-slate-400">{(dokumenPendukung.size / 1024 / 1024).toFixed(2)} MB • Berkas PDF</p>
+                                  <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">Otomatis digabung (merge) ke PDF surat keluar</p>
                                   <button
                                     type="button"
                                     onClick={() => setDokumenPendukung(null)}
@@ -3521,8 +3535,9 @@ const CreateDocumentPage = () => {
                                   <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2">
                                     <Upload className="text-slate-400" size={18} />
                                   </div>
-                                  <p className="text-xs font-bold text-slate-800 dark:text-white">Pilih Lampiran Pendukung</p>
-                                  <p className="text-[10px] text-slate-400 mt-1">PDF, DOC, DOCX maks 5MB</p>
+                                  <p className="text-xs font-bold text-slate-800 dark:text-white">Pilih Lampiran Pendukung (PDF)</p>
+                                  <p className="text-[10px] text-slate-400 mt-1">Hanya Berkas PDF (Maks 10MB)</p>
+                                  <p className="text-[9px] text-emerald-600 font-medium mt-0.5">Otomatis digabung ke PDF saat diunduh</p>
                                 </div>
                               )}
                             </div>

@@ -2977,7 +2977,7 @@ const EditTemplateLetterPage = () => {
 
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
-                        Dokumen Pendukung <span className="text-slate-400 font-normal lowercase">(upload opsional)</span>
+                        Dokumen Pendukung <span className="text-slate-400 font-normal lowercase">(hanya PDF, upload opsional)</span>
                       </label>
                       <div className={cn(
                         "border border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all cursor-pointer relative h-[162px]",
@@ -2986,10 +2986,22 @@ const EditTemplateLetterPage = () => {
                         <input
                           type="file"
                           className="absolute inset-0 opacity-0 cursor-pointer"
-                          accept=".pdf,.doc,.docx"
+                          accept=".pdf,application/pdf"
                           onChange={(e) => {
                             if (e.target.files && e.target.files[0]) {
-                              setDokumenPendukung(e.target.files[0]);
+                              const file = e.target.files[0];
+                              const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+                              if (!isPdf) {
+                                alert('Dokumen pendukung wajib berupa berkas PDF. Format selain PDF tidak diperbolehkan.');
+                                e.target.value = '';
+                                return;
+                              }
+                              if (file.size > 10 * 1024 * 1024) {
+                                alert('Ukuran berkas PDF maksimal 10MB.');
+                                e.target.value = '';
+                                return;
+                              }
+                              setDokumenPendukung(file);
                             }
                           }}
                         />
@@ -2997,7 +3009,8 @@ const EditTemplateLetterPage = () => {
                           <div className="flex flex-col items-center text-center animate-in zoom-in duration-200">
                             <Check className="text-primary mb-1" size={20} />
                             <p className="text-xs font-bold text-slate-800 dark:text-white max-w-[200px] truncate">{dokumenPendukung.name}</p>
-                            <p className="text-[10px] text-slate-400">{(dokumenPendukung.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <p className="text-[10px] text-slate-400">{(dokumenPendukung.size / 1024 / 1024).toFixed(2)} MB • Berkas PDF</p>
+                            <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">Otomatis digabung (merge) ke PDF surat keluar</p>
                             <span className="text-[9px] text-primary underline mt-1">Klik untuk ganti berkas</span>
                           </div>
                         ) : existingEvidenceFiles && existingEvidenceFiles.length > 0 ? (
@@ -3006,15 +3019,15 @@ const EditTemplateLetterPage = () => {
                             <p className="text-xs font-bold text-slate-800 dark:text-white max-w-[200px] truncate">
                               {existingEvidenceFiles[0].name}
                             </p>
-                            <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Tersimpan (Otomatis gabung di PDF)</p>
+                            <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Tersimpan (Otomatis digabung di PDF)</p>
                             <span className="text-[9px] text-slate-400 underline mt-1">Klik untuk unggah berkas baru</span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center text-center">
                             <Plus className="text-slate-400 mb-1" size={20} />
-                            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Unggah Berkas Pendukung</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">PDF, DOC, DOCX (Maks 10MB)</p>
-                            <p className="text-[9px] text-emerald-600 font-medium mt-1">Otomatis digabung di halaman berikutnya</p>
+                            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Unggah Berkas Pendukung (PDF)</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Hanya Berkas PDF (Maks 10MB)</p>
+                            <p className="text-[9px] text-emerald-600 font-medium mt-1">Otomatis digabung (merge) ke PDF saat diunduh</p>
                           </div>
                         )}
                       </div>

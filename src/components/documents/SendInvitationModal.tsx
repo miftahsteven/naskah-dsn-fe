@@ -66,7 +66,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
   // Invitation Content & Meeting
   const [invitationTitle, setInvitationTitle] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
-  const [location, setLocation] = useState('Ruang Rapat Pleno DSN-MUI Lt. 3 / Zoom Cloud Meeting');
+  const [location, setLocation] = useState('Kantor DSN MUI Jl. Dempo No. 19 Pegangsaan, Menteng, Jakarta Pusat 10320');
   const [syncAgenda, setSyncAgenda] = useState(true);
   const [customNote, setCustomNote] = useState('');
 

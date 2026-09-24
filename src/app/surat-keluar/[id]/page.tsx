@@ -24,7 +24,8 @@ import {
   Eye,
   FileCheck,
   Pencil,
-  Lock
+  Lock,
+  Printer
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
 import { cn, isSignedByFinalSignatory } from "@/lib/utils";
@@ -773,6 +774,10 @@ const DocumentDetailPage = () => {
    * which returns HTML with QR codes injected, then opens a print window.
    */
   const handleDownloadLatestAsPdf = async (docId: string, fileName: string) => {
+    handleDownloadFile(`/api/documents/${docId}/download`, fileName);
+  };
+
+  const handlePrintDocument = async (docId: string, fileName: string) => {
     try {
       const baseUrl = getBaseUrl();
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -788,8 +793,8 @@ const DocumentDetailPage = () => {
       const htmlText = await res.text();
       openPrintWindow(htmlText, fileName);
     } catch (err) {
-      console.error('Gagal mengunduh PDF:', err);
-      alert('Gagal mengunduh PDF. Silakan coba lagi.');
+      console.error('Gagal mencetak dokumen:', err);
+      alert('Gagal membuka pratinjau cetak. Silakan coba lagi.');
     }
   };
 
@@ -840,11 +845,11 @@ const DocumentDetailPage = () => {
     if (!doc || !doc.versions || doc.versions.length === 0) return;
     const latestVersion = doc.versions[0];
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-    if (isTemplate) {
-      handleDownloadLatestAsPdf(doc.id, latestVersion.fileName);
-    } else {
-      handleDownloadFile(latestVersion.fileUrl, latestVersion.fileName);
-    }
+    const targetUrl = isTemplate || (doc.evidenceFiles && doc.evidenceFiles.length > 0)
+      ? `/api/documents/${doc.id}/download`
+      : latestVersion.fileUrl;
+    const defaultName = doc.documentNumber ? `${doc.documentNumber}.pdf` : latestVersion.fileName;
+    handleDownloadFile(targetUrl, defaultName);
   };
 
 
@@ -902,9 +907,20 @@ const DocumentDetailPage = () => {
               </button>
             )}
           </Can>
-          <button onClick={handleDownloadLatest} className="flex-1 sm:flex-none flex items-center justify-center gap-2 p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-primary transition-all">
-            <Download size={20} />
-            <span className="sm:hidden text-xs font-bold">Unduh</span>
+          <button
+            onClick={handleDownloadLatest}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all text-xs shadow-sm cursor-pointer"
+            title="Unduh Berkas PDF Resmi (Tergabung dengan Dokumen Pendukung)"
+          >
+            <Download size={16} />
+            <span>Unduh PDF</span>
+          </button>
+          <button
+            onClick={() => handlePrintDocument(doc.id, doc.documentNumber || doc.title)}
+            className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-primary transition-all cursor-pointer"
+            title="Cetak Surat / Pratinjau Cetak"
+          >
+            <Printer size={18} />
           </button>
           <button className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-primary transition-all">
             <MoreVertical size={20} />
