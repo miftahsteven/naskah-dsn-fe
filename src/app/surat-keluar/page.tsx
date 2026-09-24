@@ -33,7 +33,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
-import { cn, getAssetUrl, isSignedByFinalSignatory } from "@/lib/utils";
+import { cn, getAssetUrl, isSignedByFinalSignatory, isSigningFlowComplete } from "@/lib/utils";
 import Can from "@/components/auth/Can";
 import DocumentReader from "@/components/documents/DocumentReader";
 import SendInvitationModal from "@/components/documents/SendInvitationModal";
@@ -1895,9 +1895,11 @@ const DocumentsPage = () => {
                                   <button onClick={() => handleDownloadDocument(doc)} className="p-1.5 rounded-lg text-indigo-650 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-405 dark:hover:bg-indigo-900/30 transition-colors" title="Unduh">
                                     <Download size={14} />
                                   </button>
-                                  <button onClick={() => setInvitationModalDoc(doc)} className="p-1.5 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer" title="Kirim Undangan Resmi">
-                                    <Send size={14} />
-                                  </button>
+                                  {isSigningFlowComplete(doc) && (
+                                    <button onClick={() => setInvitationModalDoc(doc)} className="p-1.5 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer" title="Kirim Undangan Resmi">
+                                      <Send size={14} />
+                                    </button>
+                                  )}
                                   <Can perform="DOC_EDIT">
                                     {(() => {
                                       const isFinalSigned = isSignedByFinalSignatory(doc);
@@ -2017,9 +2019,11 @@ const DocumentsPage = () => {
                           <button onClick={() => handleDownloadDocument(doc)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all whitespace-nowrap">
                             <Download size={14} /> Unduh
                           </button>
-                          <button onClick={() => setInvitationModalDoc(doc)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded text-xs font-bold text-[#006633] dark:text-emerald-300 hover:bg-[#006633] hover:text-white transition-all whitespace-nowrap cursor-pointer">
-                            <Send size={14} /> Kirim Undangan
-                          </button>
+                          {isSigningFlowComplete(doc) && (
+                            <button onClick={() => setInvitationModalDoc(doc)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded text-xs font-bold text-[#006633] dark:text-emerald-300 hover:bg-[#006633] hover:text-white transition-all whitespace-nowrap cursor-pointer">
+                              <Send size={14} /> Kirim Undangan
+                            </button>
+                          )}
                           <Can perform="DOC_EDIT">
                             {(() => {
                               const isFinalSigned = isSignedByFinalSignatory(doc);
@@ -2205,9 +2209,11 @@ const DocumentsPage = () => {
                      <button onClick={() => handleDownloadDocument(sidebarDoc)} className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Unduh">
                        <Download size={18} />
                      </button>
-                     <button onClick={() => setInvitationModalDoc(sidebarDoc)} className="p-2 text-slate-400 hover:text-[#006633] hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all cursor-pointer" title="Kirim Undangan Resmi">
-                       <Send size={18} />
-                     </button>
+                     {isSigningFlowComplete(sidebarDoc) && (
+                       <button onClick={() => setInvitationModalDoc(sidebarDoc)} className="p-2 text-slate-400 hover:text-[#006633] hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all cursor-pointer" title="Kirim Undangan Resmi">
+                         <Send size={18} />
+                       </button>
+                     )}
                      <button className="p-2 md:hidden text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all" onClick={() => setSelectedDocId(null)}>
                        <X size={18} />
                      </button>

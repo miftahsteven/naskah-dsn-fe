@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 
+export type RecipientRole = 'TO' | 'CC' | 'BCC';
+
 export interface RecipientItem {
   id?: string;
   userId?: string | null;
@@ -32,6 +34,7 @@ export interface RecipientItem {
   jobTitle?: string;
   department?: string;
   isExternal?: boolean;
+  role: RecipientRole;
 }
 
 interface SendInvitationModalProps {
@@ -52,11 +55,13 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [selectedRecipients, setSelectedRecipients] = useState<RecipientItem[]>([]);
+  const [activeTargetRole, setActiveTargetRole] = useState<RecipientRole>('TO');
   
   // External Guest Form
   const [showAddExternal, setShowAddExternal] = useState(false);
   const [extName, setExtName] = useState('');
   const [extEmail, setExtEmail] = useState('');
+  const [extRole, setExtRole] = useState<RecipientRole>('TO');
 
   // Invitation Content & Meeting
   const [invitationTitle, setInvitationTitle] = useState('');
@@ -87,12 +92,27 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Grouped recipients by role
+  const toRecipients = useMemo(
+    () => selectedRecipients.filter((r) => r.role === 'TO'),
+    [selectedRecipients]
+  );
+  const ccRecipients = useMemo(
+    () => selectedRecipients.filter((r) => r.role === 'CC'),
+    [selectedRecipients]
+  );
+  const bccRecipients = useMemo(
+    () => selectedRecipients.filter((r) => r.role === 'BCC'),
+    [selectedRecipients]
+  );
+
   // Initialize values when modal opens
   useEffect(() => {
     if (isOpen && doc) {
       setInvitationTitle(doc.title || '');
       setSendResults(null);
       setErrorMsg(null);
+      setActiveTargetRole('TO');
       
       // Default meeting date: tomorrow at 09:00 WIB
       const tomorrow = new Date();
@@ -122,12 +142,14 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
   useEffect(() => {
     if (selectedRecipients.length > 0) {
       if (!previewRecipientEmail || !selectedRecipients.some((r) => r.email === previewRecipientEmail)) {
-        setPreviewRecipientEmail(selectedRecipients[0].email);
+        // Prefer previewing a TO recipient first
+        const firstTo = toRecipients[0];
+        setPreviewRecipientEmail(firstTo ? firstTo.email : selectedRecipients[0].email);
       }
     } else {
       setPreviewRecipientEmail('');
     }
-  }, [selectedRecipients, previewRecipientEmail]);
+  }, [selectedRecipients, previewRecipientEmail, toRecipients]);
 
   // Filtered users for search
   const filteredUsers = useMemo(() => {
@@ -142,24 +164,108 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
     });
   }, [users, userSearch]);
 
-  const isUserSelected = (userEmail: string) => {
-    return selectedRecipients.some((r) => r.email.toLowerCase() === userEmail.toLowerCase());
+  // Helper to format/shorten overly long jabatan so user name is never hidden
+  const formatShortJabatan = (jabatanName?: string | null, maxChars = 20): string => {
+    if (!jabatanName) return '';
+    // Strip English translation after slash (e.g. "Ketua/Chairman" -> "Ketua")
+    let text = jabatanName.split('/')[0].trim();
+    
+    // Abbreviate common long organizational terms
+    text = text
+      .replace(/Koordinator/gi, 'Koord.')
+      .replace(/Wakil/gi, 'Wk.')
+      .replace(/Sekretaris/gi, 'Sekr.')
+      .replace(/Bendahara/gi, 'Bend.')
+      .replace(/Anggota/gi, 'Angg.')
+      .replace(/Kepala/gi, 'Ka.')
+      .replace(/Kesekretariatan/gi, 'Sekretariat')
+      .replace(/Bidang Layanan, Literasi, Relasi Industri dan Regulasi/gi, 'Bid. Layanan & Regulasi')
+      .replace(/Bidang Layanan, Literasi, Relasi lndustri dan Regulasi/gi, 'Bid. Layanan & Regulasi')
+      .replace(/Bidang Fatwa/gi, 'Bid. Fatwa')
+      .replace(/Badan Pengawas DSN-MUI/gi, 'Pengawas DSN')
+      .replace(/Badan Pengurus DSN-MUI/gi, 'Pengurus DSN')
+      .replace(/Administrasi/gi, 'Admin.');
+
+    if (text.length > maxChars) {
+      return text.slice(0, maxChars - 1).trim() + '…';
+    }
+    return text;
   };
 
-  const handleToggleUser = (user: any) => {
-    if (isUserSelected(user.email)) {
-      setSelectedRecipients(selectedRecipients.filter((r) => r.email.toLowerCase() !== user.email.toLowerCase()));
+  const getRecipientByEmail = (userEmail?: string | null) => {
+    if (!userEmail) return undefined;
+    const target = userEmail.trim().toLowerCase();
+    return selectedRecipients.find((r) => r.email && r.email.trim().toLowerCase() === target);
+  };
+
+  const getRecipientByUser = (user: any) => {
+    if (!user) return undefined;
+    if (user.id) {
+      const byId = selectedRecipients.find((r) => r.userId === user.id);
+      if (byId) return byId;
+    }
+    if (user.email) {
+      const target = user.email.trim().toLowerCase();
+      return selectedRecipients.find((r) => r.email && r.email.trim().toLowerCase() === target);
+    }
+    return undefined;
+  };
+
+  const handleToggleUserWithRole = (user: any, targetRole: RecipientRole) => {
+    if (!user.email) {
+      alert(`Pengguna "${user.fullName || user.name || 'Pengguna'}" belum memiliki alamat email yang terdaftar sehingga tidak dapat ditambahkan sebagai penerima email undangan.`);
+      return;
+    }
+    const existing = getRecipientByUser(user);
+    if (existing) {
+      if (existing.role === targetRole) {
+        // Toggle off
+        setSelectedRecipients(
+          selectedRecipients.filter((r) =>
+            user.id && r.userId ? r.userId !== user.id : (r.email || '').toLowerCase() !== (user.email || '').toLowerCase()
+          )
+        );
+      } else {
+        // Switch role
+        setSelectedRecipients(
+          selectedRecipients.map((r) => {
+            const isMatch = (user.id && r.userId && r.userId === user.id) || ((r.email || '').toLowerCase() === (user.email || '').toLowerCase());
+            return isMatch ? { ...r, role: targetRole } : r;
+          })
+        );
+      }
     } else {
       const newRec: RecipientItem = {
-        userId: user.id,
-        name: user.fullName,
+        userId: user.id || null,
+        name: user.fullName || user.name || user.email,
         email: user.email,
         jobTitle: user.jobTitle || user.jabatan?.name || '',
-        department: user.department?.name || '',
+        department: user.department?.name || user.department || '',
         isExternal: false,
+        role: targetRole,
       };
       setSelectedRecipients([...selectedRecipients, newRec]);
     }
+  };
+
+  const handleSwitchRole = (email: string, newRole: RecipientRole) => {
+    if (!email) return;
+    const target = email.trim().toLowerCase();
+    setSelectedRecipients(
+      selectedRecipients.map((r) =>
+        (r.email || '').trim().toLowerCase() === target ? { ...r, role: newRole } : r
+      )
+    );
+  };
+
+  const handleRemoveRecipient = (email?: string | null, userId?: string | null) => {
+    setSelectedRecipients(
+      selectedRecipients.filter((r) => {
+        if (userId && r.userId) return r.userId !== userId;
+        if (email && r.email) return r.email.trim().toLowerCase() !== email.trim().toLowerCase();
+        return true;
+      })
+    );
   };
 
   const handleAddExternalGuest = (e: React.FormEvent) => {
@@ -168,7 +274,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
       alert('Nama dan email tamu eksternal wajib diisi.');
       return;
     }
-    if (isUserSelected(extEmail)) {
+    if (getRecipientByEmail(extEmail)) {
       alert('Email ini sudah ada dalam daftar penerima.');
       return;
     }
@@ -179,6 +285,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
       department: 'Eksternal',
       jobTitle: 'Tamu / Undangan Luar',
       isExternal: true,
+      role: extRole,
     };
     setSelectedRecipients([...selectedRecipients, newGuest]);
     setExtName('');
@@ -186,43 +293,53 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
     setShowAddExternal(false);
   };
 
-  const handleRemoveRecipient = (email: string) => {
-    setSelectedRecipients(selectedRecipients.filter((r) => r.email.toLowerCase() !== email.toLowerCase()));
-  };
-
   const handleSelectAllFiltered = () => {
     const newItems = [...selectedRecipients];
+    let skippedWithoutEmail = 0;
     filteredUsers.forEach((u) => {
-      if (!newItems.some((r) => r.email.toLowerCase() === u.email.toLowerCase())) {
+      if (!u.email) {
+        skippedWithoutEmail++;
+        return;
+      }
+      const targetEmail = u.email.trim().toLowerCase();
+      const exists = newItems.find((r) => 
+        (u.id && r.userId && r.userId === u.id) || (r.email && r.email.trim().toLowerCase() === targetEmail)
+      );
+      if (!exists) {
         newItems.push({
           userId: u.id,
-          name: u.fullName,
+          name: u.fullName || u.name,
           email: u.email,
           jobTitle: u.jobTitle || u.jabatan?.name || '',
           department: u.department?.name || '',
           isExternal: false,
+          role: activeTargetRole,
         });
       }
     });
     setSelectedRecipients(newItems);
+    if (skippedWithoutEmail > 0) {
+      alert(`${skippedWithoutEmail} pengguna tidak ditambahkan karena belum memiliki alamat email terdaftar.`);
+    }
   };
 
-  const handleClearAllRecipients = () => {
-    setSelectedRecipients([]);
+  const handleClearRole = (role: RecipientRole) => {
+    setSelectedRecipients(selectedRecipients.filter((r) => r.role !== role));
   };
 
   // Preview helper
   const activePreviewRecipient = useMemo(() => {
     return (
       selectedRecipients.find((r) => r.email === previewRecipientEmail) ||
-      selectedRecipients[0] || { name: '[Nama Terundang]', email: 'penerima@email.com' }
+      toRecipients[0] ||
+      selectedRecipients[0] || { name: '[Nama Terundang]', email: 'penerima@email.com', role: 'TO' as RecipientRole }
     );
-  }, [selectedRecipients, previewRecipientEmail]);
+  }, [selectedRecipients, previewRecipientEmail, toRecipients]);
 
   // Handle Send to All
   const handleSendToAll = async () => {
-    if (selectedRecipients.length === 0) {
-      alert('Harap pilih minimal 1 penerima undangan.');
+    if (toRecipients.length === 0) {
+      alert('Harap pilih minimal 1 penerima utama (Kepada / To).');
       return;
     }
 
@@ -231,7 +348,10 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
       return;
     }
 
-    const confirmMsg = `Kirim undangan resmi via SMTP DSN-MUI ke ${selectedRecipients.length} orang penerima?\n\nSurat keluar akan otomatis dilampirkan dalam format PDF dengan body yang dipersonalisasi per penerima.`;
+    const ccText = ccRecipients.length > 0 ? `\n• ${ccRecipients.length} Tembusan (CC)` : '';
+    const bccText = bccRecipients.length > 0 ? `\n• ${bccRecipients.length} BCC` : '';
+    const confirmMsg = `Kirim undangan resmi via SMTP DSN-MUI ke:\n• ${toRecipients.length} Penerima Utama (Kepada)${ccText}${bccText}\n\nSurat keluar akan otomatis dilampirkan dalam format PDF dengan body yang dipersonalisasi per penerima. Lanjutkan?`;
+    
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -245,7 +365,21 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
         location: syncAgenda ? location.trim() : undefined,
         syncAgenda,
         customNote: customNote.trim() || undefined,
-        recipients: selectedRecipients.map((r) => ({
+        recipients: toRecipients.map((r) => ({
+          userId: r.userId || null,
+          name: r.name,
+          email: r.email,
+          jobTitle: r.jobTitle,
+          department: r.department,
+        })),
+        cc: ccRecipients.map((r) => ({
+          userId: r.userId || null,
+          name: r.name,
+          email: r.email,
+          jobTitle: r.jobTitle,
+          department: r.department,
+        })),
+        bcc: bccRecipients.map((r) => ({
           userId: r.userId || null,
           name: r.name,
           email: r.email,
@@ -322,7 +456,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
         <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-slate-800/80">
           
           {/* ── LEFT COLUMN: Recipient Selection & Meeting Settings ── */}
-          <div className="lg:col-span-6 p-5 sm:p-6 space-y-5 overflow-y-auto max-h-full">
+          <div className="lg:col-span-6 p-5 sm:p-6 space-y-4 overflow-y-auto max-h-full">
             
             {/* Title / Perihal */}
             <div>
@@ -339,47 +473,100 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
               />
             </div>
 
-            {/* Recipients Header & Search */}
+            {/* Recipient Role Switcher & Unified Search */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Users size={14} className="text-[#006633]" />
-                  Pilih Nama-Nama Terundang ({selectedRecipients.length} Terpilih)
-                </label>
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  {selectedRecipients.length > 0 && (
-                    <button
-                      type="button"
-                      disabled={isSending}
-                      onClick={handleClearAllRecipients}
-                      className="text-rose-500 hover:underline font-semibold"
-                    >
-                      Hapus Semua
-                    </button>
-                  )}
-                  <span className="text-slate-300">|</span>
+                {/* Target Role Segmented Tabs */}
+                <div className="inline-flex items-center p-0.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl">
                   <button
                     type="button"
-                    disabled={isSending}
-                    onClick={() => setShowAddExternal(!showAddExternal)}
-                    className="text-[#006633] dark:text-emerald-400 font-bold hover:underline flex items-center gap-0.5"
+                    onClick={() => setActiveTargetRole('TO')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      activeTargetRole === 'TO'
+                        ? 'bg-[#006633] text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
                   >
-                    <UserPlus size={12} />
-                    + Tamu Luar
+                    <span>Kepada (To)</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      activeTargetRole === 'TO'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}>
+                      {toRecipients.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTargetRole('CC')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      activeTargetRole === 'CC'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>Tembusan (CC)</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      activeTargetRole === 'CC'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}>
+                      {ccRecipients.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTargetRole('BCC')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      activeTargetRole === 'BCC'
+                        ? 'bg-slate-700 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>BCC</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      activeTargetRole === 'BCC'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}>
+                      {bccRecipients.length}
+                    </span>
                   </button>
                 </div>
+
+                {/* External Guest Button */}
+                <button
+                  type="button"
+                  disabled={isSending}
+                  onClick={() => {
+                    setExtRole(activeTargetRole);
+                    setShowAddExternal(!showAddExternal);
+                  }}
+                  className="text-[#006633] dark:text-emerald-400 text-xs font-bold hover:underline flex items-center gap-1"
+                >
+                  <UserPlus size={13} />
+                  + Tamu Luar
+                </button>
               </div>
 
               {/* External Guest Collapsible Form */}
               {showAddExternal && (
                 <form
                   onSubmit={handleAddExternalGuest}
-                  className="mb-3 p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 rounded-xl space-y-2 animate-in fade-in"
+                  className="mb-3 p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/90 dark:border-amber-900/40 rounded-xl space-y-2.5 animate-in fade-in"
                 >
-                  <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300">
-                    Tambah Peserta Eksternal (Luar DSN-MUI):
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1">
+                      <UserPlus size={13} /> Tambah Peserta Eksternal (Luar DSN-MUI):
+                    </p>
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                      Target: <strong>{extRole}</strong>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <input
                       type="text"
                       placeholder="Nama Lengkap & Gelar"
@@ -394,7 +581,17 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                       onChange={(e) => setExtEmail(e.target.value)}
                       className="px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 rounded-lg text-xs outline-none focus:border-amber-500"
                     />
+                    <select
+                      value={extRole}
+                      onChange={(e) => setExtRole(e.target.value as RecipientRole)}
+                      className="px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 rounded-lg text-xs font-bold outline-none text-slate-800 dark:text-white"
+                    >
+                      <option value="TO">Peran: Kepada (To)</option>
+                      <option value="CC">Peran: Tembusan (CC)</option>
+                      <option value="BCC">Peran: BCC</option>
+                    </select>
                   </div>
+
                   <div className="flex justify-end gap-2 pt-1">
                     <button
                       type="button"
@@ -405,7 +602,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                     </button>
                     <button
                       type="submit"
-                      className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold shadow-xs"
+                      className="px-3.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold shadow-xs cursor-pointer"
                     >
                       Tambahkan Tamu
                     </button>
@@ -413,7 +610,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                 </form>
               )}
 
-              {/* Search Box */}
+              {/* Single Unified Search Box */}
               <div className="relative mb-2">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -421,22 +618,28 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                   disabled={isSending}
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Ketik nama, email, jabatan, atau divisi..."
-                  className="w-full pl-9 pr-20 py-2 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-[#006633] transition-all"
+                  placeholder={
+                    activeTargetRole === 'TO'
+                      ? 'Cari nama/email untuk ditambahkan ke Kepada (To)...'
+                      : activeTargetRole === 'CC'
+                      ? 'Cari nama/email untuk ditambahkan ke Tembusan (CC)...'
+                      : 'Cari nama/email untuk ditambahkan ke BCC...'
+                  }
+                  className="w-full pl-9 pr-24 py-2 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-[#006633] transition-all"
                 />
                 {filteredUsers.length > 0 && userSearch && (
                   <button
                     type="button"
                     onClick={handleSelectAllFiltered}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#006633] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 px-2 py-0.5 rounded"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#006633] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 px-2 py-0.5 rounded cursor-pointer"
                   >
-                    + Semua ({filteredUsers.length})
+                    + Semua ({filteredUsers.length}) ke {activeTargetRole}
                   </button>
                 )}
               </div>
 
-              {/* User Selection List Container */}
-              <div className="border border-slate-200 dark:border-slate-700/80 rounded-2xl p-2 max-h-48 overflow-y-auto bg-slate-50/40 dark:bg-slate-900/40 space-y-1">
+              {/* Directory User Result List */}
+              <div className="border border-slate-200 dark:border-slate-700/80 rounded-2xl p-2 max-h-44 overflow-y-auto bg-slate-50/40 dark:bg-slate-900/40 space-y-1">
                 {loadingUsers ? (
                   <div className="py-6 flex items-center justify-center gap-2 text-xs text-slate-400">
                     <Loader2 size={16} className="animate-spin text-[#006633]" />
@@ -448,38 +651,111 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                   </div>
                 ) : (
                   filteredUsers.map((user) => {
-                    const selected = isUserSelected(user.email);
+                    const existingRecipient = getRecipientByUser(user);
+                    const hasEmail = Boolean(user.email);
                     return (
                       <div
                         key={user.id || user.email}
-                        onClick={() => !isSending && handleToggleUser(user)}
-                        className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer transition-all ${
-                          selected
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 font-semibold'
-                            : 'hover:bg-white dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
+                        className={`flex items-center justify-between p-2 rounded-xl text-xs transition-all ${
+                          existingRecipient
+                            ? existingRecipient.role === 'TO'
+                              ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 font-semibold'
+                              : existingRecipient.role === 'CC'
+                              ? 'bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 font-semibold'
+                              : 'bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-semibold'
+                            : 'hover:bg-white dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 truncate">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            readOnly
-                            className="rounded border-slate-300 text-[#006633] focus:ring-[#006633]"
-                          />
-                          <div className="truncate">
-                            <p className="truncate text-slate-800 dark:text-white font-medium">
-                              {user.fullName}
+                        <div
+                          className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer mr-2"
+                          onClick={() => !isSending && handleToggleUserWithRole(user, activeTargetRole)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-slate-800 dark:text-white font-semibold text-xs leading-tight">
+                              {user.fullName || user.name}
                             </p>
-                            <p className="text-[10px] text-slate-400 truncate">
-                              {user.email} {user.department?.name ? `• ${user.department.name}` : ''}
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                              {user.email ? (
+                                <span>{user.email}</span>
+                              ) : (
+                                <span className="text-amber-600 dark:text-amber-400 font-medium italic">(Tanpa Email)</span>
+                              )}
+                              {user.department?.name ? ` • ${user.department.name}` : ''}
                             </p>
                           </div>
                         </div>
-                        {user.jabatan?.name && (
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-350 shrink-0 ml-2">
-                            {user.jabatan.name}
-                          </span>
-                        )}
+
+                        {/* Quick Action or Status */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {user.jabatan?.name && (
+                            <span
+                              className="text-[9px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700/70 text-slate-600 dark:text-slate-350 max-w-[100px] sm:max-w-[130px] truncate inline-block shrink-0 font-medium"
+                              title={user.jabatan.name}
+                            >
+                              {formatShortJabatan(user.jabatan.name, 18)}
+                            </span>
+                          )}
+
+                          {existingRecipient ? (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                existingRecipient.role === 'TO'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                                  : existingRecipient.role === 'CC'
+                                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300'
+                                  : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                              }`}>
+                                {existingRecipient.role === 'TO' ? 'Kepada' : existingRecipient.role}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={isSending}
+                                onClick={() => handleRemoveRecipient(user.email, user.id)}
+                                className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
+                                title="Hapus dari daftar"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : hasEmail ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={isSending}
+                                onClick={() => handleToggleUserWithRole(user, 'TO')}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 hover:bg-[#006633] text-[#006633] hover:text-white transition-all border border-emerald-200 cursor-pointer"
+                                title="Tambahkan ke Kepada (To)"
+                              >
+                                + To
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSending}
+                                onClick={() => handleToggleUserWithRole(user, 'CC')}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white transition-all border border-indigo-200 cursor-pointer"
+                                title="Tambahkan ke Tembusan (CC)"
+                              >
+                                + CC
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSending}
+                                onClick={() => handleToggleUserWithRole(user, 'BCC')}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-700 text-slate-600 hover:text-white transition-all border border-slate-300 cursor-pointer"
+                                title="Tambahkan ke BCC"
+                              >
+                                + BCC
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              className="text-[9px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 rounded"
+                              title="Pengguna belum memiliki email terdaftar"
+                            >
+                              Tanpa Email
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -487,38 +763,136 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
               </div>
             </div>
 
-            {/* Selected Recipients Tag Cloud */}
-            {selectedRecipients.length > 0 && (
-              <div>
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1.5">
-                  Penerima Terpilih ({selectedRecipients.length}):
-                </span>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-                  {selectedRecipients.map((rec) => (
-                    <span
-                      key={rec.email}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-[#006633] dark:text-emerald-300"
-                    >
-                      <span className="truncate max-w-[130px]">{rec.name}</span>
-                      {rec.isExternal && (
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-amber-200 text-amber-900 font-bold">
-                          Luar
-                        </span>
-                      )}
-                      {!isSending && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRecipient(rec.email)}
-                          className="text-emerald-600 hover:text-rose-500"
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
+            {/* ── 3 RECIPIENT CATEGORIES: KEPADA, CC, BCC ── */}
+            <div className="space-y-3 pt-1">
+              
+              {/* 1. KEPADA (TO) */}
+              <div className="p-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl space-y-2 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <label className="text-xs font-bold text-slate-800 dark:text-white">
+                      Kepada (To) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      ({toRecipients.length} Penerima Utama • <span className="text-rose-600 font-semibold">Wajib min. 1</span>)
                     </span>
-                  ))}
+                  </div>
+                  {toRecipients.length > 0 && !isSending && (
+                    <button
+                      type="button"
+                      onClick={() => handleClearRole('TO')}
+                      className="text-[10px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                    >
+                      Kosongkan
+                    </button>
+                  )}
                 </div>
+
+                {toRecipients.length === 0 ? (
+                  <div className="py-2.5 px-3 border border-dashed border-emerald-200 dark:border-emerald-900/40 rounded-xl text-center text-xs text-slate-400 bg-emerald-50/30 dark:bg-emerald-950/10">
+                    Belum ada penerima utama dipilih. Klik nama di daftar atas untuk menambahkan ke <strong className="text-emerald-700 dark:text-emerald-400 font-semibold">Kepada (To)</strong>.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {toRecipients.map((rec) => (
+                      <RecipientChip
+                        key={rec.userId || rec.email}
+                        rec={rec}
+                        isSending={isSending}
+                        onSwitchRole={handleSwitchRole}
+                        onRemove={handleRemoveRecipient}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* 2. TEMBUSAN (CC) */}
+              <div className="p-3 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/50 rounded-2xl space-y-2 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <label className="text-xs font-bold text-slate-800 dark:text-white">
+                      Tembusan (CC)
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      ({ccRecipients.length} Penerima • <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Opsional</span>)
+                    </span>
+                  </div>
+                  {ccRecipients.length > 0 && !isSending && (
+                    <button
+                      type="button"
+                      onClick={() => handleClearRole('CC')}
+                      className="text-[10px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                    >
+                      Kosongkan
+                    </button>
+                  )}
+                </div>
+
+                {ccRecipients.length === 0 ? (
+                  <div className="py-2 px-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-400 italic bg-slate-50/50 dark:bg-slate-800/20">
+                    Tidak ada tembusan (opsional). Nama yang di-CC akan tercantum dalam surat resmi dan menerima tembusan.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {ccRecipients.map((rec) => (
+                      <RecipientChip
+                        key={rec.userId || rec.email}
+                        rec={rec}
+                        isSending={isSending}
+                        onSwitchRole={handleSwitchRole}
+                        onRemove={handleRemoveRecipient}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. BCC */}
+              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <label className="text-xs font-bold text-slate-800 dark:text-white">
+                      BCC (Blind Carbon Copy)
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      ({bccRecipients.length} Penerima • <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Opsional</span>)
+                    </span>
+                  </div>
+                  {bccRecipients.length > 0 && !isSending && (
+                    <button
+                      type="button"
+                      onClick={() => handleClearRole('BCC')}
+                      className="text-[10px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                    >
+                      Kosongkan
+                    </button>
+                  )}
+                </div>
+
+                {bccRecipients.length === 0 ? (
+                  <div className="py-2 px-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-400 italic bg-slate-50/50 dark:bg-slate-800/20">
+                    Tidak ada BCC (opsional). Akun penerima BCC tidak akan terlihat oleh penerima lainnya.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {bccRecipients.map((rec) => (
+                      <RecipientChip
+                        key={rec.userId || rec.email}
+                        rec={rec}
+                        isSending={isSending}
+                        onSwitchRole={handleSwitchRole}
+                        onRemove={handleRemoveRecipient}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
 
             {/* Meeting & Agenda Integration */}
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-3">
@@ -571,7 +945,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
           {/* ── RIGHT COLUMN: Dynamic Preview & Delivery Status ── */}
           <div className="lg:col-span-6 p-5 sm:p-6 flex flex-col justify-between space-y-4 bg-[#FBFBF8] dark:bg-[#0E1510] overflow-y-auto max-h-full">
             
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {/* Preview Header & Recipient Switcher */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div>
@@ -580,7 +954,7 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                     Pratinjau Pesan Personal Email
                   </h3>
                   <p className="text-[10px] text-slate-400">
-                    Setiap email dikirim terpisah dengan nama yang otomatis disesuaikan
+                    Setiap email dikirim personal dengan PDF resmi terlampir
                   </p>
                 </div>
 
@@ -590,14 +964,89 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                     <select
                       value={previewRecipientEmail}
                       onChange={(e) => setPreviewRecipientEmail(e.target.value)}
-                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-[#006633] outline-none"
+                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-[#006633] outline-none max-w-[150px] truncate"
                     >
-                      {selectedRecipients.map((r) => (
-                        <option key={r.email} value={r.email}>
-                          {r.name}
-                        </option>
-                      ))}
+                      {toRecipients.length > 0 && (
+                        <optgroup label="Kepada (To)">
+                          {toRecipients.map((r) => (
+                            <option key={r.email} value={r.email}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {ccRecipients.length > 0 && (
+                        <optgroup label="Tembusan (CC)">
+                          {ccRecipients.map((r) => (
+                            <option key={r.email} value={r.email}>
+                              [CC] {r.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {bccRecipients.length > 0 && (
+                        <optgroup label="BCC">
+                          {bccRecipients.map((r) => (
+                            <option key={r.email} value={r.email}>
+                              [BCC] {r.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Distribution Summary Card */}
+              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-1.5 text-xs">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">Rincian Distribusi Email:</span>
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    Total {selectedRecipients.length} Penerima ({toRecipients.length} To, {ccRecipients.length} CC, {bccRecipients.length} BCC)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-1 text-[11px]">
+                  <div className="flex items-start gap-2">
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 min-w-[70px]">Kepada:</span>
+                    <span className="text-slate-700 dark:text-slate-300 truncate">
+                      {toRecipients.length > 0 ? (
+                        toRecipients.map((r) => r.name).join(', ')
+                      ) : (
+                        <span className="text-rose-500 font-semibold italic">Belum dipilih (Wajib min. 1)</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-bold text-indigo-700 dark:text-indigo-400 min-w-[70px]">Tembusan:</span>
+                    <span className="text-slate-600 dark:text-slate-400 truncate">
+                      {ccRecipients.length > 0 ? (
+                        ccRecipients.map((r) => r.name).join(', ')
+                      ) : (
+                        <span className="italic text-slate-400">– (Opsional)</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-bold text-slate-600 dark:text-slate-400 min-w-[70px]">BCC:</span>
+                    <span className="text-slate-600 dark:text-slate-400 truncate">
+                      {bccRecipients.length > 0 ? (
+                        `${bccRecipients.length} penerima tersembunyi (${bccRecipients.map((r) => r.name).join(', ')})`
+                      ) : (
+                        <span className="italic text-slate-400">– (Opsional)</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {(ccRecipients.length > 0 || bccRecipients.length > 0) && (
+                  <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 text-[10.5px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ 1 Surat Khusus:</span>
+                    <span>
+                      {toRecipients.length > 1
+                        ? 'Penerima CC & BCC dikirimi 1 surat khusus rekap (tidak dikirim berulang per penerima utama).'
+                        : 'Penerima CC & BCC disertakan pada 1 surat resmi ini.'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -663,11 +1112,29 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                   Wassalamu&apos;alaykum Wr. Wb.
                 </p>
 
+                {/* Signature Area */}
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
                   <p className="font-semibold">Ttd,</p>
                   <p className="font-bold text-[#006633] dark:text-emerald-400">Sekretariat DSN-MUI</p>
                   <p className="text-[10px]">Dewan Syariah Nasional – Majelis Ulama Indonesia</p>
                 </div>
+
+                {/* Formal Tembusan Section in letter body (if CC present) */}
+                {ccRecipients.length > 0 && (
+                  <div className="pt-2 mt-2 border-t border-dashed border-slate-200 dark:border-slate-800 text-[11px]">
+                    <p className="font-bold text-slate-700 dark:text-slate-300">
+                      Tembusan disampaikan kepada Yth.:
+                    </p>
+                    <ol className="list-decimal pl-4 space-y-0.5 mt-1 text-slate-600 dark:text-slate-400">
+                      {ccRecipients.map((c, i) => (
+                        <li key={c.email || i}>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{c.name}</span>
+                          {c.department && <span className="text-[10px] text-slate-400"> ({c.department})</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
 
               {/* Automatic PDF Attachment Badge */}
@@ -740,26 +1207,28 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                 type="button"
                 disabled={isSending}
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all"
+                className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all cursor-pointer"
               >
                 {sendResults ? 'Selesai / Tutup' : 'Batal'}
               </button>
 
               <button
                 type="button"
-                disabled={isSending || selectedRecipients.length === 0}
+                disabled={isSending || toRecipients.length === 0}
                 onClick={handleSendToAll}
                 className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#006633] to-[#004d26] hover:from-[#004d26] hover:to-[#003319] text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-[#006633]/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isSending ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Mengirim ke {selectedRecipients.length} Email...</span>
+                    <span>Mengirim ke {toRecipients.length} Penerima...</span>
                   </>
                 ) : (
                   <>
                     <Send size={15} />
-                    <span>Kirim Undangan ke Semua ({selectedRecipients.length})</span>
+                    <span>
+                      Kirim Undangan ({toRecipients.length} Kepada{ccRecipients.length > 0 ? ` + ${ccRecipients.length} CC` : ''})
+                    </span>
                   </>
                 )}
               </button>
@@ -771,6 +1240,72 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
 
       </div>
     </div>
+  );
+};
+
+/**
+ * Helper Sub-Component: RecipientChip
+ * Renders individual recipient pill with role badge, 1-click role switcher, and remove button.
+ */
+const RecipientChip: React.FC<{
+  rec: RecipientItem;
+  isSending: boolean;
+  onSwitchRole: (email: string, role: RecipientRole) => void;
+  onRemove: (email?: string | null, userId?: string | null) => void;
+}> = ({ rec, isSending, onSwitchRole, onRemove }) => {
+  const isTo = rec.role === 'TO';
+  const isCc = rec.role === 'CC';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+        isTo
+          ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-[#006633] dark:text-emerald-300'
+          : isCc
+          ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300'
+          : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+      }`}
+    >
+      <span className="truncate max-w-[130px]" title={`${rec.name} (${rec.email})`}>
+        {rec.name}
+      </span>
+      {rec.isExternal && (
+        <span className="text-[9px] px-1 py-0.2 rounded bg-amber-200 text-amber-900 font-bold">
+          Luar
+        </span>
+      )}
+
+      {/* Role Switcher Select */}
+      {!isSending && (
+        <select
+          value={rec.role}
+          onChange={(e) => onSwitchRole(rec.email, e.target.value as RecipientRole)}
+          className={`text-[9px] font-bold uppercase rounded px-1 py-0.5 border cursor-pointer outline-none ${
+            isTo
+              ? 'bg-emerald-100 dark:bg-emerald-900 border-emerald-300 text-emerald-800 dark:text-emerald-200'
+              : isCc
+              ? 'bg-indigo-100 dark:bg-indigo-900 border-indigo-300 text-indigo-800 dark:text-indigo-200'
+              : 'bg-slate-200 dark:bg-slate-700 border-slate-400 text-slate-800 dark:text-slate-200'
+          }`}
+          title="Ubah peran penerima"
+        >
+          <option value="TO">TO</option>
+          <option value="CC">CC</option>
+          <option value="BCC">BCC</option>
+        </select>
+      )}
+
+      {!isSending && (
+        <button
+          type="button"
+          onClick={() => onRemove(rec.email, rec.userId)}
+          className="text-slate-400 hover:text-rose-500 transition-colors p-0.5 cursor-pointer"
+          title="Hapus"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </span>
   );
 };
 

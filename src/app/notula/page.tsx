@@ -360,7 +360,7 @@ function NotulaPageContent() {
   const filteredUsers = useMemo(() => {
     return usersList.filter((u) =>
       u.fullName.toLowerCase().includes(attendeeSearchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(attendeeSearchQuery.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(attendeeSearchQuery.toLowerCase()) ||
       (u.department?.name && u.department.name.toLowerCase().includes(attendeeSearchQuery.toLowerCase()))
     );
   }, [usersList, attendeeSearchQuery]);
@@ -372,7 +372,7 @@ function NotulaPageContent() {
       if (shareTargetNotula && u.id === shareTargetNotula.creatorId) return false;
       return (
         u.fullName.toLowerCase().includes(shareSearchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(shareSearchQuery.toLowerCase())
+        (u.email || '').toLowerCase().includes(shareSearchQuery.toLowerCase())
       );
     });
   }, [usersList, shareSearchQuery, shareTargetNotula]);

@@ -28,7 +28,17 @@ export function isSignedByFinalSignatory(doc: any): boolean {
   if (!doc) return false;
   if (doc.status === 'SIGNED' || doc.status === 'COMPLETED') return true;
 
-  const wf = doc.workflowInstances?.[0] || doc.workflowInstance;
+  let wf = doc.workflowInstance;
+  if (Array.isArray(doc.workflowInstances) && doc.workflowInstances.length > 0) {
+    wf = doc.workflowInstances.reduce((latest: any, curr: any) => {
+      if (!latest) return curr;
+      if (curr.createdAt && latest.createdAt) {
+        return new Date(curr.createdAt) > new Date(latest.createdAt) ? curr : latest;
+      }
+      return curr;
+    }, doc.workflowInstances[doc.workflowInstances.length - 1]);
+  }
+
   if (!wf || !wf.steps || wf.steps.length === 0) {
     return false;
   }
@@ -59,6 +69,72 @@ export function isSignedByFinalSignatory(doc: any): boolean {
   if (finalSignatoryStep.userId && doc.signatures && Array.isArray(doc.signatures)) {
     const isSigned = doc.signatures.some((sig: any) => sig.userId === finalSignatoryStep.userId && sig.signedAt);
     if (isSigned) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if the entire signing workflow progress for an outgoing document has reached 100%.
+ * Returns true ONLY when all steps in the signing workflow are APPROVED and no pending/unsigned signatories remain.
+ */
+export function isSigningFlowComplete(doc: any): boolean {
+  if (!doc) return false;
+
+  // Documents in rejected, revision, cancelled, or draft status cannot be 100% complete
+  if (
+    doc.status === 'REJECTED' ||
+    doc.status === 'REVISION' ||
+    doc.status === 'CANCELLED' ||
+    doc.status === 'DRAFT'
+  ) {
+    return false;
+  }
+
+  // 1. Check workflow steps
+  let wf = doc.workflowInstance;
+  if (Array.isArray(doc.workflowInstances) && doc.workflowInstances.length > 0) {
+    wf = doc.workflowInstances.reduce((latest: any, curr: any) => {
+      if (!latest) return curr;
+      if (curr.createdAt && latest.createdAt) {
+        return new Date(curr.createdAt) > new Date(latest.createdAt) ? curr : latest;
+      }
+      return curr;
+    }, doc.workflowInstances[doc.workflowInstances.length - 1]);
+  }
+
+  if (wf && Array.isArray(wf.steps) && wf.steps.length > 0) {
+    const steps = wf.steps;
+    const totalSteps = steps.length;
+    const approvedSteps = steps.filter((s: any) => s.status === 'APPROVED').length;
+
+    // Must be 100% of steps approved
+    if (totalSteps === 0 || approvedSteps < totalSteps) {
+      return false;
+    }
+
+    // Explicitly verify that no signatory is unapproved
+    const hasUnsignedSignatory = steps.some((s: any) => {
+      const role = s.roleId || s.role;
+      return (role === 'PENANDATANGAN' || role === 'SIGNER' || !role) && s.status !== 'APPROVED';
+    });
+
+    if (hasUnsignedSignatory) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // 2. Check signatures array if document uses direct signature model without workflow instance
+  if (doc.signatures && Array.isArray(doc.signatures) && doc.signatures.length > 0) {
+    const allSigned = doc.signatures.every((sig: any) => !!sig.signedAt || sig.status === 'SIGNED');
+    return allSigned;
+  }
+
+  // 3. Fallback: if document status is explicitly COMPLETED or SIGNED
+  if (doc.status === 'COMPLETED' || doc.status === 'SIGNED') {
+    return true;
   }
 
   return false;

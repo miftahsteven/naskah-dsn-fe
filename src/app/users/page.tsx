@@ -493,7 +493,7 @@ const ActionDropdown = ({
               onClick={() => { setOpen(false); onDelete(); }}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
             >
-              <Trash2 size={14} /> Nonaktifkan User
+              <Trash2 size={14} /> Hapus Pengguna
             </button>
           </Can>
         </div>
@@ -538,20 +538,24 @@ const UserManagementPage = () => {
 
   const filteredUsers = users.filter(
     (u) =>
-      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      (u.department?.name || "").toLowerCase().includes(search.toLowerCase())
+      (u.fullName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.department?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.jabatan?.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleDelete = async () => {
     if (!deleteUser) return;
     setActionLoading(true);
     try {
-      await api.delete(`/users/${deleteUser.id}`);
+      const res = await api.delete(`/users/${deleteUser.id}`);
       await fetchData();
       setDeleteUser(null);
+      if (res.data?.message) {
+        alert(res.data.message);
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message || "Gagal menonaktifkan user");
+      alert(err.response?.data?.message || "Gagal menghapus user");
     } finally {
       setActionLoading(false);
     }
@@ -585,9 +589,9 @@ const UserManagementPage = () => {
       )}
       {deleteUser && (
         <ConfirmModal
-          title="Nonaktifkan User?"
-          message={`Akun "${deleteUser.fullName}" akan dinonaktifkan. User tidak dapat login, tetapi data historis tetap terjaga.`}
-          confirmLabel="Ya, Nonaktifkan"
+          title="Hapus Pengguna?"
+          message={`Apakah Anda yakin ingin menghapus akun "${deleteUser.fullName}" (${deleteUser.email || 'Tanpa Email'})? Apabila akun belum memiliki riwayat persetujuan dokumen dinas, sistem akan menghapusnya secara permanen. Namun jika terdapat dokumen terkait, akun akan dinonaktifkan demi menjaga keabsahan arsip resmi.`}
+          confirmLabel="Ya, Hapus Pengguna"
           danger loading={actionLoading}
           onConfirm={handleDelete}
           onClose={() => setDeleteUser(null)}
@@ -642,7 +646,7 @@ const UserManagementPage = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-slate-200 shadow-sm relative z-10">
+      <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-slate-200 shadow-sm relative z-10 overflow-hidden">
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-4 text-slate-400">
             <Loader2 className="animate-spin text-primary" size={40} />
@@ -661,59 +665,72 @@ const UserManagementPage = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block">
-              <table className="w-full">
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full table-fixed min-w-[760px]">
+                <colgroup>
+                  <col className="w-[28%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-slate-50">
-                    <th className="rounded-tl-[24px] text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">User</th>
-                    <th className="text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Role & Department</th>
-                    <th className="text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Jabatan</th>
-                    <th className="text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">2FA</th>
-                    <th className="text-left py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Status</th>
-                    <th className="rounded-tr-[24px] text-right py-5 px-6 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Aksi</th>
+                    <th className="rounded-tl-[24px] text-left py-4 px-4 sm:px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">User</th>
+                    <th className="text-left py-4 px-4 sm:px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Role & Department</th>
+                    <th className="text-left py-4 px-4 sm:px-5 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Jabatan</th>
+                    <th className="text-left py-4 px-3 sm:px-4 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">2FA</th>
+                    <th className="text-left py-4 px-3 sm:px-4 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Status</th>
+                    <th className="rounded-tr-[24px] text-right py-4 pr-6 pl-2 text-[10px] uppercase tracking-widest text-slate-400 font-bold border-b border-slate-100">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredUsers.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50/50 transition-all group">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-white text-sm uppercase flex-shrink-0"
+                      <td className="py-4 px-4 sm:px-5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-white text-xs uppercase shrink-0"
                             style={{ background: 'linear-gradient(135deg, #006633 0%, #1B7F4A 100%)' }}>
                             {u.fullName.charAt(0)}
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 leading-tight truncate">{u.fullName}</p>
-                            <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
-                              <Mail size={10} />
-                              <span className="truncate">{u.email}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-900 text-xs sm:text-sm leading-tight truncate" title={u.fullName}>
+                              {u.fullName}
+                            </p>
+                            <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5 truncate" title={u.email || ''}>
+                              <Mail size={10} className="shrink-0" />
+                              <span className="truncate">{u.email || <span className="italic text-amber-600 font-medium">(Tanpa Email)</span>}</span>
                             </div>
                             {u.phone && (
-                              <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                                <Phone size={10} />
-                                <span>{u.phone}</span>
+                              <div className="flex items-center gap-1 text-[10px] text-slate-400 truncate" title={u.phone}>
+                                <Phone size={10} className="shrink-0" />
+                                <span className="truncate">{u.phone}</span>
                               </div>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-tight" style={{ background: '#E8F5EE', color: '#006633' }}>
+                      <td className="py-4 px-4 sm:px-5 min-w-0">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-tight inline-block" style={{ background: '#E8F5EE', color: '#006633' }}>
                           {u.role.name}
                         </span>
                         {u.department && (
-                          <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1.5 font-medium">
-                            <Building2 size={11} />
-                            <span className="truncate max-w-[150px]">{u.department.name}</span>
+                          <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1.5 font-medium min-w-0 truncate" title={u.department.name}>
+                            <Building2 size={11} className="shrink-0" />
+                            <span className="truncate">{u.department.name}</span>
                           </div>
                         )}
                       </td>
-                      <td className="py-4 px-6">
-                        <span className="text-[11px] text-slate-600 font-medium">
+                      <td className="py-4 px-4 sm:px-5 min-w-0">
+                        <span
+                          className="text-[11px] text-slate-600 font-medium line-clamp-2 leading-snug block"
+                          title={u.jabatan?.name || ''}
+                        >
                           {u.jabatan?.name || <span className="text-slate-300 italic">—</span>}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-3 sm:px-4">
                         <div className="flex items-center gap-1.5">
                           <div className={cn("w-2 h-2 rounded-full", u.twoFactorEnabled ? "bg-emerald-500" : "bg-slate-300")} />
                           <span className={cn("text-[10px] font-bold uppercase tracking-tighter", u.twoFactorEnabled ? "text-emerald-600" : "text-slate-400")}>
@@ -721,26 +738,35 @@ const UserManagementPage = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-3 sm:px-4">
                         {u.isActive ? (
-                          <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                            <CheckCircle2 size={12} /> Aktif
+                          <div className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            <CheckCircle2 size={11} /> Aktif
                           </div>
                         ) : (
-                          <div className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 font-bold bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-                            <XCircle size={12} /> Nonaktif
+                          <div className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                            <XCircle size={11} /> Nonaktif
                           </div>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 pr-6 pl-2 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setEditUser(u)}
-                            className="p-2 hover:bg-[#006633]/10 hover:text-[#006633] text-slate-400 rounded-lg transition-all"
-                            title="Edit user"
+                            className="p-1.5 hover:bg-[#006633]/10 hover:text-[#006633] text-slate-400 rounded-lg transition-all"
+                            title="Edit data user"
                           >
-                            <Edit2 size={16} />
+                            <Edit2 size={15} />
                           </button>
+                          <Can perform="USER_DELETE">
+                            <button
+                              onClick={() => setDeleteUser(u)}
+                              className="p-1.5 hover:bg-red-50 hover:text-red-600 text-slate-400 rounded-lg transition-all"
+                              title="Hapus pengguna"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </Can>
                           <ActionDropdown
                             user={u}
                             onEdit={() => setEditUser(u)}
@@ -771,12 +797,21 @@ const UserManagementPage = () => {
                         <p className="text-[11px] text-slate-400 truncate">{u.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       {u.isActive ? (
                         <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Aktif</span>
                       ) : (
                         <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border">Nonaktif</span>
                       )}
+                      <Can perform="USER_DELETE">
+                        <button
+                          onClick={() => setDeleteUser(u)}
+                          className="p-1.5 hover:bg-red-50 hover:text-red-600 text-slate-400 rounded-lg transition-all"
+                          title="Hapus pengguna"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </Can>
                       <ActionDropdown
                         user={u}
                         onEdit={() => setEditUser(u)}

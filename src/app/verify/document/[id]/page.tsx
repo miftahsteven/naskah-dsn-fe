@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
-  CheckCircle2,
   XCircle,
   ShieldCheck,
   FileText,
@@ -14,8 +13,6 @@ import {
   Copy,
   Check,
   Printer,
-  ChevronDown,
-  ChevronUp,
   Lock,
   BadgeCheck,
   Share2,
@@ -56,7 +53,6 @@ const DocumentVerificationPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   const API_BASE = getApiUrl();
 
@@ -97,30 +93,6 @@ const DocumentVerificationPage = () => {
     if (typeof window !== "undefined") {
       window.print();
     }
-  };
-
-  // Helper to format role title according to DSN-MUI official appointments
-  const getOfficialRole = (fullName: string, jobTitle: string) => {
-    const lower = (fullName || "").toLowerCase();
-    if (lower.includes("cholil") || lower.includes("nafis")) {
-      return "Ketua Badan Pengurus DSN-MUI";
-    }
-    if (lower.includes("amirsyah") || lower.includes("tambunan")) {
-      return "Sekretaris Badan Pengurus DSN-MUI";
-    }
-    if (lower.includes("adiwarman")) {
-      return "Wakil Ketua Badan Pengurus DSN-MUI";
-    }
-    if (lower.includes("hasanuddin")) {
-      return "Wakil Ketua Badan Pengurus DSN-MUI";
-    }
-    if (lower.includes("anwar abbas") || lower.includes("asrori")) {
-      return "Wakil Sekretaris Badan Pengurus DSN-MUI";
-    }
-    if (jobTitle && jobTitle !== "Pejabat" && jobTitle !== "PENANDATANGAN") {
-      return jobTitle;
-    }
-    return "Pejabat Penandatangan DSN-MUI";
   };
 
   if (loading) {
@@ -362,139 +334,7 @@ const DocumentVerificationPage = () => {
             </div>
           </div>
 
-          {/* ── SIGNATORIES SECTION ── */}
-          <div className="space-y-3 pt-3">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-2.5">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#006633] dark:text-emerald-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Penandatangan Resmi (TTE)
-                </h3>
-              </div>
-              <span className="text-[10px] font-bold text-[#006633] dark:text-emerald-400 bg-[#006633]/10 px-2 py-0.5 rounded-md">
-                {data.signatures.length} Pejabat Berwenang
-              </span>
-            </div>
 
-            {data.signatures.length > 0 ? (
-              <div className="space-y-3">
-                {data.signatures.map((sig, idx) => {
-                  const roleName = getOfficialRole(sig.fullName, sig.jobTitle);
-                  return (
-                    <div
-                      key={sig.userId || idx}
-                      className="p-4 sm:p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#132219] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-[#006633]/40 transition-colors"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-[#006633] dark:text-emerald-400 border border-[#006633]/20 flex items-center justify-center shrink-0">
-                          <ShieldCheck size={24} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
-                            {sig.fullName}
-                          </p>
-                          <p className="text-[11px] font-semibold text-[#006633] dark:text-emerald-400 uppercase tracking-wide truncate">
-                            {roleName}
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {sig.email}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between sm:flex-col sm:items-end sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 dark:border-slate-800/80 shrink-0">
-                        <div className="inline-flex items-center gap-1 text-[10px] text-[#006633] dark:text-emerald-300 font-bold bg-[#006633]/10 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-[#006633]/20">
-                          <CheckCircle2 size={12} />
-                          Ditandatangani
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-medium sm:mt-1">
-                          {new Date(sig.signedAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}{" "}
-                          WIB
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs font-medium">
-                Belum ada penandatanganan digital yang tercatat untuk dokumen ini.
-              </div>
-            )}
-          </div>
-
-          {/* ── AUDIT TRAIL DISCLOSURE (ALUR PERSETUJUAN & PARAF) ── */}
-          {data.workflowSteps && data.workflowSteps.length > 0 && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAuditTrail(!showAuditTrail)}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-between transition-colors print:hidden"
-              >
-                <span className="flex items-center gap-2">
-                  <Clock size={14} className="text-slate-400" />
-                  Riwayat Alur Persetujuan & Paraf ({data.workflowSteps.length} Tahapan)
-                </span>
-                {showAuditTrail ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
-
-              {showAuditTrail && (
-                <div className="mt-3 p-4 rounded-2xl bg-[#FBFBF8] dark:bg-[#132219]/60 border border-slate-200/80 dark:border-slate-800 space-y-3">
-                  {data.workflowSteps.map((step, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800 last:border-b-0 last:pb-0"
-                    >
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold ${
-                          step.status === "APPROVED" || step.status === "SIGNED"
-                            ? "bg-emerald-100 text-[#006633] dark:bg-emerald-950/60 dark:text-emerald-400"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                            {step.fullName}
-                          </p>
-                          <span
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                              step.status === "APPROVED" || step.status === "SIGNED"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {step.status}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400">{step.jobTitle}</p>
-                        {step.actionedAt && (
-                          <p className="text-[9px] text-slate-400 mt-0.5">
-                            {new Date(step.actionedAt).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}{" "}
-                            WIB
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ── ACTION BUTTONS ── */}
           <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 print:hidden">
