@@ -31,12 +31,19 @@ import {
   ShieldCheck,
   History,
   Maximize2,
+  Mail,
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
 import { cn, getAssetUrl, isSignedByFinalSignatory, isSigningFlowComplete } from "@/lib/utils";
 import Can from "@/components/auth/Can";
 import DocumentReader from "@/components/documents/DocumentReader";
 import SendInvitationModal from "@/components/documents/SendInvitationModal";
+import {
+  loadEvidencePdfImages,
+  generateAttachmentPagesHtml,
+  ATTACHMENT_CSS,
+  openPrintWindow,
+} from "@/lib/pdf-preview";
 
 const statusClass = (status: string) => {
   const map: Record<string, string> = {
@@ -45,6 +52,63 @@ const statusClass = (status: string) => {
     REJECTED: "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:border-red-900/50",
   };
   return map[status] ?? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+};
+
+export const getDocumentDeliveryInfo = (doc: any) => {
+  if (!doc) {
+    return { isSent: false, sentCount: 0, lastSentAt: null, recipients: [] };
+  }
+
+  // 1. If backend provided deliveryStatus, prefer it
+  if (doc.deliveryStatus) {
+    return {
+      isSent: Boolean(doc.deliveryStatus.isSent),
+      sentCount: Number(doc.deliveryStatus.sentCount || 0),
+      lastSentAt: doc.deliveryStatus.lastSentAt || null,
+      recipients: doc.deliveryStatus.recipients || [],
+    };
+  }
+
+  // 2. Otherwise calculate from doc.meetings
+  const meetings = Array.isArray(doc.meetings) ? doc.meetings : [];
+  let isSent = false;
+  let sentCount = 0;
+  let lastSentAt: string | null = null;
+  const sentRecipients: any[] = [];
+
+  for (const m of meetings) {
+    if (m.invitationSent) isSent = true;
+    const attendees = Array.isArray(m.attendees) ? m.attendees : [];
+    for (const att of attendees) {
+      if (att.invitationSent) {
+        sentCount++;
+        sentRecipients.push(att);
+        if (att.lastSentAt && (!lastSentAt || new Date(att.lastSentAt) > new Date(lastSentAt))) {
+          lastSentAt = att.lastSentAt;
+        }
+      }
+    }
+  }
+
+  // Fallback for meetings where invitationSent is true but attendees don't have individual flags
+  if (isSent && sentCount === 0) {
+    for (const m of meetings) {
+      if (m.invitationSent) {
+        const attendees = Array.isArray(m.attendees) ? m.attendees : [];
+        sentCount += attendees.length > 0 ? attendees.length : 1;
+        if (m.updatedAt || m.createdAt) {
+          lastSentAt = m.updatedAt || m.createdAt;
+        }
+      }
+    }
+  }
+
+  return {
+    isSent: isSent || sentCount > 0,
+    sentCount,
+    lastSentAt,
+    recipients: sentRecipients,
+  };
 };
 
 // ── Approval Submit Modal ──────────────────────────────────────────────────
@@ -417,7 +481,7 @@ const toDataURL = (url: string): Promise<string> =>
         })
     );
 
-const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: string, docId?: string }) => {
+const DocumentPreview = ({ fileUrl, title, docId, evidenceFiles }: { fileUrl: string, title: string, docId?: string, evidenceFiles?: any[] }) => {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -500,7 +564,19 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
           }
           return res.text();
         })
-        .then(text => {
+        .then(async text => {
+          let attachmentHtml = '';
+          if (evidenceFiles && evidenceFiles.length > 0) {
+            try {
+              const attachments = await loadEvidencePdfImages(evidenceFiles);
+              if (attachments.length > 0) {
+                attachmentHtml = generateAttachmentPagesHtml(attachments);
+              }
+            } catch (err) {
+              console.warn("Failed to load evidence pdf images for DocumentPreview:", err);
+            }
+          }
+
           const FOOTER_HTML = `<table class="amanah-letter-footer" style="display: none; width: 100%; border-collapse: collapse; margin-top: 14px; font-family: Arial, sans-serif;">
     <tr>
       <td style="vertical-align: middle; text-align: left; padding: 2px 10px 2px 0; font-size: 7.5pt; line-height: 1.35; font-style: italic; color: #1f2937;">
@@ -640,6 +716,16 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
             /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
             '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
           );
+
+          if (attachmentHtml) {
+            const injection = `\n<style>${ATTACHMENT_CSS}</style>\n${attachmentHtml}\n`;
+            if (processed.includes('</body>')) {
+              processed = processed.replace('</body>', `${injection}</body>`);
+            } else {
+              processed = `${processed}${injection}`;
+            }
+          }
+
           setHtmlContent(processed);
         })
         .catch(err => {
@@ -647,7 +733,7 @@ const DocumentPreview = ({ fileUrl, title, docId }: { fileUrl: string, title: st
           setFetchError(err.message || "Gagal memuat pratinjau dokumen.");
         });
     }
-  }, [isHtml, fullUrlWithToken, docId, safeFileUrl, fullUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64, certBgBase64, bismillahCertBase64, logoCertBase64]);
+  }, [isHtml, fullUrlWithToken, docId, safeFileUrl, fullUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64, certBgBase64, bismillahCertBase64, logoCertBase64, evidenceFiles]);
 
   const viewerUrl = isDocx 
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrlWithToken)}` 
@@ -731,6 +817,7 @@ const DocumentsPage = () => {
     classification: "",
     status: "",
     creator: "",
+    dispatchStatus: "",
   });
 
   // Right Sidebar States
@@ -775,330 +862,36 @@ const DocumentsPage = () => {
   };
 
   /**
-   * Opens a print window with the rendered HTML for browser-native PDF saving.
-   * No external libraries needed - uses browser's built-in print-to-PDF feature.
+   * Enters browser print mode preview (with letter and any attached PDF lampiran).
+   * Restored to print-preview-mode first workflow requested by DSN client.
    */
-  const openPrintWindow = (htmlText: string, fileName: string) => {
-    if (typeof window === 'undefined') return;
+  const downloadDocumentAsPdf = async (docId: string, fileName: string, evidenceFiles?: any[]) => {
+    try {
+      const BASE_URL = getBaseUrl();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-    const BASE_URL = getBaseUrl();
-    let processedHtml = htmlText;
+      const res = await fetch(`${BASE_URL}/api/documents/${docId}/render`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
 
-    // Convert relative image URLs (e.g. images/logo-dsn.png) to absolute URL
-    processedHtml = processedHtml.replace(/src=["']\/?(images\/[^"']+)["']/gi, `src="${BASE_URL}/$1"`);
-    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*#000000;?/gi, 'border-top: none;');
-    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*black;?/gi, 'border-top: none;');
-    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*#000;?/gi, 'border-top: none;');
-    processedHtml = processedHtml.replace(/<table class="amanah-letter-footer"[\s\S]*?<\/table>/gi, '');
-    processedHtml = processedHtml.replace(/\\?\${FOOTER_HTML}/g, '');
-    processedHtml = processedHtml.replace(/(<img[^>]*(?:bismillah|Bismillah)[^>]*style=["'])([^"']*)(["'])/gi, (match, p1, p2, p3) => {
-      let cleanStyle = p2.replace(/height:\s*[^;]+;?/gi, '').replace(/max-height:\s*[^;]+;?/gi, '').replace(/width:\s*[^;]+;?/gi, '').replace(/max-width:\s*[^;]+;?/gi, '').trim();
-      return `${p1}${cleanStyle ? cleanStyle + '; ' : ''}width: 260px; max-width: 45%; height: auto; max-height: 48px; margin: 8px auto 14px auto;${p3}`;
-    });
-    processedHtml = processedHtml.replace(
-      /(<!--\s*SALAM\s*PENUTUP\s*-->[\s\S]*?<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh[\.,]?)\s*(<\/p>)/gi,
-      '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
-    );
-    processedHtml = processedHtml.replace(
-      /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
-      '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
-    );
-
-    const FOOTER_HTML = `<table class="amanah-letter-footer" style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
-    <tr>
-      <td style="vertical-align: middle; text-align: left; padding: 4px 10px 4px 0; font-size: 7.5pt; line-height: 1.25; font-style: italic; color: #1f2937; border-top: 1px solid #e5e7eb;">
-        Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silakan pindai QR-Code
-      </td>
-      <td style="vertical-align: middle; text-align: right; width: 32px; padding: 4px 0; border-top: 1px solid #e5e7eb;">
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle;">
-          <path d="M16 2L5 6.5V14.5C5 21.2 9.7 27.5 16 29.5C22.3 27.5 27 21.2 27 14.5V6.5L16 2Z" fill="#006633" stroke="#004D26" stroke-width="1.5" stroke-linejoin="round"/>
-          <circle cx="16" cy="16" r="8.5" fill="#006633" stroke="#ffffff" stroke-width="1" stroke-dasharray="2 1.5"/>
-          <path d="M12 16L14.8 18.8L20.5 13" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </td>
-    </tr>
-  </table>`;
-
-    const styles = (processedHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
-    const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    let bodyInner = bodyMatch ? bodyMatch[1] : processedHtml;
-    if (bodyInner.includes('master-page-table')) {
-      bodyInner = bodyInner
-        .replace(/<table class="master-page-table"[\s\S]*?<tbody>\s*<tr>\s*<td>/gi, '')
-        .replace(/<\/td>\s*<\/tr>\s*<\/tbody>\s*<tfoot>[\s\S]*?<\/tfoot>\s*<\/table>/gi, '');
-    }
-
-    // Auto-wrap body in letter-body-wrapper if not already present
-    if (!bodyInner.includes('letter-body-wrapper')) {
-      const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
-      const bismillahMatch = bismillahEndRegex.exec(bodyInner);
-      if (bismillahMatch) {
-        const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
-        const headerPart = bodyInner.substring(0, cutIndex);
-        const restPart = bodyInner.substring(cutIndex);
-        bodyInner = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
       }
-    }
 
-    const printHtml = `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <base href="${BASE_URL}/">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${fileName || 'Dokumen'}</title>
-  ${styles}
-  <style>
-    @page {
-      size: A4;
-      margin-top: 10mm !important;
-      margin-bottom: 12mm !important;
-      margin-left: 10mm !important;
-      margin-right: 10mm !important;
-    }
-    @media print {
-      .print-btn-bar { display: none !important; }
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        padding-top: 0 !important;
+      const htmlText = await res.text();
+      let attachmentHtml = '';
+      if (evidenceFiles && evidenceFiles.length > 0) {
+        const attachments = await loadEvidencePdfImages(evidenceFiles);
+        if (attachments.length > 0) {
+          attachmentHtml = generateAttachmentPagesHtml(attachments);
+        }
       }
-    }
-    .print-btn-bar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
-      background: #1e40af; color: white; padding: 10px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-family: Arial, sans-serif;
-    }
-    .print-btn {
-      background: white; color: #1e40af; border: none; border-radius: 6px;
-      padding: 8px 20px; font-size: 14px; font-weight: bold;
-      cursor: pointer;
-    }
-    .print-btn:hover { background: #dbeafe; }
-    body {
-      padding-top: 56px;
-      font-family: Arial, Helvetica, sans-serif !important;
-      font-size: 10.5pt !important;
-      line-height: 1.25 !important;
-      color: #111827 !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
 
-    /* Wrapper to keep 25mm left & 20mm right body margins while Kop Surat uses full 190mm */
-    .letter-body-wrapper {
-      margin-left: 15mm !important;
-      margin-right: 10mm !important;
+      openPrintWindow(htmlText, fileName, attachmentHtml);
+    } catch (err) {
+      console.error('Gagal membuka mode cetak/unduh PDF:', err);
+      alert('Gagal membuka pratinjau cetak. Silakan coba lagi.');
     }
-
-    /* Master Print Layout Table */
-    table.master-page-table {
-      width: 100% !important;
-      border-collapse: collapse !important;
-      border: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-    table.master-page-table > tbody > tr > td {
-      padding: 0 !important;
-      border: none !important;
-      vertical-align: top !important;
-    }
-    table.master-page-table > tfoot > tr > td {
-      height: 20mm !important; /* Reserves space so body never overlaps footer */
-      padding: 0 !important;
-      border: none !important;
-    }
-
-    /* Ensure container uses full printable width within standard margins */
-    @media screen {
-      body {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-      }
-      .master-page-table {
-        max-width: 794px !important;
-        width: 100% !important;
-        margin: 0 auto !important;
-        padding: 10mm 10mm 12mm 10mm !important;
-        background: #ffffff !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-        box-sizing: border-box !important;
-        order: 1 !important;
-      }
-      .amanah-letter-footer {
-        display: table !important;
-        order: 2 !important;
-        width: 100% !important;
-        max-width: 794px !important;
-        margin: 16px auto 20px auto !important;
-        padding: 0 10mm !important;
-        box-sizing: border-box !important;
-      }
-    }
-    @media print {
-      .master-page-table {
-        max-width: 100% !important;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
-      }
-      tfoot {
-        display: table-footer-group !important;
-      }
-      .amanah-letter-footer {
-        display: table !important;
-        position: fixed !important;
-        bottom: 4mm !important;
-        left: 0 !important;
-        right: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        background: #ffffff !important;
-        z-index: 99999 !important;
-      }
-    }
-
-    /* Eliminate unwanted horizontal lines / borders on page break sections */
-    hr { display: none !important; }
-    div[style*="border-top: 1px solid #000000"],
-    div[style*="border-top:1px solid #000000"],
-    div[style*="border-top: 1px solid black"],
-    div[style*="border-top:1px solid black"],
-    div[style*="border-top: 1px solid #000"],
-    div[style*="border-top:1px solid #000"] {
-      border-top: none !important;
-      padding-top: 0 !important;
-    }
-
-    div[style*="margin-left: -30px"],
-    div[style*="margin-left:-30px"],
-    div[style*="margin-left: -40px"],
-    div[style*="margin-left:-40px"] {
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-      padding-top: 0 !important;
-    }
-    div, p, span, td, th, li, a, ol, ul, b, strong {
-      font-family: Arial, Helvetica, sans-serif !important;
-      line-height: 1.25 !important;
-    }
-    p, td, th, li, ol, ul {
-      font-size: 10.5pt !important;
-    }
-    ol, ul {
-      margin-top: 2px !important;
-      margin-bottom: 4px !important;
-      padding-left: 20px !important;
-    }
-    li {
-      margin-bottom: 2px !important;
-      font-size: 10.5pt !important;
-    }
-    p {
-      margin-top: 0px !important;
-      margin-bottom: 4px !important;
-      font-size: 10.5pt !important;
-    }
-    *[style*="font-size: 11pt"],
-    *[style*="font-size:11pt"],
-    *[style*="font-size: 12pt"],
-    *[style*="font-size:12pt"],
-    *[style*="font-size: 13pt"],
-    *[style*="font-size:13pt"],
-    *[style*="font-size: 14pt"],
-    *[style*="font-size:14pt"] {
-      font-size: 10.5pt !important;
-    }
-    .kop-surat-img, img[alt*="Kop Surat"] {
-      width: 100% !important;
-      max-width: 100% !important;
-      height: auto !important;
-      display: block !important;
-      margin: 0 auto 4px auto !important;
-    }
-    img[src*="bismillah"], img[alt*="Bismillah"] {
-      width: 260px !important;
-      max-width: 45% !important;
-      height: auto !important;
-      max-height: 48px !important;
-      display: block !important;
-      margin: 8px auto 14px auto !important;
-      object-fit: contain !important;
-      filter: brightness(0) !important;
-    }
-    img.qr-signature-img {
-      width: 55px !important;
-      height: 55px !important;
-      max-width: 55px !important;
-      max-height: 55px !important;
-      display: inline-block !important;
-      object-fit: contain !important;
-    }
-    div[style*="width: 60px"][style*="height: 60px"],
-    div[style*="width: 70px"][style*="height: 70px"] {
-      margin: 2px 0 2px 0 !important;
-      width: 55px !important;
-      height: 55px !important;
-    }
-    .amanah-letter-footer td {
-      font-size: 7.5pt !important;
-      line-height: 1.25 !important;
-    }
-  </style>
-</head>
-<body>
-  <div class="print-btn-bar">
-    <span>📄 ${fileName ? fileName.replace(/\.(html?|htm)$/i, '.pdf') : 'Dokumen'}</span>
-    <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan sebagai PDF</button>
-  </div>
-  ${FOOTER_HTML}
-  <table class="master-page-table">
-    <tbody>
-      <tr>
-        <td>
-          ${bodyInner}
-        </td>
-      </tr>
-    </tbody>
-    <tfoot>
-      <tr>
-        <td>
-          <div style="height: 20mm;"></div>
-        </td>
-      </tr>
-    </tfoot>
-  </table>
-  <script>
-    window.addEventListener('load', function() {
-      setTimeout(function() { window.print(); }, 800);
-    });
-  <\/script>
-</body>
-</html>`;
-
-    const blob = new Blob([printHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const printWin = window.open(url, '_blank');
-    if (!printWin) {
-      alert('Popup diblokir browser. Izinkan popup untuk halaman ini dan coba lagi.');
-      URL.revokeObjectURL(url);
-      return;
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  };
-
-  /**
-   * For HTML template documents or documents with evidence: calls /api/documents/:id/download
-   * which generates the official PDF merged with supporting documents (dokumen pendukung).
-   */
-  const downloadDocumentAsPdf = async (docId: string, fileName: string) => {
-    handleDownloadFile(`/api/documents/${docId}/download`, fileName);
   };
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
@@ -1153,18 +946,21 @@ const DocumentsPage = () => {
     }
   };
 
-  const handleDownloadDocument = (doc: any) => {
+  const handleDownloadDocument = async (doc: any) => {
     const latestVersion = getLatestVersion(doc);
     if (!latestVersion) {
       alert("Tidak ada file untuk diunduh");
       return;
     }
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-    const targetUrl = isTemplate || (doc.evidenceFiles && doc.evidenceFiles.length > 0)
-      ? `/api/documents/${doc.id}/download`
-      : latestVersion.fileUrl;
+    const hasEvidence = doc.evidenceFiles && doc.evidenceFiles.length > 0;
     const defaultName = doc.documentNumber ? `${doc.documentNumber}.pdf` : latestVersion.fileName;
-    handleDownloadFile(targetUrl, defaultName);
+
+    if (isTemplate || hasEvidence) {
+      await downloadDocumentAsPdf(doc.id, defaultName, doc.evidenceFiles);
+    } else {
+      handleDownloadFile(latestVersion.fileUrl, defaultName);
+    }
   };
 
   const fetchData = async () => {
@@ -1511,6 +1307,12 @@ const DocumentsPage = () => {
       const creatorMatch = doc.creator?.fullName?.toLowerCase().includes(query);
       if (!creatorMatch) return false;
     }
+    // 5. Dispatch / Pengiriman Surat filter (Sudah / Belum)
+    if (colFilters.dispatchStatus) {
+      const delivery = getDocumentDeliveryInfo(doc);
+      if (colFilters.dispatchStatus === "SENT" && !delivery.isSent) return false;
+      if (colFilters.dispatchStatus === "NOT_SENT" && delivery.isSent) return false;
+    }
     return true;
   });
 
@@ -1610,7 +1412,7 @@ const DocumentsPage = () => {
               <>
                 {/* Desktop Table - ERP SAP B1 Style */}
                  <div className="hidden md:block relative overflow-x-auto w-full">
-                   <table className="w-full min-w-[900px] text-xs border-collapse">
+                   <table className="w-full min-w-[1020px] text-xs border-collapse">
                      <thead className="bg-[#006633]/8 text-[#006633] dark:bg-[#006633]/15 dark:text-emerald-400">
                        <tr className="border-b border-slate-300 dark:border-slate-700">
                          <th className="text-center py-2.5 px-3 font-extrabold w-12">No.</th>
@@ -1618,6 +1420,7 @@ const DocumentsPage = () => {
                          <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Klasifikasi & Versi</th>
                          <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Progress Alur</th>
                          <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Status</th>
+                         <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 whitespace-nowrap min-w-[135px]">Pengiriman Surat</th>
                          <th className="text-left py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700">Pembuat & Tanggal</th>
                          <th className="text-center py-2.5 px-3 font-extrabold border-l border-slate-300 dark:border-slate-700 w-[140px]">Aksi</th>
                        </tr>
@@ -1673,6 +1476,17 @@ const DocumentsPage = () => {
                              <option value="REJECTED">REJECTED</option>
                            </select>
                          </th>
+                          <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
+                            <select
+                              value={colFilters.dispatchStatus}
+                              onChange={(e) => setColFilters(prev => ({ ...prev, dispatchStatus: e.target.value }))}
+                              className="w-full px-1 py-1 text-[11px] font-normal bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded outline-none focus:border-[#006633] focus:ring-1 focus:ring-[#006633]/20"
+                            >
+                              <option value="">Semua</option>
+                              <option value="SENT">Sudah Dikirim</option>
+                              <option value="NOT_SENT">Belum Dikirim</option>
+                            </select>
+                          </th>
                          <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700">
                            <div className="relative">
                              <input
@@ -1690,9 +1504,9 @@ const DocumentsPage = () => {
                            </div>
                          </th>
                          <th className="py-1.5 px-2 border-l border-slate-300 dark:border-slate-700 text-center">
-                           {(colFilters.title || colFilters.classification || colFilters.status || colFilters.creator) && (
+                           {(colFilters.title || colFilters.classification || colFilters.status || colFilters.creator || colFilters.dispatchStatus) && (
                              <button
-                               onClick={() => setColFilters({ title: "", classification: "", status: "", creator: "" })}
+                               onClick={() => setColFilters({ title: "", classification: "", status: "", creator: "", dispatchStatus: "" })}
                                className="text-[10px] text-red-650 hover:text-red-855 font-bold transition-colors w-full flex items-center justify-center gap-0.5"
                              >
                                <X size={10} /> Clear
@@ -1704,7 +1518,7 @@ const DocumentsPage = () => {
                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                        {paginatedDocuments.length === 0 ? (
                          <tr>
-                           <td colSpan={7} className="py-8 text-center text-slate-400 font-medium bg-white dark:bg-slate-900">
+                           <td colSpan={8} className="py-8 text-center text-slate-400 font-medium bg-white dark:bg-slate-900">
                              Tidak ada dokumen yang cocok dengan filter kolom.
                            </td>
                          </tr>
@@ -1858,6 +1672,54 @@ const DocumentsPage = () => {
                                 </span>
                               </td>
 
+                                {/* ── Pengiriman Surat (Sudah/Belum & Jumlah Email) ── */}
+                                <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
+                                  {(() => {
+                                    const delivery = getDocumentDeliveryInfo(doc);
+                                    if (delivery.isSent) {
+                                      return (
+                                        <div className="flex flex-col gap-1 items-start">
+                                          <span
+                                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60 whitespace-nowrap shadow-2xs"
+                                            title={delivery.lastSentAt ? `Terkirim pada: ${new Date(delivery.lastSentAt).toLocaleString('id-ID')}` : 'Surat telah dikirim via email'}
+                                          >
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
+                                            Sudah
+                                          </span>
+                                          <div className="flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                            <Mail size={12} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                                            <span className="font-bold text-slate-800 dark:text-slate-200">{delivery.sentCount}</span>
+                                            <span className="text-slate-500 dark:text-slate-400">Email</span>
+                                            {delivery.lastSentAt && (
+                                              <>
+                                                <span className="text-slate-300 dark:text-slate-600">·</span>
+                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                  {new Date(delivery.lastSentAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div className="flex flex-col gap-1 items-start">
+                                        <span
+                                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 whitespace-nowrap"
+                                          title="Surat belum pernah dikirim via email resmi"
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0"></span>
+                                          Belum
+                                        </span>
+                                        <div className="flex items-center gap-1 text-[10px] text-slate-400 whitespace-nowrap">
+                                          <Mail size={12} className="text-slate-300 dark:text-slate-600 flex-shrink-0" />
+                                          <span className="italic">0 Email</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+
                               {/* ── Pembuat & Tanggal ── */}
                               <td className="py-2.5 px-3 border-b border-l border-slate-200 dark:border-slate-800 align-top">
                                 <div className="flex flex-col gap-0.5">
@@ -1953,10 +1815,29 @@ const DocumentsPage = () => {
                           <button onClick={() => handleViewDocument(doc)} className="font-bold text-[#006633] text-sm leading-tight line-clamp-2 hover:underline transition-colors text-left">
                             {doc.title}
                           </button>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                             <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded border", statusClass(doc.status))}>
                               {doc.status}
                             </span>
+                            {(() => {
+                              const delivery = getDocumentDeliveryInfo(doc);
+                              if (delivery.isSent) {
+                                return (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[#006633] dark:text-emerald-300"
+                                    title={delivery.lastSentAt ? `Terkirim: ${new Date(delivery.lastSentAt).toLocaleString('id-ID')}` : 'Terkirim'}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#006633] dark:bg-emerald-400"></span>
+                                    Sudah ({delivery.sentCount} Email)
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500">
+                                  Belum Dikirim
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                         
@@ -2209,7 +2090,7 @@ const DocumentsPage = () => {
                          return <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-bold">Tidak ada file</div>;
                       }
                       const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-                      return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} docId={sidebarDoc.id} />;
+                      return <DocumentPreview fileUrl={isTemplate ? `/api/documents/${sidebarDoc.id}/download` : latestVersion.fileUrl} title={latestVersion.fileName} docId={sidebarDoc.id} evidenceFiles={sidebarDoc.evidenceFiles} />;
                    })()}
                 </div>
               </div>
@@ -2393,6 +2274,27 @@ const DocumentsPage = () => {
                       <div className="flex justify-between pb-1">
                         <span className="text-slate-500">Pembuat</span>
                         <span className="text-slate-900 dark:text-slate-100 font-bold text-right truncate max-w-[150px]">{sidebarDoc.creator?.fullName}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-100 dark:border-slate-700/50 pt-2 pb-1">
+                        <span className="text-slate-500">Pengiriman Email</span>
+                        {(() => {
+                          const delivery = getDocumentDeliveryInfo(sidebarDoc);
+                          if (delivery.isSent) {
+                            return (
+                              <span className="text-right">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#006633] dark:text-emerald-400">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#006633] dark:bg-emerald-400"></span>
+                                  Sudah ({delivery.sentCount} Email Terkirim)
+                                </span>
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="text-right text-[11px] font-semibold text-slate-400">
+                              Belum Dikirim (0 Email)
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

@@ -5,28 +5,28 @@ export interface DPSMember {
   id: string;
   status: string; // 'Calon DPS' | 'Aktif' | 'Nonaktif'
   jenisPenugasan: string; // 'Penuh Waktu' | 'Paruh Waktu'
-  tanggalPengajuan: string;
+  tanggalPengajuan?: string;
   namaLengkap: string;
   fotoUrl?: string;
-  tempatLahir: string;
-  tanggalLahir: string;
-  jenisKelamin: string;
-  kewarganegaraan: string;
-  agama: string;
-  npwp: string;
-  alamatDomisili: string;
-  rtRw: string;
-  kelurahan: string;
-  kecamatan: string;
-  kotaKabupaten: string;
-  provinsi: string;
-  kodePos: string;
-  noTelepon: string;
-  noHp: string;
-  email: string;
-  pendidikanTerakhir: string;
-  perguruanTinggi: string;
-  tahunLulus: string;
+  tempatLahir?: string;
+  tanggalLahir?: string;
+  jenisKelamin?: string;
+  kewarganegaraan?: string;
+  agama?: string;
+  npwp?: string;
+  alamatDomisili?: string;
+  rtRw?: string;
+  kelurahan?: string;
+  kecamatan?: string;
+  kotaKabupaten?: string;
+  provinsi?: string;
+  kodePos?: string;
+  noTelepon?: string;
+  noHp?: string;
+  email?: string;
+  pendidikanTerakhir?: string;
+  perguruanTinggi?: string;
+  tahunLulus?: string;
 
   // Tab 2 fields
   lembagaPenempatan?: string;
@@ -44,6 +44,30 @@ export interface DPSMember {
 
   // Tab 4 fields
   dokumenFiles?: Array<{ tipe: string; namaFile: string }>;
+
+  // Excel Migration fields
+  externalId?: string;
+  namaNonGelar?: string;
+  statusDiMui?: string;
+  nik?: string;
+  aspm?: string;
+  wajibIkutPelatihan?: string;
+  nomorVirtualAccount?: string;
+  nomorSertifikatPelatihan?: string;
+  linkSertifikatPelatihan?: string;
+  nomorSertifikatLsp?: string;
+  linkSertifikatLsp?: string;
+  tanggalPaktaIntegritas?: string;
+  linkPaktaIntegritas?: string;
+  keterangan?: string;
+
+  // Company relation
+  companyId?: string;
+  company?: {
+    id: string;
+    name: string;
+    legalType?: string;
+  };
 }
 
 interface DPSState {

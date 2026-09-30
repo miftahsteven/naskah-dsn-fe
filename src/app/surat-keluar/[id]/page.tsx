@@ -32,6 +32,11 @@ import { cn, isSignedByFinalSignatory } from "@/lib/utils";
 import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
 import Can from "@/components/auth/Can";
+import {
+  openPrintWindow,
+  loadEvidencePdfImages,
+  generateAttachmentPagesHtml
+} from "@/lib/pdf-preview";
 
 // ── Approval Submit Modal ──────────────────────────────────────────────────
 const ApprovalSubmitModal = ({
@@ -448,334 +453,6 @@ const DocumentDetailPage = () => {
     </div>
   );
 
-  /**
-   * Opens the document HTML in a new browser window with a print button.
-   * The user can then use Ctrl+P / Cmd+P to Save as PDF.
-   * This approach is 100% reliable - no external libraries, no Puppeteer.
-   */
-  const openPrintWindow = (htmlText: string, fileName: string) => {
-    if (typeof window === 'undefined') return;
-
-    const BASE_URL = getBaseUrl();
-    let processedHtml = htmlText;
-
-    // Convert relative image URLs (e.g. images/logo-dsn.png) to absolute URL
-    processedHtml = processedHtml.replace(/src=["']\/?(images\/[^"']+)["']/gi, `src="${BASE_URL}/$1"`);
-    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*#000000;?/gi, 'border-top: none;');
-    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*black;?/gi, 'border-top: none;');
-    processedHtml = processedHtml.replace(/border-top:\s*1px\s*solid\s*#000;?/gi, 'border-top: none;');
-    processedHtml = processedHtml.replace(/<table class="amanah-letter-footer"[\s\S]*?<\/table>/gi, '');
-    processedHtml = processedHtml.replace(/\\?\${FOOTER_HTML}/g, '');
-    processedHtml = processedHtml.replace(/(<img[^>]*(?:bismillah|Bismillah)[^>]*style=["'])([^"']*)(["'])/gi, (match, p1, p2, p3) => {
-      let cleanStyle = p2.replace(/height:\s*[^;]+;?/gi, '').replace(/max-height:\s*[^;]+;?/gi, '').replace(/width:\s*[^;]+;?/gi, '').replace(/max-width:\s*[^;]+;?/gi, '').trim();
-      return `${p1}${cleanStyle ? cleanStyle + '; ' : ''}width: 260px; max-width: 45%; height: auto; max-height: 48px; margin: 8px auto 14px auto;${p3}`;
-    });
-    processedHtml = processedHtml.replace(
-      /(<!--\s*SALAM\s*PENUTUP\s*-->[\s\S]*?<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh[\.,]?)\s*(<\/p>)/gi,
-      '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
-    );
-    processedHtml = processedHtml.replace(
-      /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
-      '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
-    );
-
-    const FOOTER_HTML = `<table class="amanah-letter-footer" style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
-    <tr>
-      <td style="vertical-align: middle; text-align: left; padding: 4px 10px 4px 0; font-size: 7.5pt; line-height: 1.25; font-style: italic; color: #1f2937; border-top: 1px solid #e5e7eb;">
-        Dokumen ini telah ditandatangani secara elektronik oleh Sistem Digital Amanah dibawah otoritas Dewan Syariah Nasional-Majelis Ulama Indonesia. Untuk memastikan keaslian tanda tangan elektronik, silakan pindai QR-Code
-      </td>
-      <td style="vertical-align: middle; text-align: right; width: 32px; padding: 4px 0; border-top: 1px solid #e5e7eb;">
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle;">
-          <path d="M16 2L5 6.5V14.5C5 21.2 9.7 27.5 16 29.5C22.3 27.5 27 21.2 27 14.5V6.5L16 2Z" fill="#006633" stroke="#004D26" stroke-width="1.5" stroke-linejoin="round"/>
-          <circle cx="16" cy="16" r="8.5" fill="#006633" stroke="#ffffff" stroke-width="1" stroke-dasharray="2 1.5"/>
-          <path d="M12 16L14.8 18.8L20.5 13" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </td>
-    </tr>
-  </table>`;
-
-    const styles = (processedHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n');
-    const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    let bodyInner = bodyMatch ? bodyMatch[1] : processedHtml;
-    if (bodyInner.includes('master-page-table')) {
-      bodyInner = bodyInner
-        .replace(/<table class="master-page-table"[\s\S]*?<tbody>\s*<tr>\s*<td>/gi, '')
-        .replace(/<\/td>\s*<\/tr>\s*<\/tbody>\s*<tfoot>[\s\S]*?<\/tfoot>\s*<\/table>/gi, '');
-    }
-
-    // Auto-wrap body in letter-body-wrapper if not already present
-    if (!bodyInner.includes('letter-body-wrapper')) {
-      const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
-      const bismillahMatch = bismillahEndRegex.exec(bodyInner);
-      if (bismillahMatch) {
-        const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
-        const headerPart = bodyInner.substring(0, cutIndex);
-        const restPart = bodyInner.substring(cutIndex);
-        bodyInner = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
-      }
-    }
-
-    const printHtml = `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <base href="${BASE_URL}/">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${fileName || 'Dokumen'}</title>
-  ${styles}
-  <style>
-    @page {
-      size: A4;
-      margin-top: 10mm !important;
-      margin-bottom: 12mm !important;
-      margin-left: 10mm !important;
-      margin-right: 10mm !important;
-    }
-    @media print {
-      .print-btn-bar { display: none !important; }
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        padding-top: 0 !important;
-      }
-    }
-    .print-btn-bar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
-      background: #1e40af; color: white; padding: 10px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-family: Arial, sans-serif;
-    }
-    .print-btn {
-      background: white; color: #1e40af; border: none; border-radius: 6px;
-      padding: 8px 20px; font-size: 14px; font-weight: bold;
-      cursor: pointer; display: flex; align-items: center; gap: 8px;
-    }
-    .print-btn:hover { background: #dbeafe; }
-    body {
-      padding-top: 56px;
-      font-family: Arial, Helvetica, sans-serif !important;
-      font-size: 10.5pt !important;
-      line-height: 1.25 !important;
-      color: #111827 !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-
-    /* Wrapper to keep 25mm left & 20mm right body margins while Kop Surat uses full 190mm */
-    .letter-body-wrapper {
-      margin-left: 15mm !important;
-      margin-right: 10mm !important;
-    }
-
-    /* Master Print Layout Table */
-    table.master-page-table {
-      width: 100% !important;
-      border-collapse: collapse !important;
-      border: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-    table.master-page-table > tbody > tr > td {
-      padding: 0 !important;
-      border: none !important;
-      vertical-align: top !important;
-    }
-    table.master-page-table > tfoot > tr > td {
-      height: 20mm !important; /* Reserves space so body never overlaps footer */
-      padding: 0 !important;
-      border: none !important;
-    }
-
-    /* Ensure container uses full printable width within standard margins */
-    @media screen {
-      body {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-      }
-      .master-page-table {
-        max-width: 794px !important;
-        width: 100% !important;
-        margin: 0 auto !important;
-        padding: 10mm 10mm 12mm 10mm !important;
-        background: #ffffff !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-        box-sizing: border-box !important;
-        order: 1 !important;
-      }
-      .amanah-letter-footer {
-        display: table !important;
-        order: 2 !important;
-        width: 100% !important;
-        max-width: 794px !important;
-        margin: 16px auto 20px auto !important;
-        padding: 0 10mm !important;
-        box-sizing: border-box !important;
-      }
-    }
-    @media print {
-      .master-page-table {
-        max-width: 100% !important;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
-      }
-      tfoot {
-        display: table-footer-group !important;
-      }
-      .amanah-letter-footer {
-        display: table !important;
-        position: fixed !important;
-        bottom: 4mm !important;
-        left: 0 !important;
-        right: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        background: #ffffff !important;
-        z-index: 99999 !important;
-      }
-    }
-
-    /* Eliminate unwanted horizontal lines / borders on page break sections */
-    hr { display: none !important; }
-    div[style*="border-top: 1px solid #000000"],
-    div[style*="border-top:1px solid #000000"],
-    div[style*="border-top: 1px solid black"],
-    div[style*="border-top:1px solid black"],
-    div[style*="border-top: 1px solid #000"],
-    div[style*="border-top:1px solid #000"] {
-      border-top: none !important;
-      padding-top: 0 !important;
-    }
-
-    div[style*="margin-left: -30px"],
-    div[style*="margin-left:-30px"],
-    div[style*="margin-left: -40px"],
-    div[style*="margin-left:-40px"] {
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-      padding-top: 0 !important;
-    }
-    div, p, span, td, th, li, a, ol, ul, b, strong {
-      font-family: Arial, Helvetica, sans-serif !important;
-      line-height: 1.25 !important;
-    }
-    p, td, th, li, ol, ul {
-      font-size: 10.5pt !important;
-    }
-    ol, ul {
-      margin-top: 2px !important;
-      margin-bottom: 4px !important;
-      padding-left: 20px !important;
-    }
-    li {
-      margin-bottom: 2px !important;
-      font-size: 10.5pt !important;
-    }
-    p {
-      margin-top: 0px !important;
-      margin-bottom: 4px !important;
-      font-size: 10.5pt !important;
-    }
-    *[style*="font-size: 11pt"],
-    *[style*="font-size:11pt"],
-    *[style*="font-size: 12pt"],
-    *[style*="font-size:12pt"],
-    *[style*="font-size: 13pt"],
-    *[style*="font-size:13pt"],
-    *[style*="font-size: 14pt"],
-    *[style*="font-size:14pt"] {
-      font-size: 10.5pt !important;
-    }
-    .kop-surat-img, img[alt*="Kop Surat"] {
-      width: 100% !important;
-      max-width: 100% !important;
-      height: auto !important;
-      display: block !important;
-      margin: 0 auto 4px auto !important;
-    }
-    img[src*="bismillah"], img[alt*="Bismillah"] {
-      width: 260px !important;
-      max-width: 45% !important;
-      height: auto !important;
-      max-height: 48px !important;
-      display: block !important;
-      margin: 8px auto 14px auto !important;
-      object-fit: contain !important;
-      filter: brightness(0) !important;
-    }
-    img.qr-signature-img {
-      width: 55px !important;
-      height: 55px !important;
-      max-width: 55px !important;
-      max-height: 55px !important;
-      display: inline-block !important;
-      object-fit: contain !important;
-    }
-    div[style*="width: 60px"][style*="height: 60px"],
-    div[style*="width: 70px"][style*="height: 70px"] {
-      margin: 2px 0 2px 0 !important;
-      width: 55px !important;
-      height: 55px !important;
-    }
-    .amanah-letter-footer td {
-      font-size: 7.5pt !important;
-      line-height: 1.25 !important;
-    }
-  </style>
-</head>
-<body>
-  <div class="print-btn-bar">
-    <span>📄 ${fileName ? fileName.replace(/\.(html?|htm)$/i, '.pdf') : 'Dokumen'}</span>
-    <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan sebagai PDF</button>
-  </div>
-  ${FOOTER_HTML}
-  <table class="master-page-table">
-    <tbody>
-      <tr>
-        <td>
-          ${bodyInner}
-        </td>
-      </tr>
-    </tbody>
-    <tfoot>
-      <tr>
-        <td>
-          <div style="height: 20mm;"></div>
-        </td>
-      </tr>
-    </tfoot>
-  </table>
-  <script>
-    window.addEventListener('load', function() {
-      setTimeout(function() { window.print(); }, 800);
-    });
-  <\/script>
-</body>
-</html>`;
-
-    const blob = new Blob([printHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const printWin = window.open(url, '_blank');
-    if (!printWin) {
-      alert('Popup diblokir browser. Izinkan popup untuk halaman ini dan coba lagi.');
-      URL.revokeObjectURL(url);
-      return;
-    }
-    // Cleanup blob URL after window opens
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  };
-
-  /**
-   * Downloads a document as PDF. For HTML template docs, calls the /render endpoint
-   * which returns HTML with QR codes injected, then opens a print window.
-   */
-  const handleDownloadLatestAsPdf = async (docId: string, fileName: string) => {
-    handleDownloadFile(`/api/documents/${docId}/download`, fileName);
-  };
 
   const handlePrintDocument = async (docId: string, fileName: string) => {
     try {
@@ -791,7 +468,16 @@ const DocumentDetailPage = () => {
       }
 
       const htmlText = await res.text();
-      openPrintWindow(htmlText, fileName);
+      let attachmentHtml = "";
+      if (doc?.evidenceFiles && doc.evidenceFiles.length > 0) {
+        try {
+          const evidenceImages = await loadEvidencePdfImages(doc.evidenceFiles);
+          attachmentHtml = generateAttachmentPagesHtml(evidenceImages);
+        } catch (evErr) {
+          console.warn("Gagal memuat pratinjau lampiran untuk cetak:", evErr);
+        }
+      }
+      openPrintWindow(htmlText, fileName, attachmentHtml);
     } catch (err) {
       console.error('Gagal mencetak dokumen:', err);
       alert('Gagal membuka pratinjau cetak. Silakan coba lagi.');
@@ -819,8 +505,17 @@ const DocumentDetailPage = () => {
       if (cdMatch && cdMatch[1]) finalFileName = cdMatch[1];
 
       if (contentType.includes('text/html')) {
+        let attachmentHtml = "";
+        if (doc?.evidenceFiles && doc.evidenceFiles.length > 0) {
+          try {
+            const evidenceImages = await loadEvidencePdfImages(doc.evidenceFiles);
+            attachmentHtml = generateAttachmentPagesHtml(evidenceImages);
+          } catch (evErr) {
+            console.warn("Gagal memuat pratinjau lampiran:", evErr);
+          }
+        }
         const htmlText = await res.text();
-        openPrintWindow(htmlText, finalFileName);
+        openPrintWindow(htmlText, finalFileName, attachmentHtml);
         return;
       }
 
@@ -845,11 +540,12 @@ const DocumentDetailPage = () => {
     if (!doc || !doc.versions || doc.versions.length === 0) return;
     const latestVersion = doc.versions[0];
     const isTemplate = latestVersion.fileName?.toLowerCase().endsWith('.html') || latestVersion.mimeType === 'text/html';
-    const targetUrl = isTemplate || (doc.evidenceFiles && doc.evidenceFiles.length > 0)
-      ? `/api/documents/${doc.id}/download`
-      : latestVersion.fileUrl;
+    if (isTemplate || (doc.evidenceFiles && doc.evidenceFiles.length > 0)) {
+      handlePrintDocument(doc.id, doc.documentNumber || doc.title);
+      return;
+    }
     const defaultName = doc.documentNumber ? `${doc.documentNumber}.pdf` : latestVersion.fileName;
-    handleDownloadFile(targetUrl, defaultName);
+    handleDownloadFile(latestVersion.fileUrl, defaultName);
   };
 
 
@@ -910,10 +606,10 @@ const DocumentDetailPage = () => {
           <button
             onClick={handleDownloadLatest}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all text-xs shadow-sm cursor-pointer"
-            title="Unduh Berkas PDF Resmi (Tergabung dengan Dokumen Pendukung)"
+            title="Cetak / Unduh PDF (Mode Print dengan Lampiran Dokumen)"
           >
-            <Download size={16} />
-            <span>Unduh PDF</span>
+            <Printer size={16} />
+            <span>Cetak / Unduh PDF</span>
           </button>
           <button
             onClick={() => handlePrintDocument(doc.id, doc.documentNumber || doc.title)}

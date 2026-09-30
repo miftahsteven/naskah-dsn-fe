@@ -5,6 +5,13 @@ import { X, ExternalLink, Download, FileText, Loader2, Printer, ZoomIn, ZoomOut,
 import { getBaseUrl } from "@/lib/api";
 import { getAssetUrl, getBasePath } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  loadEvidencePdfImages,
+  generateAttachmentPagesHtml,
+  openPrintWindow,
+  ATTACHMENT_CSS,
+  AttachmentImage,
+} from "@/lib/pdf-preview";
 
 const HTML_PDF_PRIMARY_COLOR = '#2563eb';
 
@@ -19,6 +26,13 @@ interface DocumentReaderProps {
 const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, isOpen, onClose }) => {
   const [htmlContent, setHtmlContent] = React.useState<string | null>(null);
   const [htmlContentWithSignatures, setHtmlContentWithSignatures] = React.useState<string | null>(null);
+  const [attachmentPages, setAttachmentPages] = React.useState<AttachmentImage[]>([]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setAttachmentPages([]);
+    }
+  }, [isOpen]);
 
   const [kopSuratBase64, setKopSuratBase64] = React.useState<string>("");
   const [bismillahBase64, setBismillahBase64] = React.useState<string>("");
@@ -153,6 +167,16 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const htmlPreviewUrl = isHtml ? appendQueryParam(fullUrlWithToken, 'preview', 'html') : fullUrlWithToken;
 
   const handleDownload = async (downloadUrl: string, filename: string) => {
+    if (isHtml) {
+      // Revert download process to enter print preview mode first so user can adjust page margins, scale, etc. before printing or saving as PDF
+      const contentToPrint = htmlContentWithSignatures || htmlContent;
+      if (contentToPrint) {
+        const attachmentHtml = generateAttachmentPagesHtml(attachmentPages);
+        openPrintWindow(contentToPrint, filename, attachmentHtml);
+        return;
+      }
+    }
+
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers: Record<string, string> = {};
@@ -199,9 +223,12 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       return;
     }
     if (isHtml) {
-      const iframe = document.getElementById('document-iframe') as HTMLIFrameElement;
-      iframe?.contentWindow?.print();
-      return;
+      const contentToPrint = htmlContentWithSignatures || htmlContent;
+      if (contentToPrint) {
+        const attachmentHtml = generateAttachmentPagesHtml(attachmentPages);
+        openPrintWindow(contentToPrint, downloadFileName, attachmentHtml);
+        return;
+      }
     }
     window.open(blobUrl || fullUrlWithToken, '_blank')?.print();
   };
@@ -322,6 +349,25 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         });
 
         setSignatureRows(rows);
+
+        const evidenceFiles = json?.data?.evidenceFiles || [];
+        if (evidenceFiles.length > 0) {
+          const mapped = evidenceFiles.map((f: any) => ({
+            ...f,
+            name: f.name || f.fileName || 'Lampiran.pdf',
+            fileUrl: f.fileUrl || (f.id ? `${BASE_URL}/api/documents/${docIdentifier}/evidence/files/${f.id}/download` : undefined)
+          }));
+          loadEvidencePdfImages(mapped)
+            .then((images) => {
+              if (!cancelled) setAttachmentPages(images);
+            })
+            .catch((err) => {
+              console.warn('Failed to load document attachments for viewer:', err);
+              if (!cancelled) setAttachmentPages([]);
+            });
+        } else {
+          setAttachmentPages([]);
+        }
       } catch (err) {
         console.warn('Failed to load document signatures for viewer:', err);
       }
@@ -705,8 +751,18 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       }
     }
 
+    if (attachmentPages.length > 0) {
+      const attHtml = generateAttachmentPagesHtml(attachmentPages);
+      const injection = `\n<style>${ATTACHMENT_CSS}</style>\n${attHtml}\n`;
+      if (enhanced.includes('</body>')) {
+        enhanced = enhanced.replace('</body>', `${injection}</body>`);
+      } else {
+        enhanced = `${enhanced}${injection}`;
+      }
+    }
+
     setHtmlContentWithSignatures(enhanced);
-  }, [isHtml, htmlContent, signatureRows, signatureQrMap]);
+  }, [isHtml, htmlContent, signatureRows, signatureQrMap, attachmentPages]);
 
   React.useEffect(() => {
     if (isOpen && isHtml) {
@@ -1174,7 +1230,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
               type="button"
               onClick={() => handleDownload(downloadUrl, downloadFileName)}
               className="p-2.5 text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-              title={isHtml ? 'Download HTML sebagai PDF' : 'Download file'}
+              title={isHtml ? 'Cetak / Unduh PDF (Buka Mode Print)' : 'Download file'}
             >
               <Download size={18} />
             </button>

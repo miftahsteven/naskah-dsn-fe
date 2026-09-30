@@ -41,9 +41,9 @@ export default function EditDpsPage() {
     namaLengkap: "",
     tempatLahir: "",
     tanggalLahir: "",
-    jenisKelamin: "Laki-laki",
-    kewarganegaraan: "Indonesia",
-    agama: "Islam",
+    jenisKelamin: "",
+    nik: "",
+    nomorVirtualAccount: "",
     npwp: "",
     alamatDomisili: "",
     rtRw: "",
@@ -101,26 +101,26 @@ export default function EditDpsPage() {
         const d = res.data.data as DPSMember;
         setFormData({
           status: d.status || "Calon DPS",
-          jenisPenugasan: d.jenisPenugasan || "Penuh Waktu",
-          tanggalPengajuan: d.tanggalPengajuan || "",
+          jenisPenugasan: d.jenisPenugasan || "Paruh Waktu",
+          tanggalPengajuan: d.tanggalPaktaIntegritas || d.tanggalPengajuan || "",
           namaLengkap: d.namaLengkap || "",
           tempatLahir: d.tempatLahir || "",
           tanggalLahir: d.tanggalLahir || "",
-          jenisKelamin: d.jenisKelamin || "Laki-laki",
-          kewarganegaraan: d.kewarganegaraan || "Indonesia",
-          agama: d.agama || "Islam",
+          jenisKelamin: d.jenisKelamin || "",
+          nik: d.nik || "",
+          nomorVirtualAccount: d.nomorVirtualAccount && d.nomorVirtualAccount.toLowerCase() !== "tidak ada" ? d.nomorVirtualAccount : "",
           npwp: d.npwp || "",
           alamatDomisili: d.alamatDomisili || "",
           rtRw: d.rtRw || "",
           kelurahan: d.kelurahan || "",
           kecamatan: d.kecamatan || "",
           kotaKabupaten: d.kotaKabupaten || "",
-          provinsi: d.provinsi || "DKI Jakarta",
+          provinsi: d.provinsi || "",
           kodePos: d.kodePos || "",
           noTelepon: d.noTelepon || "",
           noHp: d.noHp || "",
           email: d.email || "",
-          pendidikanTerakhir: d.pendidikanTerakhir || "S3 - Ekonomi Islam",
+          pendidikanTerakhir: d.pendidikanTerakhir || "",
           perguruanTinggi: d.perguruanTinggi || "",
           tahunLulus: d.tahunLulus || "",
           fotoFileName: d.fotoUrl ? d.fotoUrl.split("/").pop() || "" : "",
@@ -227,8 +227,8 @@ export default function EditDpsPage() {
       tempatLahir: formData.tempatLahir,
       tanggalLahir: formData.tanggalLahir,
       jenisKelamin: formData.jenisKelamin,
-      kewarganegaraan: formData.kewarganegaraan,
-      agama: formData.agama,
+      nik: formData.nik,
+      nomorVirtualAccount: formData.nomorVirtualAccount,
       npwp: formData.npwp,
       alamatDomisili: formData.alamatDomisili,
       rtRw: formData.rtRw,
@@ -347,7 +347,7 @@ export default function EditDpsPage() {
               {/* Left Form Column (8 Cols) */}
               <div className="lg:col-span-8 space-y-5">
                 
-                {/* Row 1: Status DPS, Jenis Penugasan, Tanggal Pengajuan */}
+                {/* Row 1: Status DPS, Jenis Penugasan, Tgl Pakta Integritas */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
@@ -387,14 +387,14 @@ export default function EditDpsPage() {
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Tanggal Pengajuan <span className="text-rose-500">*</span>
+                      Tgl Pakta Integritas
                     </label>
                     <input
-                      type="date"
+                      type="text"
                       name="tanggalPengajuan"
+                      placeholder="Contoh: 08 Juni 2016"
                       value={formData.tanggalPengajuan}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
@@ -420,7 +420,7 @@ export default function EditDpsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Tempat Lahir <span className="text-rose-500">*</span>
+                      Tempat Lahir
                     </label>
                     <input
                       type="text"
@@ -428,28 +428,27 @@ export default function EditDpsPage() {
                       placeholder="Contoh: Jakarta"
                       value={formData.tempatLahir}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Tanggal Lahir <span className="text-rose-500">*</span>
+                      Tanggal Lahir
                     </label>
                     <input
-                      type="date"
+                      type="text"
                       name="tanggalLahir"
+                      placeholder="Contoh: 11 Maret 1943"
                       value={formData.tanggalLahir}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Jenis Kelamin <span className="text-rose-500">*</span>
+                      Jenis Kelamin
                     </label>
                     <select
                       name="jenisKelamin"
@@ -457,40 +456,40 @@ export default function EditDpsPage() {
                       onChange={handleChange}
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200 cursor-pointer"
                     >
+                      <option value="">-- Pilih Jenis Kelamin --</option>
                       <option value="Laki-laki">Laki-laki</option>
                       <option value="Perempuan">Perempuan</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Row 4: Kewarganegaraan, Agama, NPWP */}
+                {/* Row 4: NIK, No. VA, NPWP */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Kewarganegaraan <span className="text-rose-500">*</span>
+                      NIK (Nomor Induk Kependudukan)
                     </label>
-                    <select
-                      name="kewarganegaraan"
-                      value={formData.kewarganegaraan}
+                    <input
+                      type="text"
+                      name="nik"
+                      placeholder="Contoh: 3201xxxxxxxxxxxx"
+                      value={formData.nik}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200 cursor-pointer"
-                    >
-                      <option value="Indonesia">Indonesia</option>
-                      <option value="WNA">WNA</option>
-                    </select>
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200 font-mono"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Agama <span className="text-rose-500">*</span>
+                      Nomor Virtual Account (VA)
                     </label>
                     <input
                       type="text"
-                      name="agama"
-                      value={formData.agama}
+                      name="nomorVirtualAccount"
+                      placeholder="Contoh: 988xxxxxxxxxxxxx"
+                      value={formData.nomorVirtualAccount}
                       onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200 font-mono"
                     />
                   </div>
 
@@ -513,7 +512,7 @@ export default function EditDpsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Alamat Domisili <span className="text-rose-500">*</span>
+                      Alamat Domisili
                     </label>
                     <input
                       type="text"
@@ -521,7 +520,6 @@ export default function EditDpsPage() {
                       placeholder="Jalan, No. Rumah, Perumahan"
                       value={formData.alamatDomisili}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
@@ -542,14 +540,13 @@ export default function EditDpsPage() {
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Kelurahan <span className="text-rose-500">*</span>
+                      Kelurahan
                     </label>
                     <input
                       type="text"
                       name="kelurahan"
                       value={formData.kelurahan}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
@@ -559,35 +556,33 @@ export default function EditDpsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Kecamatan <span className="text-rose-500">*</span>
+                      Kecamatan
                     </label>
                     <input
                       type="text"
                       name="kecamatan"
                       value={formData.kecamatan}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Kota/Kabupaten <span className="text-rose-500">*</span>
+                      Kota/Kabupaten
                     </label>
                     <input
                       type="text"
                       name="kotaKabupaten"
                       value={formData.kotaKabupaten}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Provinsi <span className="text-rose-500">*</span>
+                      Provinsi
                     </label>
                     <select
                       name="provinsi"
@@ -595,18 +590,23 @@ export default function EditDpsPage() {
                       onChange={handleChange}
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200 cursor-pointer"
                     >
+                      <option value="">-- Pilih Provinsi --</option>
                       <option value="DKI Jakarta">DKI Jakarta</option>
                       <option value="Jawa Barat">Jawa Barat</option>
                       <option value="Banten">Banten</option>
                       <option value="Jawa Tengah">Jawa Tengah</option>
                       <option value="DI Yogyakarta">DI Yogyakarta</option>
                       <option value="Jawa Timur">Jawa Timur</option>
+                      <option value="Sumatera Utara">Sumatera Utara</option>
+                      <option value="Sumatera Barat">Sumatera Barat</option>
+                      <option value="Riau">Riau</option>
+                      <option value="Lainnya">Lainnya</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Kode Pos <span className="text-rose-500">*</span>
+                      Kode Pos
                     </label>
                     <input
                       type="text"
@@ -614,7 +614,6 @@ export default function EditDpsPage() {
                       placeholder="12345"
                       value={formData.kodePos}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
@@ -638,7 +637,7 @@ export default function EditDpsPage() {
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      No. HP <span className="text-rose-500">*</span>
+                      No. HP
                     </label>
                     <input
                       type="text"
@@ -646,14 +645,13 @@ export default function EditDpsPage() {
                       placeholder="08xxxxxxxxxx"
                       value={formData.noHp}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Email <span className="text-rose-500">*</span>
+                      Email
                     </label>
                     <input
                       type="email"
@@ -661,7 +659,6 @@ export default function EditDpsPage() {
                       placeholder="zaki@dsnmui.or.id"
                       value={formData.email}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
@@ -671,7 +668,7 @@ export default function EditDpsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Pendidikan Terakhir <span className="text-rose-500">*</span>
+                      Pendidikan Terakhir
                     </label>
                     <select
                       name="pendidikanTerakhir"
@@ -679,6 +676,7 @@ export default function EditDpsPage() {
                       onChange={handleChange}
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200 cursor-pointer"
                     >
+                      <option value="">-- Pilih Pendidikan --</option>
                       <option value="S1 - Ekonomi Islam">S1 - Ekonomi Islam</option>
                       <option value="S1 - Hukum Islam (Syariah)">S1 - Hukum Islam (Syariah)</option>
                       <option value="S2 - Keuangan Syariah">S2 - Keuangan Syariah</option>
@@ -690,7 +688,7 @@ export default function EditDpsPage() {
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Perguruan Tinggi <span className="text-rose-500">*</span>
+                      Perguruan Tinggi
                     </label>
                     <input
                       type="text"
@@ -698,14 +696,13 @@ export default function EditDpsPage() {
                       placeholder="Contoh: Universitas Indonesia"
                       value={formData.perguruanTinggi}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-450 dark:text-slate-400 tracking-wider mb-1.5">
-                      Tahun Lulus <span className="text-rose-500">*</span>
+                      Tahun Lulus
                     </label>
                     <input
                       type="text"
@@ -713,7 +710,6 @@ export default function EditDpsPage() {
                       placeholder="Contoh: 2010"
                       value={formData.tahunLulus}
                       onChange={handleChange}
-                      required
                       className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-[#006633]/20 focus:border-[#006633] text-slate-800 dark:text-slate-200"
                     />
                   </div>
@@ -1083,28 +1079,38 @@ export default function EditDpsPage() {
 
                     <div className="font-bold text-slate-450">Tempat, Tgl Lahir:</div>
                     <div className="col-span-2 font-semibold text-slate-700 dark:text-slate-350">
-                      {formData.tempatLahir && formData.tanggalLahir ? `${formData.tempatLahir}, ${formData.tanggalLahir}` : "-"}
+                      {[formData.tempatLahir, formData.tanggalLahir].filter(Boolean).join(", ") || "-"}
                     </div>
 
-                    <div className="font-bold text-slate-450">Jenis Kelamin:</div>
-                    <div className="col-span-2 font-semibold text-slate-700 dark:text-slate-350">{formData.jenisKelamin}</div>
+                    <div className="font-bold text-slate-450">NIK:</div>
+                    <div className="col-span-2 font-semibold text-slate-700 dark:text-slate-350 font-mono">{formData.nik || "-"}</div>
 
-                    <div className="font-bold text-slate-450">Kewarganegaraan:</div>
-                    <div className="col-span-2 font-semibold text-slate-700 dark:text-slate-350">{formData.kewarganegaraan}</div>
+                    <div className="font-bold text-slate-450">Nomor VA:</div>
+                    <div className="col-span-2 font-semibold text-emerald-700 dark:text-emerald-400 font-mono">{formData.nomorVirtualAccount || "-"}</div>
 
                     <div className="font-bold text-slate-450">Email / Kontak:</div>
                     <div className="col-span-2 font-semibold text-slate-700 dark:text-slate-350 font-mono">
-                      {formData.email} {formData.noHp ? `/ ${formData.noHp}` : ""}
+                      {[formData.email, formData.noHp].filter(Boolean).join(" / ") || "-"}
                     </div>
 
                     <div className="font-bold text-slate-450">Alamat Lengkap:</div>
                     <div className="col-span-2 font-semibold text-slate-750 dark:text-slate-350">
-                      {formData.alamatDomisili ? `${formData.alamatDomisili}, RT/RW: ${formData.rtRw || "-"}, Kel. ${formData.kelurahan || "-"}, Kec. ${formData.kecamatan || "-"}, ${formData.kotaKabupaten || "-"}, ${formData.provinsi}` : "-"}
+                      {[
+                        formData.alamatDomisili,
+                        formData.rtRw ? `RT/RW: ${formData.rtRw}` : null,
+                        formData.kelurahan ? `Kel. ${formData.kelurahan}` : null,
+                        formData.kecamatan ? `Kec. ${formData.kecamatan}` : null,
+                        formData.kotaKabupaten,
+                        formData.provinsi,
+                        formData.kodePos
+                      ].filter(Boolean).join(", ") || "-"}
                     </div>
 
                     <div className="font-bold text-slate-450">Pendidikan:</div>
                     <div className="col-span-2 font-semibold text-slate-750 dark:text-slate-350">
-                      {formData.pendidikanTerakhir} dari {formData.perguruanTinggi || "-"} ({formData.tahunLulus || "-"})
+                      {formData.pendidikanTerakhir 
+                        ? `${formData.pendidikanTerakhir}${formData.perguruanTinggi ? ` dari ${formData.perguruanTinggi}` : ""}${formData.tahunLulus ? ` (${formData.tahunLulus})` : ""}`
+                        : "-"}
                     </div>
                   </div>
                 </div>
@@ -1120,6 +1126,9 @@ export default function EditDpsPage() {
 
                     <div className="font-bold text-slate-450">Jenis Penugasan:</div>
                     <div className="col-span-2 font-semibold text-slate-700 dark:text-slate-350">{formData.jenisPenugasan}</div>
+
+                    <div className="font-bold text-slate-450">Tgl Pakta Integritas:</div>
+                    <div className="col-span-2 font-semibold text-slate-750 dark:text-slate-350 font-mono">{formData.tanggalPengajuan || "-"}</div>
 
                     <div className="font-bold text-slate-450">Lembaga Penempatan:</div>
                     <div className="col-span-2 font-bold text-[#006633] dark:text-[#D4AF37]">{formData.lembagaPenempatan || "-"}</div>

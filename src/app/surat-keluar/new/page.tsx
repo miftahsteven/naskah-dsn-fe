@@ -30,11 +30,19 @@ import {
   UserCheck,
   Hash,
   RefreshCw,
-  Building2
+  Building2,
+  Printer
 } from "lucide-react";
 import api from "@/lib/api";
 import { cn, getAssetUrl } from "@/lib/utils";
 import SimpleRichEditor from "@/components/SimpleRichEditor";
+import {
+  renderPdfToImageUrls,
+  generateAttachmentPagesHtml,
+  openPrintWindow,
+  ATTACHMENT_CSS,
+  AttachmentImage,
+} from "@/lib/pdf-preview";
 
 // List of available templates
 const templatesList = [
@@ -725,7 +733,44 @@ const CreateDocumentPage = () => {
   const [perihal, setPerihal] = useState("");
   const [lampiran, setLampiran] = useState("");
   const [dokumenPendukung, setDokumenPendukung] = useState<File | null>(null);
+  const [attachmentPages, setAttachmentPages] = useState<AttachmentImage[]>([]);
+  const [loadingAttachmentPreview, setLoadingAttachmentPreview] = useState(false);
   const [catatan, setCatatan] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!dokumenPendukung) {
+      setAttachmentPages([]);
+      return;
+    }
+    const isPdf = dokumenPendukung.type === "application/pdf" || dokumenPendukung.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setAttachmentPages([]);
+      return;
+    }
+
+    setLoadingAttachmentPreview(true);
+    renderPdfToImageUrls(dokumenPendukung)
+      .then((urls) => {
+        if (cancelled) return;
+        if (urls.length > 0) {
+          setAttachmentPages([{ name: dokumenPendukung.name, images: urls }]);
+        } else {
+          setAttachmentPages([]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Gagal merender pratinjau lampiran PDF:", err);
+        if (!cancelled) setAttachmentPages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAttachmentPreview(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dokumenPendukung]);
   
   // Nested Workflow states: Pemparaf, Approver, Penandatangan
   const [pemparafList, setPemparafList] = useState<{ userId: string }[]>([]);
@@ -2186,6 +2231,124 @@ const CreateDocumentPage = () => {
     }
   };
 
+  const handleOpenPrintPreview = () => {
+    let html = "";
+    if (isEditorMode) {
+      const bodyHtml = editorRef.current?.innerHTML || "";
+      const signersOnly = penandatanganList.filter(s => s.userId);
+      const resolvedSteps = signersOnly.map((step, idx) => {
+        const u = users.find(user => user.id === step.userId);
+        return {
+          name: u ? u.fullName : `Penandatangan ${idx + 1}`,
+          title: u ? u.jobTitle || u.role?.name || "Pejabat Organisasi" : ""
+        };
+      });
+
+      let signatureHtml = "";
+      if (resolvedSteps.length > 0) {
+        if (resolvedSteps.length === 1) {
+          signatureHtml += `
+            <div style="display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; border-top: 1px dashed #e2e8f0; padding-top: 20px;">
+              <div style="text-align: center; min-width: 180px;">
+                <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">Menyetujui,</div>
+                <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${resolvedSteps[0].name}</div>
+                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${resolvedSteps[0].title}</div>
+              </div>
+            </div>
+          `;
+        } else {
+          signatureHtml += `<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px 20px; margin-top: 60px; page-break-inside: avoid; border-top: 1px dashed #e2e8f0; padding-top: 20px;">`;
+          resolvedSteps.forEach((s, idx) => {
+            const isLastOdd = idx === resolvedSteps.length - 1 && resolvedSteps.length % 2 !== 0;
+            const label = idx === resolvedSteps.length - 1 ? "Menyetujui," : "Mengetahui,";
+            if (isLastOdd) {
+              signatureHtml += `
+                <div style="grid-column: span 2; display: flex; justify-content: center;">
+                  <div style="text-align: center; min-width: 180px;">
+                    <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">${label}</div>
+                    <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${s.name}</div>
+                    <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${s.title}</div>
+                  </div>
+                </div>
+              `;
+            } else {
+              const justify = idx % 2 === 0 ? "flex-start" : "flex-end";
+              signatureHtml += `
+                <div style="display: flex; justify-content: ${justify};">
+                  <div style="text-align: center; min-width: 180px;">
+                    <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">${label}</div>
+                    <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${s.name}</div>
+                    <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${s.title}</div>
+                  </div>
+                </div>
+              `;
+            }
+          });
+          signatureHtml += `</div>`;
+        }
+      }
+
+      html = `
+        <div style="font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111827;">
+          <div style="margin-bottom: 8px;">
+            <img src="${getAssetUrl("/images/kop-surat.png")}" alt="Kop Surat" style="width: 100%; height: auto; display: block;" />
+          </div>
+          <div style="text-align: center; margin: 8px 0 14px 0;">
+            <img src="${bismillahBase64 || getAssetUrl("/images/bismillah.svg")}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
+          </div>
+          <div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">
+            <div style="text-align: center; font-weight: bold; text-transform: uppercase; font-size: 12pt; margin-bottom: 24px; text-decoration: underline;">
+              ${selectedTemplateObj?.name || "Surat Keluar"}
+            </div>
+            <table style="width: 100%; font-size: 10.5pt; margin-bottom: 24px; border-collapse: collapse;">
+              <tr>
+                <td style="vertical-align: top;">
+                  <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                    <span style="font-weight: bold; width: 75px;">Nomor</span>
+                    <span>: ${generatedDocNumber || "—"}</span>
+                  </div>
+                  <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                    <span style="font-weight: bold; width: 75px;">Lampiran</span>
+                    <span>: ${lampiran || "—"}</span>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <span style="font-weight: bold; width: 75px;">Perihal</span>
+                    <span style="font-weight: bold;">: ${perihal || "—"}</span>
+                  </div>
+                </td>
+                <td style="vertical-align: top; text-align: right;">
+                  <div>${tempatDibuat}, ${new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</div>
+                  <div style="color: #6b7280; font-size: 10pt;">${tanggalHijriah || "— H"}</div>
+                </td>
+              </tr>
+            </table>
+            <div style="margin-bottom: 24px;">
+              <div>Kepada Yang Terhormat,</div>
+              <div style="font-weight: bold;">Pimpinan / Anggota Organisasi</div>
+              <div>di — Tempat</div>
+            </div>
+            <div style="margin-bottom: 24px;">
+              ${bodyHtml}
+            </div>
+            ${signatureHtml}
+          </div>
+        </div>
+      `;
+    } else {
+      if (!selectedTemplateObj) return;
+      if (isCert) {
+        html = selectedTemplateObj.htmlContent || "";
+      } else {
+        html = (selectedTemplateObj.htmlContent || "").replace(
+          /\{\{(\w+)\}\}/g,
+          (_: string, key: string) => templateVariables[key] || ""
+        );
+      }
+    }
+    const attachmentHtml = generateAttachmentPagesHtml(attachmentPages);
+    openPrintWindow(html, perihal || "Surat Keluar", attachmentHtml);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-20 px-4">
       {/* Back Button */}
@@ -2634,14 +2797,25 @@ const CreateDocumentPage = () => {
             <div className="flex flex-col gap-6 animate-in fade-in duration-300">
               {/* TOP SECTION: A4 Live Letter Preview & Editor */}
               <div className="flex flex-col min-h-0 bg-slate-100 dark:bg-slate-800/40 p-4 sm:p-6 rounded-[32px] border border-slate-200/60 dark:border-slate-800/80 shadow-inner">
-                <div className="flex items-center justify-between shrink-0 mb-3 px-2">
+                <div className="flex flex-wrap items-center justify-between shrink-0 mb-3 px-2 gap-2">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                     {isCert ? "Sertifikat Live Preview" : "A4 Live Letter Preview & Editor"}
                   </span>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full uppercase tracking-tight flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    <span>{isCert ? "Real-time Binding (A4 Landscape)" : "Real-time Binding (A4 Format)"}</span>
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenPrintPreview}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 hover:border-emerald-500/40 shadow-sm transition-all cursor-pointer"
+                      title="Buka Mode Cetak / Pratinjau Print (Beserta Lampiran PDF)"
+                    >
+                      <Printer size={13} />
+                      <span>Mode Print / Cetak</span>
+                    </button>
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full uppercase tracking-tight flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      <span>{isCert ? "Real-time Binding (A4 Landscape)" : "Real-time Binding (A4 Format)"}</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Scrollable container with responsive height */}
@@ -2726,7 +2900,7 @@ const CreateDocumentPage = () => {
                         </div>
 
                         {/* Physical A4 Visual Paper */}
-                        <div className="bg-slate-100 dark:bg-slate-900/60 p-2 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-center overflow-x-auto">
+                        <div className="bg-slate-100 dark:bg-slate-900/60 p-2 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center overflow-x-auto">
                           <div
                             className="bg-white text-slate-800 shadow-2xl rounded-sm min-h-[1050px] border border-slate-200/80 flex flex-col text-left relative w-[794px] max-w-full"
                             style={{
@@ -2864,6 +3038,31 @@ const CreateDocumentPage = () => {
                           </div>
 
                           </div>
+
+                          {/* Visual Attachment Preview for Editor Mode */}
+                          {loadingAttachmentPreview && (
+                            <div className="mt-6 flex items-center justify-center gap-2 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 w-[794px] max-w-full text-xs font-bold text-slate-500 shadow-sm animate-pulse">
+                              <Loader2 size={16} className="animate-spin text-primary" />
+                              <span>Memuat pratinjau lampiran PDF...</span>
+                            </div>
+                          )}
+                          {attachmentPages.map((att, aIdx) => (
+                            <div key={aIdx} className="mt-8 space-y-4 w-full flex flex-col items-center">
+                              <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <FileText size={14} className="text-primary" />
+                                <span>Lampiran: {att.name} ({att.images.length} Halaman)</span>
+                              </div>
+                              {att.images.map((imgUrl, pIdx) => (
+                                <div key={pIdx} className="bg-white text-slate-800 shadow-2xl rounded-sm border border-slate-200/80 p-4 w-[794px] max-w-full box-border">
+                                  <div className="text-[10px] font-bold text-slate-400 mb-2 pb-1 border-b border-dashed border-slate-200 flex justify-between">
+                                    <span>HALAMAN LAMPIRAN {pIdx + 1}</span>
+                                    <span>{att.name}</span>
+                                  </div>
+                                  <img src={imgUrl} alt={`Lampiran Halaman ${pIdx + 1}`} className="w-full h-auto block" />
+                                </div>
+                              ))}
+                            </div>
+                          ))}
                         </div>
                       </>
                     ) : (
@@ -2971,8 +3170,21 @@ const CreateDocumentPage = () => {
                                 certHtml = `${certFitInjection}\n${certHtml}`;
                               }
 
+                              if (attachmentPages.length > 0) {
+                                const attachmentHtml = generateAttachmentPagesHtml(attachmentPages);
+                                const injection = `<style>${ATTACHMENT_CSS}</style>\n${attachmentHtml}\n`;
+                                if (certHtml.includes('</body>')) {
+                                  certHtml = certHtml.replace('</body>', `${injection}</body>`);
+                                } else {
+                                  certHtml = certHtml + injection;
+                                }
+                              }
+
                               return certHtml;
                             }
+
+                            const attachmentHtml = generateAttachmentPagesHtml(attachmentPages);
+                            const attachmentCss = `<style>${ATTACHMENT_CSS}</style>`;
 
                             return (
                               '<!DOCTYPE html><html><head><meta charset="utf-8">' +
@@ -2989,7 +3201,9 @@ const CreateDocumentPage = () => {
                               'table td { vertical-align: top; }' +
                               '.page-break { page-break-before: always; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1; position: relative; }' +
                               '.page-break::before { content: "📄 HALAMAN BERIKUTNYA (LAMPIRAN)"; display: block; text-align: center; font-size: 9pt; font-weight: bold; color: #64748b; margin-bottom: 20px; letter-spacing: 0.5px; }' +
-                              '</style></head><body><div class="a4-page-sheet">' +
+                              '</style>' +
+                              attachmentCss +
+                              '</head><body><div class="a4-page-sheet">' +
                               (bismillahBase64
                                 ? (selectedTemplateObj.htmlContent || '')
                                     .replace(/src=["'][^"']*bismillah\.svg["']/gi, 'src="' + bismillahBase64 + '"')
@@ -3010,7 +3224,9 @@ const CreateDocumentPage = () => {
                                   return '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
                                 }
                               ) +
-                              '</div></body></html>'
+                              '</div>' +
+                              (attachmentHtml || '') +
+                              '</body></html>'
                             );
                           };
 
@@ -3520,8 +3736,15 @@ const CreateDocumentPage = () => {
                                 <div className="flex flex-col items-center text-center animate-in zoom-in duration-200">
                                   <Check className="text-primary mb-1" size={20} />
                                   <p className="text-xs font-bold text-slate-800 dark:text-white max-w-[200px] truncate">{dokumenPendukung.name}</p>
-                                  <p className="text-[10px] text-slate-400">{(dokumenPendukung.size / 1024 / 1024).toFixed(2)} MB • Berkas PDF</p>
-                                  <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">Otomatis digabung (merge) ke PDF surat keluar</p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {(dokumenPendukung.size / 1024 / 1024).toFixed(2)} MB • Berkas PDF
+                                    {loadingAttachmentPreview
+                                      ? " (Memproses pratinjau...)"
+                                      : attachmentPages[0]?.images.length
+                                      ? ` (${attachmentPages[0].images.length} Halaman)`
+                                      : ""}
+                                  </p>
+                                  <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">✓ Tampil di preview sistem & disertakan saat cetak/unduh</p>
                                   <button
                                     type="button"
                                     onClick={() => setDokumenPendukung(null)}
@@ -3537,7 +3760,7 @@ const CreateDocumentPage = () => {
                                   </div>
                                   <p className="text-xs font-bold text-slate-800 dark:text-white">Pilih Lampiran Pendukung (PDF)</p>
                                   <p className="text-[10px] text-slate-400 mt-1">Hanya Berkas PDF (Maks 10MB)</p>
-                                  <p className="text-[9px] text-emerald-600 font-medium mt-0.5">Otomatis digabung ke PDF saat diunduh</p>
+                                  <p className="text-[9px] text-emerald-600 font-medium mt-0.5">Tampil langsung di pratinjau & disertakan saat cetak/unduh</p>
                                 </div>
                               )}
                             </div>

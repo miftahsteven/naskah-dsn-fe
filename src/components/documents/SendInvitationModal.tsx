@@ -37,6 +37,25 @@ export interface RecipientItem {
   role: RecipientRole;
 }
 
+export const DEFAULT_OUTGOING_CC_RECIPIENTS: RecipientItem[] = [
+  {
+    name: 'Abdul Wasik',
+    email: 'dwasik76@gmail.com',
+    role: 'CC',
+    department: 'DSN-MUI',
+    jobTitle: 'Kepala Sekretariat',
+    isExternal: false,
+  },
+  {
+    name: 'CC Surat Keluar Kyai Cholil',
+    email: 'cholilnafis.dsnmui@gmail.com',
+    role: 'CC',
+    department: 'DSN-MUI',
+    jobTitle: 'Tembusan Surat Keluar',
+    isExternal: false,
+  },
+];
+
 interface SendInvitationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -54,8 +73,9 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [selectedRecipients, setSelectedRecipients] = useState<RecipientItem[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<RecipientItem[]>(DEFAULT_OUTGOING_CC_RECIPIENTS);
   const [activeTargetRole, setActiveTargetRole] = useState<RecipientRole>('TO');
+  const [quickCcInput, setQuickCcInput] = useState('');
   
   // External Guest Form
   const [showAddExternal, setShowAddExternal] = useState(false);
@@ -113,6 +133,10 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
       setSendResults(null);
       setErrorMsg(null);
       setActiveTargetRole('TO');
+      setQuickCcInput('');
+
+      // Pre-fill default CC recipients for outgoing letters
+      setSelectedRecipients(DEFAULT_OUTGOING_CC_RECIPIENTS);
       
       // Default meeting date: tomorrow at 09:00 WIB
       const tomorrow = new Date();
@@ -130,6 +154,25 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
         .then((res) => {
           const raw = res.data?.data || [];
           setUsers(raw);
+          // Match and enrich default CC recipients with directory users if available
+          setSelectedRecipients((prev) => {
+            return prev.map((item) => {
+              if (item.email) {
+                const match = raw.find(
+                  (u: any) => u.email && u.email.trim().toLowerCase() === item.email.trim().toLowerCase()
+                );
+                if (match) {
+                  return {
+                    ...item,
+                    userId: match.id || item.userId,
+                    jobTitle: item.jobTitle || match.jobTitle || match.jabatan?.name || item.jobTitle,
+                    department: match.department?.name || item.department,
+                  };
+                }
+              }
+              return item;
+            });
+          });
         })
         .catch((err) => {
           console.error('Failed to fetch user directory:', err);
@@ -325,6 +368,75 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
 
   const handleClearRole = (role: RecipientRole) => {
     setSelectedRecipients(selectedRecipients.filter((r) => r.role !== role));
+  };
+
+  const handleRestoreDefaultCC = () => {
+    setSelectedRecipients((prev) => {
+      // Remove any existing occurrences of default emails then re-add as CC
+      const nonDefault = prev.filter(
+        (r) =>
+          !DEFAULT_OUTGOING_CC_RECIPIENTS.some(
+            (d) => d.email.trim().toLowerCase() === (r.email || '').trim().toLowerCase()
+          )
+      );
+      return [...nonDefault, ...DEFAULT_OUTGOING_CC_RECIPIENTS];
+    });
+  };
+
+  const handleQuickAddCc = () => {
+    const val = quickCcInput.trim();
+    if (!val) return;
+
+    let name = val;
+    let email = val;
+
+    const matchParentheses = val.match(/^(.+?)\s*[\(<]([^\)>]+)[\)>]$/);
+    if (matchParentheses) {
+      name = matchParentheses[1].trim();
+      email = matchParentheses[2].trim();
+    } else if (val.includes('@')) {
+      const userPart = val.split('@')[0];
+      name = userPart.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      email = val;
+    } else {
+      const matched = users.find(
+        (u) =>
+          (u.fullName || u.name || '').toLowerCase().includes(val.toLowerCase()) &&
+          u.email
+      );
+      if (matched) {
+        name = matched.fullName || matched.name;
+        email = matched.email;
+      } else {
+        alert('Format email tidak valid. Masukkan alamat email yang valid (contoh: nama@domain.com).');
+        return;
+      }
+    }
+
+    const exists = selectedRecipients.some(
+      (r) => r.email && r.email.toLowerCase() === email.toLowerCase()
+    );
+    if (exists) {
+      setSelectedRecipients((prev) =>
+        prev.map((r) =>
+          r.email.toLowerCase() === email.toLowerCase() ? { ...r, role: 'CC' } : r
+        )
+      );
+    } else {
+      setSelectedRecipients((prev) => [
+        ...prev,
+        {
+          userId: null,
+          name,
+          email,
+          role: 'CC',
+          department: 'Eksternal',
+          jobTitle: 'Tembusan',
+          isExternal: true,
+        },
+      ]);
+    }
+    setQuickCcInput('');
   };
 
   // Preview helper
@@ -820,23 +932,64 @@ export const SendInvitationModal: React.FC<SendInvitationModalProps> = ({
                       ({ccRecipients.length} Penerima • <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Opsional</span>)
                     </span>
                   </div>
-                  {ccRecipients.length > 0 && !isSending && (
-                    <button
-                      type="button"
-                      onClick={() => handleClearRole('CC')}
-                      className="text-[10px] text-rose-500 hover:underline font-semibold cursor-pointer"
-                    >
-                      Kosongkan
-                    </button>
+                  {!isSending && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaultCC}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
+                        title="Terapkan kembali tembusan default (Abdul Wasik & CC Surat Keluar Kyai Cholil)"
+                      >
+                        + Default CC
+                      </button>
+                      {ccRecipients.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleClearRole('CC')}
+                          className="text-[10px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                        >
+                          Kosongkan
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
+
+                {/* Quick Add CC inline input */}
+                {!isSending && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        placeholder="Ketik email atau nama untuk tambah CC langsung (tekan Enter)..."
+                        value={quickCcInput}
+                        onChange={(e) => setQuickCcInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleQuickAddCc();
+                          }
+                        }}
+                        className="w-full pl-2.5 pr-16 py-1 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+                      />
+                      <button
+                        type="button"
+                        disabled={!quickCcInput.trim()}
+                        onClick={handleQuickAddCc}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                      >
+                        + Tambah
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {ccRecipients.length === 0 ? (
                   <div className="py-2 px-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-400 italic bg-slate-50/50 dark:bg-slate-800/20">
                     Tidak ada tembusan (opsional). Nama yang di-CC akan tercantum dalam surat resmi dan menerima tembusan.
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
                     {ccRecipients.map((rec) => (
                       <RecipientChip
                         key={rec.userId || rec.email}
@@ -1266,9 +1419,23 @@ const RecipientChip: React.FC<{
           : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'
       }`}
     >
-      <span className="truncate max-w-[130px]" title={`${rec.name} (${rec.email})`}>
+      <span className="truncate max-w-[180px] sm:max-w-[220px]" title={`${rec.name} (${rec.email})`}>
         {rec.name}
       </span>
+      {rec.email && (
+        <span
+          className={`text-[10px] font-normal truncate max-w-[150px] hidden sm:inline ${
+            isTo
+              ? 'text-emerald-600/80 dark:text-emerald-400/80'
+              : isCc
+              ? 'text-indigo-600/80 dark:text-indigo-400/80'
+              : 'text-slate-500'
+          }`}
+          title={rec.email}
+        >
+          ({rec.email})
+        </span>
+      )}
       {rec.isExternal && (
         <span className="text-[9px] px-1 py-0.2 rounded bg-amber-200 text-amber-900 font-bold">
           Luar
