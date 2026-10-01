@@ -86,7 +86,7 @@ interface EvidenceDocumentsTabProps {
   publicSub: any;
   candidatesList: any[];
   isRsDoc: boolean;
-  onOpenReaderDoc: (docInfo: { title: string; fileUrl: string }) => void;
+  onOpenReaderDoc: (docInfo: { title: string; fileUrl: string; docId?: string }) => void;
 }
 
 export const EvidenceDocumentsTab: React.FC<EvidenceDocumentsTabProps> = ({

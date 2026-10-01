@@ -35,7 +35,7 @@ import {
   User,
   Quote,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getBasePath } from "@/lib/utils";
 import { getBaseUrl } from "@/lib/api";
 
 const getBaseUrlSafe = () => {
@@ -88,7 +88,7 @@ interface ProcessDashboardTabProps {
   onOpenApproveModal: () => void;
   onOpenRejectModal: () => void;
   onOpenReminderModal: () => void;
-  onOpenReaderDoc: (docInfo: { title: string; fileUrl: string }) => void;
+  onOpenReaderDoc: (docInfo: { title: string; fileUrl: string; docId?: string }) => void;
   onNavigateToTab: (tab: "permohonan" | "agenda" | "evidence" | "log") => void;
 }
 
@@ -927,23 +927,46 @@ export const ProcessDashboardTab: React.FC<ProcessDashboardTabProps> = ({
                                     )}
                                   </div>
                                   {rnd.outgoingLetterId ? (
-                                    <a
-                                      href={`/surat-keluar/${rnd.outgoingLetterId}`}
-                                      className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
-                                    >
-                                      <span>Lihat Surat</span>
-                                      <ExternalLink size={12} />
-                                    </a>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          onOpenReaderDoc({
+                                            title: rnd.outgoingLetterTitle || rnd.outgoingLetterNumber || "Surat Undangan Wawancara DSN-MUI",
+                                            fileUrl: `/api/documents/${rnd.outgoingLetterId}/download`,
+                                            docId: rnd.outgoingLetterId,
+                                          });
+                                        }}
+                                        className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 hover:underline flex items-center gap-1.5 shrink-0 cursor-pointer"
+                                      >
+                                        <Eye size={13} />
+                                        <span>Lihat Surat</span>
+                                      </button>
+                                      <a
+                                        href={`${getBasePath()}/surat-keluar/${rnd.outgoingLetterId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-0.5 ml-1"
+                                        title="Buka Halaman Detail Dokumen (Tab Baru)"
+                                      >
+                                        <ExternalLink size={11} />
+                                      </a>
+                                    </div>
                                   ) : rnd.outgoingLetterFileUrl ? (
-                                    <a
-                                      href={getFileDownloadUrl(rnd.outgoingLetterFileUrl)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onOpenReaderDoc({
+                                          title: rnd.outgoingLetterTitle || rnd.outgoingLetterNumber || "Surat Undangan Wawancara DSN-MUI",
+                                          fileUrl: rnd.outgoingLetterFileUrl || "",
+                                          docId: rnd.outgoingLetterId,
+                                        });
+                                      }}
+                                      className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 hover:underline flex items-center gap-1.5 shrink-0 cursor-pointer"
                                     >
-                                      <Download size={12} />
-                                      <span>Unduh Dokumen</span>
-                                    </a>
+                                      <Eye size={13} />
+                                      <span>Lihat Surat</span>
+                                    </button>
                                   ) : null}
                                 </div>
                               )}

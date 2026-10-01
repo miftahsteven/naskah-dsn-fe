@@ -2,7 +2,7 @@
 
 import React from "react";
 import { X, ExternalLink, Download, FileText, Loader2, Printer, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
-import { getBaseUrl } from "@/lib/api";
+import api, { getBaseUrl } from "@/lib/api";
 import { getAssetUrl, getBasePath, cleanJobTitle } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import {
@@ -107,6 +107,15 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     }
   })()) : null);
 
+  const storeRefreshToken = useAuthStore((state) => state.refreshToken);
+  const refreshToken = storeRefreshToken || (typeof window !== 'undefined' ? (localStorage.getItem('refreshToken') || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.refreshToken;
+    } catch {
+      return null;
+    }
+  })()) : null);
+
   const isDetailEndpoint = builtUrl.includes('/api/documents/') && !builtUrl.endsWith('/download');
   const directUrl = isDetailEndpoint ? resolvedUrl : fullUrl;
   const effectiveUrl = directUrl || fullUrl;
@@ -122,14 +131,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     || lowerTitle.endsWith('.docx') || lowerTitle.endsWith('.doc')
     || lowerTitle.includes('.docx') || lowerTitle.includes('.doc');
 
-  const isHtml = !isDocx && (
-    resolvedMimeType === 'text/html'
-    || lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')
-    || lowerEffective.includes('.html') || lowerEffective.includes('.htm')
-    || lowerTitle.endsWith('.html') || lowerTitle.endsWith('.htm')
-  );
-
-  const isPdf = !isDocx && !isHtml && (
+  const isPdf = !isDocx && (
     resolvedMimeType === 'application/pdf'
     || lowerUrl.endsWith('.pdf')
     || lowerUrl.includes('.pdf')
@@ -139,11 +141,20 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   );
 
   const imageRegex = /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i;
-  const isImage = !isDocx && !isHtml && !isPdf && (
+  const isImage = !isDocx && !isPdf && (
     imageRegex.test(lowerUrl)
     || imageRegex.test(lowerEffective)
     || imageRegex.test(lowerTitle)
     || (resolvedMimeType?.startsWith('image/') ?? false)
+  );
+
+  const isHtml = !isDocx && !isPdf && !isImage && (
+    resolvedMimeType === 'text/html'
+    || lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')
+    || lowerEffective.includes('.html') || lowerEffective.includes('.htm')
+    || lowerTitle.endsWith('.html') || lowerTitle.endsWith('.htm')
+    || Boolean(docId)
+    || safeFileUrl.includes('/api/documents/')
   );
 
   const isLocalhost = (effectiveUrl || '').includes('localhost') || (effectiveUrl || '').includes('127.0.0.1');
@@ -152,6 +163,9 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   if (token && effectiveUrl && (effectiveUrl.startsWith("http://") || effectiveUrl.startsWith("https://"))) {
     const separator = effectiveUrl.includes('?') ? '&' : '?';
     fullUrlWithToken = `${effectiveUrl}${separator}token=${encodeURIComponent(token)}`;
+    if (refreshToken) {
+      fullUrlWithToken += `&refreshToken=${encodeURIComponent(refreshToken)}`;
+    }
   }
 
   const appendQueryParam = (url: string, key: string, value: string) => {
@@ -178,14 +192,8 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     }
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const res = await fetch(downloadUrl, { headers });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
+      const res = await api.get(downloadUrl, { responseType: 'blob' });
+      const blob = res.data;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -249,13 +257,10 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       if (!builtUrl || !builtUrl.includes('/api/documents/') || builtUrl.includes('/versions/')) return;
 
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
         const detailUrl = builtUrl.replace(/\/download$/, '');
-        const res = await fetch(detailUrl, { headers });
-        if (!res.ok) return;
-        const json = await res.json();
+        const res = await api.get(detailUrl);
         if (cancelled) return;
+        const json = res.data;
 
         const version = json?.data?.versions?.[0];
         const resolved = version?.fileUrl || json?.data?.fileUrl;
@@ -268,7 +273,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     }
     resolveDocFileUrl();
     return () => { cancelled = true; };
-  }, [builtUrl, token]);
+  }, [builtUrl]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -276,13 +281,10 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
 
     async function loadDocumentSignatures() {
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
         const detailUrl = builtUrl.replace(/\/download$/, '');
-        const res = await fetch(detailUrl, { headers });
-        if (!res.ok) return;
-        const json = await res.json();
+        const res = await api.get(detailUrl);
         if (cancelled) return;
+        const json = res.data;
 
         const signatures = json?.data?.signatures || [];
         const workflowInstances = json?.data?.workflowInstances || json?.data?.workflow || [];
@@ -764,14 +766,12 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     setHtmlContentWithSignatures(enhanced);
   }, [isHtml, htmlContent, signatureRows, signatureQrMap, attachmentPages]);
 
+  const [renderError, setRenderError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (isOpen && isHtml) {
       setHtmlContent(null);
-
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      setRenderError(null);
 
       // Extract document ID from docId prop or builtUrl API path
       const extractedDocId = docId 
@@ -783,12 +783,18 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
 
       if (!targetFetchUrl) return;
 
-      fetch(targetFetchUrl, { headers })
+      api.get(targetFetchUrl, { responseType: 'text' })
         .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.text();
-        })
-        .then(text => {
+          let text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+          if (text.trim().startsWith('{') && text.includes('"error"')) {
+            try {
+              const errObj = JSON.parse(text);
+              if (errObj.message) {
+                setRenderError(errObj.message);
+                return;
+              }
+            } catch (_) {}
+          }
           const FOOTER_HTML = `<table class="amanah-letter-footer" style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
     <tr>
       <td style="vertical-align: middle; text-align: left; padding: 4px 10px 4px 0; font-size: 7.5pt; line-height: 1.25; font-style: italic; color: #1f2937; border-top: 1px solid #e5e7eb;">
@@ -990,7 +996,10 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
 
           setHtmlContent(processed);
         })
-        .catch(err => console.error("Failed to load HTML:", err));
+        .catch(err => {
+          console.error("Failed to load HTML:", err);
+          setRenderError(err?.response?.data?.message || err?.message || "Gagal memuat pratinjau dokumen");
+        });
     }
   }, [isOpen, isHtml, htmlPreviewUrl, docId, builtUrl, BASE_URL, token, kopSuratBase64, bismillahBase64, logoBase64, wqaUkasBase64]);
 
@@ -1004,13 +1013,9 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     setDocxReady(false);
     setHtmlContent(null);
 
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    fetch(directUrl, { headers })
+    api.get(directUrl, { responseType: 'arraybuffer' })
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal mengunduh berkas`);
-        return res.arrayBuffer();
+        return res.data;
       })
       .then(async (arrayBuffer) => {
         if (cancelled) return;
@@ -1119,17 +1124,11 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
 
     setBlobUrl(null);
 
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    fetch(directUrl, { headers })
+    api.get(directUrl, { responseType: 'blob' })
       .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then(blob => {
         if (cancelled) return;
-        const pdfBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+        const blob = res.data;
+        const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' });
         objectUrl = URL.createObjectURL(pdfBlob);
         setBlobUrl(objectUrl);
       })
@@ -1319,12 +1318,28 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             </div>
           ) : (
             <>
-              {((isHtml && htmlContent === null) || (isDetailEndpoint && !directUrl)) && (
+              {((isHtml && htmlContent === null && !renderError) || (isDetailEndpoint && !directUrl)) && (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none">
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 size={32} className="animate-spin text-primary/30" />
                     <p className="text-xs font-bold uppercase tracking-widest opacity-50">Memuat berkas amanah...</p>
                   </div>
+                </div>
+              )}
+              {renderError && isHtml && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-slate-900 z-20">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+                    <FileText size={32} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Pratinjau Dokumen</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mb-6">{renderError}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(downloadUrl, downloadFileName)}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-xl shadow-md hover:opacity-90"
+                  >
+                    <Download size={16} /> Unduh File Dokumen
+                  </button>
                 </div>
               )}
               {isPdf ? (

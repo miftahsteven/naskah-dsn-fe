@@ -51,7 +51,7 @@ import {
   Search,
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, getBasePath } from "@/lib/utils";
 import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
 import Can from "@/components/auth/Can";
@@ -633,6 +633,7 @@ interface CreateInterviewInvitationModalProps {
   isHospital?: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  onOpenReaderDoc?: (docInfo: { title: string; fileUrl: string; docId?: string }) => void;
 }
 
 const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalProps> = ({
@@ -646,6 +647,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
   isHospital,
   onClose,
   onSuccess,
+  onOpenReaderDoc,
 }) => {
   const activeRound = round || existingInvitation?.round || 1;
 
@@ -913,7 +915,7 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                 1. Lampirkan Surat Undangan dari Surat Keluar
               </div>
               <a
-                href="/surat-keluar/new"
+                href={`${getBasePath()}/surat-keluar/new`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[11px] font-bold text-amber-800 hover:text-amber-950 dark:text-amber-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
@@ -954,13 +956,38 @@ const CreateInterviewInvitationModal: React.FC<CreateInterviewInvitationModalPro
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {onOpenReaderDoc ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenReaderDoc({
+                            title: selectedLetter.title || selectedLetter.documentNumber || "Surat Keluar",
+                            fileUrl: `/api/documents/${selectedLetter.id}/download`,
+                            docId: selectedLetter.id,
+                          });
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Eye size={12} /> Pratinjau
+                      </button>
+                    ) : (
+                      <a
+                        href={`${getBasePath()}/surat-keluar/${selectedLetter.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <Eye size={12} /> Buka
+                      </a>
+                    )}
                     <a
-                      href={`/surat-keluar/${selectedLetter.id}`}
+                      href={`${getBasePath()}/surat-keluar/${selectedLetter.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg flex items-center gap-1 transition-colors"
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded transition-colors"
+                      title="Buka Halaman Detail (Tab Baru)"
                     >
-                      <Eye size={12} /> Buka
+                      <ExternalLink size={12} />
                     </a>
                     <button
                       type="button"
@@ -2814,7 +2841,7 @@ const DocumentDetailPage: React.FC = () => {
   const [isUploadCertModalOpen, setIsUploadCertModalOpen] = useState<boolean>(false);
   const [interviewRoundToSchedule, setInterviewRoundToSchedule] = useState<number | null>(null);
   const [isCreateMeetingModalOpen, setIsCreateMeetingModalOpen] = useState<boolean>(initialCreateParam);
-  const [readerDoc, setReaderDoc] = useState<{ title: string; fileUrl: string } | null>(null);
+  const [readerDoc, setReaderDoc] = useState<{ title: string; fileUrl: string; docId?: string } | null>(null);
 
   // Workflow Dynamic Tools Modals
   const [isInvitePresentationModalOpen, setIsInvitePresentationModalOpen] = useState<boolean>(false);
@@ -3677,6 +3704,7 @@ const DocumentDetailPage: React.FC = () => {
             setInterviewRoundToSchedule(null);
             fetchDetail();
           }}
+          onOpenReaderDoc={(docInfo) => setReaderDoc(docInfo)}
         />
       )}
 
@@ -3829,6 +3857,7 @@ const DocumentDetailPage: React.FC = () => {
         onClose={() => setReaderDoc(null)}
         title={readerDoc?.title || ""}
         fileUrl={readerDoc?.fileUrl || ""}
+        docId={readerDoc?.docId}
       />
     </div>
   );
