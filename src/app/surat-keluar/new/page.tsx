@@ -34,8 +34,10 @@ import {
   Printer
 } from "lucide-react";
 import api from "@/lib/api";
-import { cn, getAssetUrl } from "@/lib/utils";
+import { cn, getAssetUrl, cleanJobTitle, formatSignerTitle, buildSignaturesHtml, DocumentSignerItem } from "@/lib/utils";
 import SimpleRichEditor from "@/components/SimpleRichEditor";
+import UniversalLetterEditorToolbar, { cleanPastedHtmlAndText } from "@/components/documents/UniversalLetterEditorToolbar";
+import UniversalSignaturesBlock from "@/components/documents/UniversalSignaturesBlock";
 import {
   renderPdfToImageUrls,
   generateAttachmentPagesHtml,
@@ -46,6 +48,7 @@ import {
 
 // List of available templates
 const templatesList = [
+  { id: "SK-UNIVERSAL", name: "Surat Keluar Universal (Kustom Bebas)" },
   { id: "rutin", name: "Surat Rutin Internal" },
   { id: "pengantar", name: "Surat Pengantar Internal" },
   { id: "keputusan", name: "Surat Keputusan" },
@@ -470,6 +473,18 @@ function getEstimatedHijriah(gregorianDateString: string): string {
 
 const getDefaultTemplateBody = (id: string): string => {
   switch (id) {
+    case "universal":
+    case "SK-UNIVERSAL":
+      return `
+        <p style="text-align: justify; margin-bottom: 6px; line-height: 1.35;"><em>Assalamu’alaikum Warahmatullah Wabarakatuh,</em></p>
+        <p style="text-align: justify; text-indent: 30px; margin-bottom: 8px; line-height: 1.35;">
+          Dengan hormat, sehubungan dengan hal tersebut di atas, bersama ini kami sampaikan bahwa:
+        </p>
+        <p style="text-align: justify; text-indent: 30px; margin-bottom: 8px; line-height: 1.35;">
+          Demikian surat ini kami sampaikan untuk dapat dipergunakan sebagaimana mestinya. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.
+        </p>
+        <p style="text-align: justify; margin-top: 8px; line-height: 1.35;"><em>Wassalamu’alaikum Warahmatullah Wabarakatuh.</em></p>
+      `;
     case "rutin":
       return `
         <p>Dengan hormat,</p>
@@ -683,10 +698,11 @@ const CreateDocumentPage = () => {
   const [selectedHospitalSubId, setSelectedHospitalSubId] = useState<string>("");
   const [loadingHospitalSubs, setLoadingHospitalSubs] = useState(false);
 
-  const EDITOR_TEMPLATES = ["SK-RUTIN", "SK-PENGANTAR", "SK-KEPUTUSAN", "SK-MANDAT", "SK-TUGAS", "SK-INFORMASI", "rutin", "pengantar", "keputusan", "mandat", "tugas", "informasi"];
+  const EDITOR_TEMPLATES = ["SK-UNIVERSAL", "universal", "SK-RUTIN", "SK-PENGANTAR", "SK-KEPUTUSAN", "SK-MANDAT", "SK-TUGAS", "SK-INFORMASI", "rutin", "pengantar", "keputusan", "mandat", "tugas", "informasi"];
 
   const getLegacyId = (val: string) => {
     const mapping: Record<string, string> = {
+      "SK-UNIVERSAL": "universal",
       "SK-RUTIN": "rutin",
       "SK-PENGANTAR": "pengantar",
       "SK-KEPUTUSAN": "keputusan",
@@ -732,6 +748,8 @@ const CreateDocumentPage = () => {
   });
   const [perihal, setPerihal] = useState("");
   const [lampiran, setLampiran] = useState("");
+  const [tujuanSurat, setTujuanSurat] = useState("Pimpinan / Anggota Organisasi");
+  const [tempatTujuan, setTempatTujuan] = useState("Tempat");
   const [dokumenPendukung, setDokumenPendukung] = useState<File | null>(null);
   const [attachmentPages, setAttachmentPages] = useState<AttachmentImage[]>([]);
   const [loadingAttachmentPreview, setLoadingAttachmentPreview] = useState(false);
@@ -870,7 +888,7 @@ const CreateDocumentPage = () => {
 
         const templatesData = templatesRes.data.data || [];
         setDbTemplates(templatesData);
-        const defaultTpl = templatesData.find((t: any) => t.code === "SK-RUTIN") || templatesData[0];
+        const defaultTpl = templatesData.find((t: any) => t.code === "SK-UNIVERSAL") || templatesData.find((t: any) => t.code === "SK-RUTIN") || templatesData[0];
         if (defaultTpl) {
           setSelectedTemplate(defaultTpl.code);
         }
@@ -1784,58 +1802,15 @@ const CreateDocumentPage = () => {
       const bodyHtml = editorRef.current?.innerHTML || "";
       // Only Penandatangan should be rendered in the document signature block
       const signersOnly = penandatanganList.filter(s => s.userId);
-      const resolvedSteps = signersOnly.map((step, idx) => {
+      const resolvedSteps: DocumentSignerItem[] = signersOnly.map((step, idx) => {
         const u = users.find(user => user.id === step.userId);
         return {
           name: u ? u.fullName : `Penandatangan ${idx + 1}`,
-          title: u ? u.jobTitle || u.role?.name || "Pejabat Organisasi" : ""
+          title: u ? cleanJobTitle(u.jobTitle) || u.role?.name || "Pejabat Organisasi" : ""
         };
       });
 
-      let signatureHtml = "";
-      if (resolvedSteps.length > 0) {
-        if (resolvedSteps.length === 1) {
-          signatureHtml += `
-            <div style="display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; border-top: 1px dashed #e2e8f0; padding-top: 20px;">
-              <div style="text-align: center; min-width: 180px;">
-                <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">Menyetujui,</div>
-                <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${resolvedSteps[0].name}</div>
-                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${resolvedSteps[0].title}</div>
-              </div>
-            </div>
-          `;
-        } else {
-          signatureHtml += `<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px 20px; margin-top: 60px; page-break-inside: avoid; border-top: 1px dashed #e2e8f0; padding-top: 20px;">`;
-          resolvedSteps.forEach((s, idx) => {
-            const isLastOdd = idx === resolvedSteps.length - 1 && resolvedSteps.length % 2 !== 0;
-            const label = idx === resolvedSteps.length - 1 ? "Menyetujui," : "Mengetahui,";
-
-            if (isLastOdd) {
-              signatureHtml += `
-                <div style="grid-column: span 2; display: flex; justify-content: center;">
-                  <div style="text-align: center; min-width: 180px;">
-                    <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">${label}</div>
-                    <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${s.name}</div>
-                    <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${s.title}</div>
-                  </div>
-                </div>
-              `;
-            } else {
-              const justify = idx % 2 === 0 ? "flex-start" : "flex-end";
-              signatureHtml += `
-                <div style="display: flex; justify-content: ${justify};">
-                  <div style="text-align: center; min-width: 180px;">
-                    <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">${label}</div>
-                    <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${s.name}</div>
-                    <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${s.title}</div>
-                  </div>
-                </div>
-              `;
-            }
-          });
-          signatureHtml += `</div>`;
-        }
-      }
+      const signatureHtml = buildSignaturesHtml(resolvedSteps);
 
       const metadataStr = JSON.stringify({
         selectedTemplate,
@@ -1844,6 +1819,8 @@ const CreateDocumentPage = () => {
         tanggalHijriah,
         perihal,
         lampiran,
+        tujuanSurat,
+        tempatTujuan,
         catatan,
         steps,
         pemparafList,
@@ -1867,179 +1844,88 @@ const CreateDocumentPage = () => {
           <style>
             @page {
               size: A4 portrait;
-              margin-top: 4.2cm;
-              margin-bottom: 0.5cm;
-              margin-right: 3.17cm;
-              margin-left: 2.82cm;
+              margin: 10mm 10mm 15mm 10mm;
             }
             body {
               font-family: Arial, sans-serif;
               color: #111827;
-              line-height: 1.5;
+              line-height: 1.35;
               font-size: 10.5pt;
               margin: 0;
-              padding-top: 4.2cm;
-              padding-bottom: 0.5cm;
-              padding-right: 3.17cm;
-              padding-left: 2.82cm;
+              padding: 0;
               box-sizing: border-box;
-              text-align: left;
             }
-            .header-edge {
-              position: absolute;
-              top: 1.27cm;
-              left: 2.82cm;
-              right: 3.17cm;
+            .letter-body-wrapper {
+              margin-left: 15mm;
+              margin-right: 10mm;
             }
-            .footer-edge {
-              position: absolute;
-              bottom: 1.27cm;
-              left: 2.82cm;
-              right: 3.17cm;
-            }
-            .kop-surat {
-              text-align: center;
-              border-bottom: 2px solid #000;
-              padding-bottom: 12px;
-              margin-bottom: 20px;
-            }
-            .kop-title {
-              font-size: 14pt;
-              font-weight: 800;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
+            .letter-body-custom {
+              font-size: 10.5pt;
+              line-height: 1.35;
               color: #111827;
-            }
-            .kop-subtitle {
-              font-size: 10pt;
-              font-weight: 700;
-              text-transform: uppercase;
-              color: #4b5563;
-              margin-top: 2px;
-            }
-            .kop-address {
-              font-size: 8.5pt;
-              color: #4b5563;
-              margin-top: 4px;
-            }
-            .meta-section {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 24px;
-              font-size: 10.5pt;
-            }
-            .meta-col {
-              display: flex;
-              flex-direction: column;
-              gap: 2px;
-            }
-            .meta-row {
-              display: flex;
-              gap: 6px;
-            }
-            .meta-label {
-              font-weight: bold;
-              width: 80px;
-            }
-            .recipient-block {
-              margin-bottom: 24px;
-              font-size: 10.5pt;
-            }
-            .letter-title {
-              text-align: center;
-              font-size: 12pt;
-              font-weight: 800;
-              text-decoration: underline;
-              text-transform: uppercase;
-              margin-top: 10px;
-              margin-bottom: 20px;
-              color: #111827;
-            }
-            .letter-body {
-              font-size: 10.5pt;
-              min-height: 250px;
+              text-align: justify;
             }
             table {
-              width: 100%;
               border-collapse: collapse;
-              margin: 12px 0;
             }
-            td, th {
-              padding: 6px 8px;
-              vertical-align: top;
-              font-size: 10.5pt;
+            .kop-surat-img {
+              width: 100%;
+              max-width: 100%;
+              height: auto;
+              display: block;
+              margin: 0 auto;
             }
           </style>
         </head>
         <body>
-          <table style="width: 100%; border-collapse: collapse; border-bottom: 3px double #000000; padding-bottom: 8px; margin-bottom: 12px;">
-            <tr>
-              <td style="width: 65px; vertical-align: middle; padding: 0 8px 0 0;">
-                <img src="${logoBase64 || (window.location.origin + getAssetUrl('/images/logo-dsn.png'))}" alt="Logo DSN-MUI" style="width: 55px; height: 55px; object-fit: contain;" />
-              </td>
-              <td style="text-align: left; vertical-align: middle; padding: 0;">
-                <div style="font-family: Arial, Helvetica, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #111827; letter-spacing: -0.2px; margin-bottom: 1px; line-height: 1.2; white-space: nowrap;">
-                  DEWAN SYARIAH NASIONAL - MAJELIS ULAMA INDONESIA
-                </div>
-                <div style="font-family: Arial, Helvetica, sans-serif; font-size: 8.5px; font-weight: bold; color: #111827; margin-bottom: 3px; line-height: 1.2; white-space: nowrap;">
-                  National Sharia Board - Indonesian Council of Ulama
-                </div>
-                <div style="font-family: Arial, Helvetica, sans-serif; font-size: 7.5px; color: #374151; margin-bottom: 1px; line-height: 1.2; white-space: nowrap;">
-                  SEKRETARIAT : Jl. Dempo No.19 Pegangsaan - Jakarta Pusat 10320
-                </div>
-                <div style="font-family: Arial, Helvetica, sans-serif; font-size: 7.5px; color: #374151; line-height: 1.2; white-space: nowrap;">
-                  Telp. (021) 3904146 &nbsp; Email: sekretariat@dsnmui.or.id &nbsp; Web: www.dsnmui.or.id
-                </div>
-              </td>
-              <td style="width: 70px; vertical-align: middle; text-align: right; padding: 0 0 0 8px;">
-                <div style="border: 1px solid #000000; padding: 3px; font-family: Arial, Helvetica, sans-serif; font-size: 6px; text-align: center; line-height: 1.1; font-weight: bold; color: #111827;">
-                  <div style="border-bottom: 1px solid #000000; padding-bottom: 1px; margin-bottom: 1.5px; font-size: 5px;">REGISTERED</div>
-                  <div style="font-weight: 800; font-size: 8px; letter-spacing: 0.5px; margin-bottom: 0.5px;">WQA</div>
-                  <div style="font-size: 5px; margin: 1px 0;">ISO 9001:2015</div>
-                  <div style="border-top: 1px dashed #000000; padding-top: 1px; margin-top: 1.5px; font-size: 4.5px;">UKAS 134</div>
-                </div>
-              </td>
-            </tr>
-          </table>
-          
-          <div style="text-align: center; font-size: 20px; font-family: 'Times New Roman', serif; margin-top: 12px; margin-bottom: 18px; color: #111827;">
-            بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
-          </div>
+          <div style="font-family: Arial, sans-serif; font-size: 10.5pt; color: #111827; line-height: 1.25; width: 100%; max-width: 100%; margin: 0; padding: 0;">
+            \${HEADER_HTML}
 
-          <div class="letter-title">${templateTitle}</div>
+            <div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">
+              <!-- TANGGAL SURAT -->
+              <div style="text-align: right; margin-bottom: 12px; margin-right: 15px;">
+                <table style="display: inline-table; margin-left: auto; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 10.5pt;">
+                  <tr>
+                    <td style="padding: 0; white-space: nowrap; vertical-align: bottom; line-height: 1.05;">${tempatDibuat},&nbsp;</td>
+                    <td style="padding: 0; text-align: right; white-space: nowrap; vertical-align: bottom;">
+                      <span style="border-bottom: 1.5px solid #000; display: inline-block; padding-bottom: 0px; line-height: 1.05; white-space: nowrap;">${tanggalHijriah}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td style="padding: 2px 0 0 0; text-align: right; white-space: nowrap; line-height: 1.2;">${new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</td>
+                  </tr>
+                </table>
+              </div>
 
-          <div class="meta-section">
-            <div class="meta-col">
-              <div class="meta-row">
-                <span class="meta-label">Nomor</span>
-                <span>: ${generatedDocNumber || '[Nomor Resmi akan di-generate]'}</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Lampiran</span>
-                <span>: ${lampiran || '—'}</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Perihal</span>
-                <span>: ${perihal}</span>
+              <!-- META SECTION -->
+              <table style="width: calc(100% - 15px); border-collapse: collapse; margin-bottom: 8px; font-size: 10.5pt; line-height: 1.25;">
+                <tr><td style="width: 60px; vertical-align: top; padding: 2px 0;">Nomor</td><td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">${generatedDocNumber || '[Nomor Resmi]'}</td></tr>
+                <tr><td style="vertical-align: top; padding: 2px 0;">Lamp.</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">${lampiran || '—'}</td></tr>
+                <tr><td style="vertical-align: top; padding: 2px 0;">Hal</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">${perihal}</td></tr>
+              </table>
+
+              <!-- BODY CONTENT ALIGNED UNDER HAL -->
+              <div style="margin-left: 75px; margin-right: 15px;">
+                <!-- KEPADA YTH (HINGGA DI TEMPAT) -->
+                <div style="margin-bottom: 14px; font-size: 10.5pt; line-height: 1.25;">
+                  <div>Kepada Yth.</div>
+                  <div style="white-space: pre-line; font-weight: bold; margin-bottom: 2px;">${tujuanSurat || 'Pimpinan / Anggota Organisasi'}</div>
+                  <div>di -</div>
+                  <div style="margin-left: 20px; font-weight: bold;">${tempatTujuan || 'Tempat'}</div>
+                </div>
+
+                <!-- ISI SURAT KUSTOM 100% -->
+                <div class="letter-body-custom" style="font-size: 10.5pt; line-height: 1.35; color: #111827; min-height: 200px;">
+                  ${bodyHtml}
+                </div>
+
+                ${signatureHtml}
+
+                \${FOOTER_HTML}
               </div>
             </div>
-            <div class="meta-col" style="text-align: right; align-items: flex-end;">
-              <div>${tempatDibuat}, ${new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</div>
-              <div>${tanggalHijriah}</div>
-            </div>
           </div>
-
-          <div class="recipient-block">
-            <p style="margin-bottom: 2px;">Kepada Yang Terhormat,</p>
-            <p style="font-weight: bold; margin-bottom: 2px;">Pimpinan / Anggota Organisasi</p>
-            <p>di — Tempat</p>
-          </div>
-
-          <div class="letter-body">
-            ${bodyHtml}
-          </div>
-
-          ${signatureHtml}
         </body>
         </html>
       `;
@@ -2235,61 +2121,24 @@ const CreateDocumentPage = () => {
     let html = "";
     if (isEditorMode) {
       const bodyHtml = editorRef.current?.innerHTML || "";
-      const signersOnly = penandatanganList.filter(s => s.userId);
-      const resolvedSteps = signersOnly.map((step, idx) => {
+      const signersToBuild: DocumentSignerItem[] = penandatanganList.map((step, idx) => {
         const u = users.find(user => user.id === step.userId);
+        if (u) {
+          return {
+            name: u.fullName,
+            title: cleanJobTitle(u.jobTitle) || u.role?.name || "Pejabat Organisasi"
+          };
+        }
         return {
-          name: u ? u.fullName : `Penandatangan ${idx + 1}`,
-          title: u ? u.jobTitle || u.role?.name || "Pejabat Organisasi" : ""
+          name: `(Pilih Penandatangan ${idx + 1})`,
+          title: `Penandatangan ${idx + 1}`
         };
       });
 
-      let signatureHtml = "";
-      if (resolvedSteps.length > 0) {
-        if (resolvedSteps.length === 1) {
-          signatureHtml += `
-            <div style="display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; border-top: 1px dashed #e2e8f0; padding-top: 20px;">
-              <div style="text-align: center; min-width: 180px;">
-                <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">Menyetujui,</div>
-                <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${resolvedSteps[0].name}</div>
-                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${resolvedSteps[0].title}</div>
-              </div>
-            </div>
-          `;
-        } else {
-          signatureHtml += `<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px 20px; margin-top: 60px; page-break-inside: avoid; border-top: 1px dashed #e2e8f0; padding-top: 20px;">`;
-          resolvedSteps.forEach((s, idx) => {
-            const isLastOdd = idx === resolvedSteps.length - 1 && resolvedSteps.length % 2 !== 0;
-            const label = idx === resolvedSteps.length - 1 ? "Menyetujui," : "Mengetahui,";
-            if (isLastOdd) {
-              signatureHtml += `
-                <div style="grid-column: span 2; display: flex; justify-content: center;">
-                  <div style="text-align: center; min-width: 180px;">
-                    <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">${label}</div>
-                    <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${s.name}</div>
-                    <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${s.title}</div>
-                  </div>
-                </div>
-              `;
-            } else {
-              const justify = idx % 2 === 0 ? "flex-start" : "flex-end";
-              signatureHtml += `
-                <div style="display: flex; justify-content: ${justify};">
-                  <div style="text-align: center; min-width: 180px;">
-                    <div style="font-size: 11px; color: #4b5563; margin-bottom: 45px;">${label}</div>
-                    <div style="font-size: 12px; font-weight: bold; text-decoration: underline; color: #111827;">${s.name}</div>
-                    <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${s.title}</div>
-                  </div>
-                </div>
-              `;
-            }
-          });
-          signatureHtml += `</div>`;
-        }
-      }
+      const signatureHtml = buildSignaturesHtml(signersToBuild);
 
       html = `
-        <div style="font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111827;">
+        <div style="font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; color: #111827;">
           <div style="margin-bottom: 8px;">
             <img src="${getAssetUrl("/images/kop-surat.png")}" alt="Kop Surat" style="width: 100%; height: auto; display: block;" />
           </div>
@@ -2297,40 +2146,46 @@ const CreateDocumentPage = () => {
             <img src="${bismillahBase64 || getAssetUrl("/images/bismillah.svg")}" alt="Bismillah" style="width: 260px; max-width: 45%; height: auto; max-height: 48px; object-fit: contain; filter: brightness(0); display: block; margin: 0 auto;" />
           </div>
           <div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">
-            <div style="text-align: center; font-weight: bold; text-transform: uppercase; font-size: 12pt; margin-bottom: 24px; text-decoration: underline;">
-              ${selectedTemplateObj?.name || "Surat Keluar"}
+            <!-- TANGGAL SURAT -->
+            <div style="text-align: right; margin-bottom: 12px; margin-right: 15px;">
+              <table style="display: inline-table; margin-left: auto; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 10.5pt;">
+                <tr>
+                  <td style="padding: 0; white-space: nowrap; vertical-align: bottom; line-height: 1.05;">${tempatDibuat},&nbsp;</td>
+                  <td style="padding: 0; text-align: right; white-space: nowrap; vertical-align: bottom;">
+                    <span style="border-bottom: 1.5px solid #000; display: inline-block; padding-bottom: 0px; line-height: 1.05; white-space: nowrap;">${tanggalHijriah}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td style="padding: 2px 0 0 0; text-align: right; white-space: nowrap; line-height: 1.2;">${new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</td>
+                </tr>
+              </table>
             </div>
-            <table style="width: 100%; font-size: 10.5pt; margin-bottom: 24px; border-collapse: collapse;">
-              <tr>
-                <td style="vertical-align: top;">
-                  <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-                    <span style="font-weight: bold; width: 75px;">Nomor</span>
-                    <span>: ${generatedDocNumber || "—"}</span>
-                  </div>
-                  <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-                    <span style="font-weight: bold; width: 75px;">Lampiran</span>
-                    <span>: ${lampiran || "—"}</span>
-                  </div>
-                  <div style="display: flex; gap: 8px;">
-                    <span style="font-weight: bold; width: 75px;">Perihal</span>
-                    <span style="font-weight: bold;">: ${perihal || "—"}</span>
-                  </div>
-                </td>
-                <td style="vertical-align: top; text-align: right;">
-                  <div>${tempatDibuat}, ${new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</div>
-                  <div style="color: #6b7280; font-size: 10pt;">${tanggalHijriah || "— H"}</div>
-                </td>
-              </tr>
+
+            <!-- META SECTION -->
+            <table style="width: calc(100% - 15px); border-collapse: collapse; margin-bottom: 8px; font-size: 10.5pt; line-height: 1.25;">
+              <tr><td style="width: 60px; vertical-align: top; padding: 2px 0;">Nomor</td><td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">${generatedDocNumber || '[Nomor Resmi]'}</td></tr>
+              <tr><td style="vertical-align: top; padding: 2px 0;">Lamp.</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">${lampiran || '—'}</td></tr>
+              <tr><td style="vertical-align: top; padding: 2px 0;">Hal</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="font-weight: bold; padding: 2px 0;">${perihal}</td></tr>
             </table>
-            <div style="margin-bottom: 24px;">
-              <div>Kepada Yang Terhormat,</div>
-              <div style="font-weight: bold;">Pimpinan / Anggota Organisasi</div>
-              <div>di — Tempat</div>
+
+            <!-- BODY CONTENT ALIGNED UNDER HAL -->
+            <div style="margin-left: 75px; margin-right: 15px;">
+              <!-- KEPADA YTH -->
+              <div style="margin-bottom: 14px; font-size: 10.5pt; line-height: 1.25;">
+                <div>Kepada Yth.</div>
+                <div style="white-space: pre-line; font-weight: bold; margin-bottom: 2px;">${tujuanSurat || 'Pimpinan / Anggota Organisasi'}</div>
+                <div>di -</div>
+                <div style="margin-left: 20px; font-weight: bold;">${tempatTujuan || 'Tempat'}</div>
+              </div>
+
+              <!-- ISI SURAT -->
+              <div class="letter-body-custom" style="font-size: 10.5pt; line-height: 1.35; color: #111827; min-height: 200px; text-align: justify;">
+                ${bodyHtml}
+              </div>
+
+              ${signatureHtml}
             </div>
-            <div style="margin-bottom: 24px;">
-              ${bodyHtml}
-            </div>
-            ${signatureHtml}
           </div>
         </div>
       `;
@@ -2732,6 +2587,17 @@ const CreateDocumentPage = () => {
                       <div className="space-y-2">
                         {penandatanganList.map((item, idx) => (
                           <div key={idx} className="flex gap-1.5 items-center">
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] font-mono text-slate-400 w-4 text-center">#{idx + 1}</span>
+                              <span className={cn(
+                                "text-[8px] font-bold px-1.5 py-0.5 rounded",
+                                idx === 0
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                              )}>
+                                {idx === 0 ? "Kanan" : "Kiri"}
+                              </span>
+                            </div>
                             <select
                               required
                               value={item.userId}
@@ -2741,7 +2607,7 @@ const CreateDocumentPage = () => {
                               <option value="">— Pilih Penandatangan —</option>
                               {users.map((u) => (
                                 <option key={u.id} value={u.id}>
-                                  {u.fullName}
+                                  {u.fullName} ({cleanJobTitle(u.jobTitle) || u.role?.name || 'Pejabat'})
                                 </option>
                               ))}
                             </select>
@@ -2829,74 +2695,14 @@ const CreateDocumentPage = () => {
                   )}>
                     {isEditorMode ? (
                       <>
-                        {/* Editor Formatting Controls */}
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl mb-4 flex flex-wrap gap-1 items-center shadow-sm shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("bold")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Bold"
-                          >
-                            <Bold size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("italic")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Italic"
-                          >
-                            <Italic size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("underline")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Underline"
-                          >
-                            <Underline size={15} />
-                          </button>
-                          <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("justifyLeft")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Align Left"
-                          >
-                            <AlignLeft size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("justifyCenter")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Align Center"
-                          >
-                            <AlignCenter size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("justifyRight")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Align Right"
-                          >
-                            <AlignRight size={15} />
-                          </button>
-                          <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("insertUnorderedList")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Bullet List"
-                          >
-                            <List size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditorCommand("insertOrderedList")}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-all"
-                            title="Numbered List"
-                          >
-                            <ListOrdered size={15} />
-                          </button>
+                        {/* Editor Formatting Controls with Universal WYSIWYG Toolbar */}
+                        <div className="sticky top-20 z-20 mb-4 shadow-sm">
+                          <UniversalLetterEditorToolbar
+                            editorRef={editorRef}
+                            onContentChange={() => {
+                              // Trigger state update if needed
+                            }}
+                          />
                         </div>
 
                         {/* Physical A4 Visual Paper */}
@@ -2941,99 +2747,98 @@ const CreateDocumentPage = () => {
 
                           {/* Letter Body Wrapper to preserve 15mm left & 10mm right margins */}
                           <div style={{ marginLeft: "15mm", marginRight: "10mm" }}>
-                            {/* Letter Title */}
-                            <div className="text-center font-extrabold underline uppercase tracking-wide text-slate-900 mb-6" style={{ fontSize: "12pt" }}>
-                              {selectedTemplateObj?.name || "Surat Keluar"}
-                            </div>
+                            {/* Letter Title (hidden on SK-UNIVERSAL) */}
+                            {selectedTemplate !== "SK-UNIVERSAL" && (
+                              <div className="text-center font-extrabold underline uppercase tracking-wide text-slate-900 mb-6" style={{ fontSize: "12pt" }}>
+                                {selectedTemplateObj?.name || "Surat Keluar"}
+                              </div>
+                            )}
 
                             {/* Letter Metadata Info block */}
                             <div className="flex justify-between items-start mb-6 text-slate-700" style={{ fontSize: "10.5pt" }}>
-                              <div className="space-y-1">
-                                <div className="flex gap-2">
-                                  <span className="font-bold w-[75px]">Nomor</span>
-                                  <span className={generatedDocNumber ? 'font-medium text-slate-900' : 'italic text-slate-400'}>: {generatedDocNumber || '[Nomor Resmi akan di-generate]'}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <span className="font-bold w-[75px]">Lampiran</span>
-                                  <span>: {lampiran || "—"}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <span className="font-bold w-[75px]">Perihal</span>
-                                  <span className="font-medium text-slate-900">: {perihal || "—"}</span>
-                                </div>
-                              </div>
+                              <table style={{ borderCollapse: "collapse", fontSize: "10.5pt", lineHeight: "1.25" }}>
+                                <tbody>
+                                  <tr>
+                                    <td style={{ width: "60px", verticalAlign: "top", padding: "2px 0", fontWeight: "bold" }}>Nomor</td>
+                                    <td style={{ width: "15px", verticalAlign: "top", padding: "2px 0" }}>:</td>
+                                    <td style={{ padding: "2px 0" }} className={generatedDocNumber ? "font-medium text-slate-900" : "italic text-slate-400"}>
+                                      {generatedDocNumber || "[Nomor Resmi akan di-generate]"}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style={{ verticalAlign: "top", padding: "2px 0", fontWeight: "bold" }}>Lamp.</td>
+                                    <td style={{ verticalAlign: "top", padding: "2px 0" }}>:</td>
+                                    <td style={{ padding: "2px 0" }}>{lampiran || "—"}</td>
+                                  </tr>
+                                  <tr>
+                                    <td style={{ verticalAlign: "top", padding: "2px 0", fontWeight: "bold" }}>Hal</td>
+                                    <td style={{ verticalAlign: "top", padding: "2px 0" }}>:</td>
+                                    <td style={{ padding: "2px 0", fontWeight: "bold" }} className="text-slate-900">{perihal || "—"}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
                               <div className="text-right flex flex-col items-end">
                                 <p>{tempatDibuat}, {new Date(tanggalMasehi).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} M</p>
                                 <p className="font-mono text-[10px] text-slate-500">{tanggalHijriah || "— H"}</p>
                               </div>
                             </div>
 
-                            {/* Recipient Address */}
-                            <div className="mb-6 text-slate-700 space-y-1" style={{ fontSize: "10.5pt" }}>
-                              <p>Kepada Yang Terhormat,</p>
-                              <p className="font-bold text-slate-900">Pimpinan / Anggota Organisasi</p>
-                              <p>di — Tempat</p>
-                            </div>
-
-                            {/* Rich text Body editor */}
-                            <div className="flex-1 text-slate-850 pr-2">
-                              <div
-                                ref={editorRef}
-                                contentEditable
-                                suppressContentEditableWarning
-                                className="outline-none min-h-[300px] border-none py-1 focus:ring-1 focus:ring-primary/20 rounded-xl px-2 transition-all"
-                                style={{ fontSize: "10.5pt", fontFamily: "Arial, sans-serif", lineHeight: "1.5" }}
-                              />
-                            </div>
-
-                            {/* Signature workflow names visual display */}
-                            {(() => {
-                              const validSteps = getAllWorkflowSteps();
-                              if (validSteps.length === 0) return null;
-
-                              const renderSigner = (step: { userId: string }, idx: number, total: number) => {
-                                const u = users.find(user => user.id === step.userId);
-                                if (!u) return null;
-
-                                let label = "Mengetahui,";
-                                if (total === 1) label = "Menyetujui,";
-                                else if (idx === total - 1) label = "Menyetujui,";
-
-                                return (
-                                  <div key={idx} className="min-w-[150px] text-slate-800 animate-in fade-in duration-300 text-center">
-                                    <p className="font-bold uppercase tracking-widest mb-16 text-slate-500" style={{ fontSize: "10pt" }}>
-                                      {label}
-                                    </p>
-                                    <p className="font-extrabold underline text-slate-900" style={{ fontSize: "10.5pt" }}>{u.fullName}</p>
-                                    <p className="font-semibold text-slate-500" style={{ fontSize: "10pt" }}>{u.jobTitle || u.role?.name || "Pejabat Organisasi"}</p>
-                                  </div>
-                                );
-                              };
-
-                              return (
-                                <div className="mt-16 pt-8 mb-12 border-t border-dashed border-slate-100">
-                                  {validSteps.length === 1 && (
-                                    <div className="flex justify-end">
-                                      {renderSigner(validSteps[0], 0, 1)}
-                                    </div>
-                                  )}
-                                  {validSteps.length >= 2 && (
-                                    <div className="grid grid-cols-2 gap-y-12 gap-x-8">
-                                      {validSteps.map((step, idx) => {
-                                        const isLastOdd = idx === validSteps.length - 1 && validSteps.length % 2 !== 0;
-                                        return (
-                                          <div key={idx} className={cn(
-                                            isLastOdd ? "col-span-2 flex justify-center" : (idx % 2 === 0 ? "flex justify-start" : "flex justify-end")
-                                          )}>
-                                            {renderSigner(step, idx, validSteps.length)}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
+                            {/* Content container aligned with colon of Hal (margin-left: 75px, margin-right: 15px) */}
+                            <div style={{ marginLeft: "75px", marginRight: "15px" }}>
+                              {/* Recipient Address */}
+                              <div className="mb-4 text-slate-800" style={{ fontSize: "10.5pt", lineHeight: "1.25" }}>
+                                <div>Kepada Yth.</div>
+                                <div className="font-bold whitespace-pre-line my-1 text-slate-900">
+                                  {tujuanSurat || "Pimpinan / Anggota Organisasi"}
                                 </div>
-                              );
-                            })()}
+                                <div>di -</div>
+                                <div className="ml-5 font-bold text-slate-900">{tempatTujuan || "Tempat"}</div>
+                              </div>
+
+                              {/* Rich text Body editor */}
+                              <div className="flex-1 text-slate-850">
+                                <div
+                                  ref={editorRef}
+                                  contentEditable
+                                  suppressContentEditableWarning
+                                  onPaste={(e) => {
+                                    e.preventDefault();
+                                    const text = e.clipboardData.getData("text/plain");
+                                    const html = e.clipboardData.getData("text/html");
+                                    const sanitized = cleanPastedHtmlAndText(html, text);
+                                    document.execCommand("insertHTML", false, sanitized);
+                                  }}
+                                  className="outline-none min-h-[350px] border border-dashed border-slate-200 hover:border-primary/40 focus:border-primary/60 py-2 focus:ring-1 focus:ring-primary/20 rounded-xl px-3 transition-all"
+                                  style={{
+                                    fontSize: "10.5pt",
+                                    fontFamily: "Arial, sans-serif",
+                                    lineHeight: "1.4",
+                                    textAlign: "justify"
+                                  }}
+                                />
+                              </div>
+
+                              {/* Signature workflow names visual display matching official DSN-MUI standard */}
+                              {(() => {
+                                const signersForDisplay: DocumentSignerItem[] = penandatanganList.map((s, idx) => {
+                                  const u = users.find(user => user.id === s.userId);
+                                  if (u) {
+                                    return {
+                                      name: u.fullName,
+                                      title: cleanJobTitle(u.jobTitle) || u.role?.name || "Pejabat Organisasi",
+                                      isPlaceholder: false
+                                    };
+                                  }
+                                  return {
+                                    name: `(Pilih Penandatangan ${idx + 1})`,
+                                    title: `Penandatangan ${idx + 1}`,
+                                    isPlaceholder: true
+                                  };
+                                });
+
+                                return <UniversalSignaturesBlock signers={signersForDisplay} />;
+                              })()}
+                            </div>
 
                           </div>
 
@@ -3414,8 +3219,13 @@ const CreateDocumentPage = () => {
                                   clearFieldError("selectedTemplate");
                                 }}
                               >
+                                <optgroup label="⭐ Template Universal (Rekomendasi - Kustom Bebas)">
+                                  {dbTemplates.filter(t => t.code === "SK-UNIVERSAL").map(t => (
+                                    <option key={t.id} value={t.code}>✨ {t.name}</option>
+                                  ))}
+                                </optgroup>
                                 <optgroup label="Template Standar (Rich Text)">
-                                  {dbTemplates.filter(t => t.code && EDITOR_TEMPLATES.includes(t.code)).map(t => (
+                                  {dbTemplates.filter(t => t.code && t.code !== "SK-UNIVERSAL" && EDITOR_TEMPLATES.includes(t.code)).map(t => (
                                     <option key={t.id} value={t.code}>{t.name}</option>
                                   ))}
                                 </optgroup>
@@ -3584,6 +3394,37 @@ const CreateDocumentPage = () => {
 
                     {activeTab === "detail" && (
                       <div className="space-y-4 animate-in fade-in duration-200">
+                        {/* Tujuan Surat (Kepada Yth & Tempat Tujuan) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                          <div className="sm:col-span-2 space-y-2">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                              <span>Tujuan Surat (Kepada Yth.) <span className="text-red-500 font-bold ml-0.5">*</span></span>
+                              <span className="text-[9px] text-slate-400 font-normal lowercase">bisa lebih dari satu baris</span>
+                            </label>
+                            <textarea
+                              rows={4}
+                              required
+                              placeholder={"1. Dewan Pengawas Syariah PT Bank Syariah Indonesia\n2. Direksi PT Bank Syariah Indonesia\n3. Divisi Kepatuhan Syariah"}
+                              className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-semibold text-slate-800 dark:text-slate-100 resize-y"
+                              value={tujuanSurat}
+                              onChange={(e) => setTujuanSurat(e.target.value)}
+                            />
+                            <p className="text-[9px] text-slate-400 ml-1">Nama pejabat / pimpinan instansi / lembaga penerima surat (tekan Enter untuk baris baru)</p>
+                          </div>
+                          <div className="space-y-2 flex flex-col justify-start">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+                              Kota / Tempat Tujuan
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Tempat"
+                              className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-semibold text-slate-800 dark:text-slate-100"
+                              value={tempatTujuan}
+                              onChange={(e) => setTempatTujuan(e.target.value)}
+                            />
+                            <p className="text-[9px] text-slate-400 ml-1">Tertulis setelah kata &quot;di -&quot; (misal: Tempat, Jakarta, dsb.)</p>
+                          </div>
+                        </div>
                         {/* Row 4: Tempat, Tgl Masehi, Tgl Hijriah */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div className="space-y-2">
@@ -4084,7 +3925,7 @@ const CreateDocumentPage = () => {
                                       <option value="">— Pilih Pemparaf —</option>
                                       {users.map((u) => (
                                         <option key={u.id} value={u.id}>
-                                          {u.fullName} ({u.role?.name || u.jobTitle || 'Staff'})
+                                          {u.fullName} ({u.role?.name || cleanJobTitle(u.jobTitle) || 'Staff'})
                                         </option>
                                       ))}
                                     </select>
@@ -4145,7 +3986,7 @@ const CreateDocumentPage = () => {
                                       <option value="">— Pilih Approver —</option>
                                       {users.map((u) => (
                                         <option key={u.id} value={u.id}>
-                                          {u.fullName} ({u.role?.name || u.jobTitle || 'Pejabat'})
+                                          {u.fullName} ({u.role?.name || cleanJobTitle(u.jobTitle) || 'Pejabat'})
                                         </option>
                                       ))}
                                     </select>
@@ -4173,7 +4014,9 @@ const CreateDocumentPage = () => {
                                   <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">
                                     Penandatangan <span className="text-red-500 font-bold ml-0.5">*</span>
                                   </h5>
-                                  <p className="text-[10px] text-slate-400">Pejabat utama penandatangan surat keluar resmi</p>
+                                  <p className="text-[10px] text-slate-400">
+                                    Pejabat penandatangan (Urutan: #1 Sisi Kanan di bawah Header DSN-MUI, #2 dst. Sisi Kiri)
+                                  </p>
                                 </div>
                               </div>
                               <button
@@ -4189,7 +4032,17 @@ const CreateDocumentPage = () => {
                             <div className="space-y-2">
                               {penandatanganList.map((item, idx) => (
                                 <div key={idx} className="flex gap-2 items-center">
-                                  <span className="text-[10px] font-mono text-slate-400 w-6 text-center">#{idx + 1}</span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="text-[10px] font-mono text-slate-400 w-5 text-center">#{idx + 1}</span>
+                                    <span className={cn(
+                                      "text-[9px] font-bold px-2 py-0.5 rounded-md",
+                                      idx === 0
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                    )}>
+                                      {idx === 0 ? "Kanan (Utama)" : `Kiri (#${idx + 1})`}
+                                    </span>
+                                  </div>
                                   <select
                                     required
                                     value={item.userId}
@@ -4204,7 +4057,7 @@ const CreateDocumentPage = () => {
                                     <option value="">— Pilih Penandatangan —</option>
                                     {users.map((u) => (
                                       <option key={u.id} value={u.id}>
-                                        {u.fullName} ({u.role?.name || u.jobTitle || 'Pejabat'})
+                                        {u.fullName} ({u.role?.name || cleanJobTitle(u.jobTitle) || 'Pejabat'})
                                       </option>
                                     ))}
                                   </select>

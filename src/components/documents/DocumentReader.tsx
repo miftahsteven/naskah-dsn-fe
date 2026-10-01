@@ -3,7 +3,7 @@
 import React from "react";
 import { X, ExternalLink, Download, FileText, Loader2, Printer, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { getBaseUrl } from "@/lib/api";
-import { getAssetUrl, getBasePath } from "@/lib/utils";
+import { getAssetUrl, getBasePath, cleanJobTitle } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import {
   loadEvidencePdfImages,
@@ -313,7 +313,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
               id: String(s.id),
               userId: String(s.userId),
               fullName: s.user?.fullName || 'Penandatangan',
-              jobTitle: s.user?.jobTitle || 'Penandatangan',
+              jobTitle: cleanJobTitle(s.user?.jobTitle) || 'Penandatangan',
               signedAt: new Date(s.signedAt).toLocaleString('id-ID', {
                 timeZone: 'Asia/Jakarta',
                 dateStyle: 'long',
@@ -335,7 +335,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
                   id: String(st.id),
                   userId: String(st.userId),
                   fullName: st.user?.fullName || 'Penandatangan',
-                  jobTitle: st.user?.jobTitle || 'Penandatangan',
+                  jobTitle: cleanJobTitle(st.user?.jobTitle) || 'Penandatangan',
                   signedAt: new Date(signedDate).toLocaleString('id-ID', {
                     timeZone: 'Asia/Jakarta',
                     dateStyle: 'long',
@@ -1268,7 +1268,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{row.fullName}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{row.jobTitle}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{cleanJobTitle(row.jobTitle)}</p>
                       <p className="text-[10px] text-slate-400 mt-1">{row.signedAt}</p>
                     </div>
                   </div>

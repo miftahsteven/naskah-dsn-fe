@@ -28,7 +28,7 @@ import {
   Printer
 } from "lucide-react";
 import api, { getBaseUrl } from "@/lib/api";
-import { cn, isSignedByFinalSignatory } from "@/lib/utils";
+import { cn, isSignedByFinalSignatory, cleanJobTitle } from "@/lib/utils";
 import DocumentReader from "@/components/documents/DocumentReader";
 import { useAuthStore } from "@/stores/auth.store";
 import Can from "@/components/auth/Can";
@@ -868,7 +868,8 @@ const DocumentDetailPage = () => {
                         </div>
                         {(() => {
                           const roleLabel = (step.roleId === 'PEMPARAF' || step.role === 'PEMPARAF') ? 'Pemaraf' : (step.roleId === 'APPROVER' || step.role === 'APPROVER') ? 'Approver' : 'Penandatangan';
-                          const jobTitle = step.user?.jabatan?.name || step.user?.jobTitle || step.user?.role?.name;
+                          const rawJobTitle = step.user?.jabatan?.name || step.user?.jobTitle || step.user?.role?.name;
+                          const jobTitle = cleanJobTitle(rawJobTitle);
                           return (
                             <p className="text-[10px] text-slate-500 font-medium">
                               <span className="font-semibold text-slate-600 dark:text-slate-400">{roleLabel}</span>
