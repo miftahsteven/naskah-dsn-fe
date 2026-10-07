@@ -241,6 +241,55 @@ export const ATTACHMENT_CSS = `
 `;
 
 /**
+ * Normalizes unformatted team member lists (e.g. "1) ... 2) ..." or lines with newlines/<br>)
+ * into standard HTML semantic <ol> ordered lists.
+ */
+export function normalizeTeamListToOrderedList(html: string): string {
+  if (!html || typeof html !== "string") return html;
+  if (/<ol\b[^>]*>[\s\S]*?<li>[\s\S]*?<\/ol>/i.test(html)) return html;
+
+  function formatItemsToOl(itemsStr: string): string {
+    const clean = itemsStr.replace(/<\/?(?:div|p|span)[^>]*>/gi, " ").trim();
+    const parts = clean
+      .split(/(?:<br\s*\/?>|\r?\n|\s+|^|(?<=[A-Za-z\.,]))(?=\d+[\)\.]\s*[A-Z])/gi)
+      .map((s) => s.replace(/<br\s*\/?>/gi, "").trim())
+      .filter(Boolean);
+
+    const listItems: string[] = [];
+    for (const p of parts) {
+      const itemText = p.replace(/^\d+[\)\.]\s*/, "").trim();
+      if (itemText) listItems.push(`<li>${itemText}</li>`);
+    }
+    if (listItems.length === 0) return itemsStr;
+    return `<ol style="margin-top: 1px; margin-bottom: 3px; padding-left: 20px; list-style-type: decimal;">\n  ${listItems.join("\n  ")}\n</ol>`;
+  }
+
+  const sectionRegex = /(<(?:div|p|strong|b)\b[^>]*>(?:(?:\d+\.|\d+\))\s*)?[^<:]+:[\s\S]*?<\/(?:div|p|strong|b)>)([\s\S]*?)(?=(?:<(?:div|p|strong|b)\b[^>]*>(?:(?:\d+\.|\d+\))\s*)?[^<:]+:[\s\S]*?<\/(?:div|p|strong|b)>)|$)/gi;
+
+  const matches = [...html.matchAll(sectionRegex)];
+  if (matches.length > 0) {
+    let result = "";
+    let lastIndex = 0;
+    for (const m of matches) {
+      const matchIndex = m.index ?? 0;
+      result += html.substring(lastIndex, matchIndex);
+      const header = m[1];
+      const body = m[2] || "";
+      result += header + "\n" + formatItemsToOl(body);
+      lastIndex = matchIndex + m[0].length;
+    }
+    result += html.substring(lastIndex);
+    return result;
+  }
+
+  if (/\d+[\)\.]\s*[A-Z]/i.test(html)) {
+    return formatItemsToOl(html);
+  }
+
+  return html;
+}
+
+/**
  * Opens a print preview window for browser-native printing and PDF saving.
  * Includes the main letter and all attached PDF pages sequentially.
  */
@@ -268,6 +317,14 @@ export function openPrintWindow(htmlText: string, fileName: string, attachmentHt
   processedHtml = processedHtml.replace(
     /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
     "$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3"
+  );
+
+  // Normalize Nama Tim table cell to semantic <ol> ordered list if not already formatted
+  processedHtml = processedHtml.replace(
+    /(<td[^>]*>\s*Nama\s+Tim\s*<\/td>\s*<td[^>]*>\s*:\s*<\/td>\s*<td[^>]*>)([\s\S]*?)(<\/td>)/gi,
+    (_match, prefix, content, suffix) => {
+      return prefix + normalizeTeamListToOrderedList(content) + suffix;
+    }
   );
 
   const FOOTER_HTML = `<table class="amanah-letter-footer" style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif;">
@@ -305,6 +362,12 @@ export function openPrintWindow(htmlText: string, fileName: string, attachmentHt
       bodyInner = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
     }
   }
+
+  const isCompact =
+    processedHtml.includes("font-size: 9.5pt") ||
+    processedHtml.includes("font-size:9.5pt") ||
+    processedHtml.includes("font-size: 9pt") ||
+    processedHtml.includes("font-size:9pt");
 
   const printHtml = `<!DOCTYPE html>
 <html lang="id">
@@ -345,7 +408,7 @@ export function openPrintWindow(htmlText: string, fileName: string, attachmentHt
     body {
       padding-top: 56px;
       font-family: Arial, Helvetica, sans-serif !important;
-      font-size: 10.5pt !important;
+      font-size: ${isCompact ? "9.5pt" : "10.5pt"} !important;
       line-height: 1.25 !important;
       color: #111827 !important;
       -webkit-print-color-adjust: exact !important;
@@ -456,22 +519,33 @@ export function openPrintWindow(htmlText: string, fileName: string, attachmentHt
       line-height: 1.25 !important;
     }
     p, td, th, li, ol, ul {
-      font-size: 10.5pt !important;
+      font-size: ${isCompact ? "9.5pt" : "10.5pt"} !important;
     }
-    ol, ul {
-      margin-top: 2px !important;
-      margin-bottom: 4px !important;
+    ol {
+      list-style-type: decimal !important;
+      list-style-position: outside !important;
+      margin-top: ${isCompact ? "1px" : "2px"} !important;
+      margin-bottom: ${isCompact ? "3px" : "4px"} !important;
+      padding-left: 20px !important;
+    }
+    ul {
+      list-style-type: disc !important;
+      list-style-position: outside !important;
+      margin-top: ${isCompact ? "1px" : "2px"} !important;
+      margin-bottom: ${isCompact ? "3px" : "4px"} !important;
       padding-left: 20px !important;
     }
     li {
-      margin-bottom: 2px !important;
-      font-size: 10.5pt !important;
+      margin-bottom: ${isCompact ? "1px" : "2px"} !important;
+      font-size: ${isCompact ? "9.5pt" : "10.5pt"} !important;
+      line-height: 1.25 !important;
     }
     p {
       margin-top: 0px !important;
-      margin-bottom: 4px !important;
-      font-size: 10.5pt !important;
+      margin-bottom: ${isCompact ? "2px" : "4px"} !important;
+      font-size: ${isCompact ? "9.5pt" : "10.5pt"} !important;
     }
+    ${!isCompact ? `
     *[style*="font-size: 11pt"],
     *[style*="font-size:11pt"],
     *[style*="font-size: 12pt"],
@@ -482,6 +556,18 @@ export function openPrintWindow(htmlText: string, fileName: string, attachmentHt
     *[style*="font-size:14pt"] {
       font-size: 10.5pt !important;
     }
+    ` : `
+    *[style*="font-size: 11pt"],
+    *[style*="font-size:11pt"],
+    *[style*="font-size: 12pt"],
+    *[style*="font-size:12pt"],
+    *[style*="font-size: 13pt"],
+    *[style*="font-size:13pt"],
+    *[style*="font-size: 14pt"],
+    *[style*="font-size:14pt"] {
+      font-size: 9.5pt !important;
+    }
+    `}
     .kop-surat-img, img[alt*="Kop Surat"] {
       width: 100% !important;
       max-width: 100% !important;

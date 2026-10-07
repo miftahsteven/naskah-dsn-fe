@@ -43,6 +43,7 @@ import {
   generateAttachmentPagesHtml,
   ATTACHMENT_CSS,
   openPrintWindow,
+  normalizeTeamListToOrderedList,
 } from "@/lib/pdf-preview";
 
 const statusClass = (status: string) => {
@@ -715,6 +716,12 @@ const DocumentPreview = ({ fileUrl, title, docId, evidenceFiles }: { fileUrl: st
           processed = processed.replace(
             /(<p[^>]*>)\s*[Aa]ssalamu([’'‘`]?alaikum\s+Warahmatullah\s+Wabarakatuh)\.\s*(<\/p>)/gi,
             '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
+          );
+
+          // Normalize Nama Tim table cell if unformatted
+          processed = processed.replace(
+            /(<td[^>]*>\s*Nama\s+Tim\s*<\/td>\s*<td[^>]*>\s*:\s*<\/td>\s*<td[^>]*>)([\s\S]*?)(<\/td>)/gi,
+            (_match, prefix, content, suffix) => prefix + normalizeTeamListToOrderedList(content) + suffix
           );
 
           if (attachmentHtml) {

@@ -11,6 +11,7 @@ import {
   openPrintWindow,
   ATTACHMENT_CSS,
   AttachmentImage,
+  normalizeTeamListToOrderedList,
 } from "@/lib/pdf-preview";
 
 const HTML_PDF_PRIMARY_COLOR = '#2563eb';
@@ -419,19 +420,27 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
       return;
     }
 
-    if (htmlContent.includes('qr-signature-img') || htmlContent.includes('alt="QR Signature"')) {
-      let cleaned = htmlContent.replace(/margin:\s*-12px\s+0\s+4px\s+0/gi, 'margin: 4px 0 4px 0');
+    let baseContent = htmlContent;
+    if (baseContent.includes("Nama Tim") && !baseContent.includes("<ol")) {
+      baseContent = baseContent.replace(
+        /(<td[^>]*>\s*Nama\s+Tim\s*<\/td>\s*<td[^>]*>\s*:\s*<\/td>\s*<td[^>]*>)([\s\S]*?)(<\/td>)/gi,
+        (_match, prefix, content, suffix) => prefix + normalizeTeamListToOrderedList(content) + suffix
+      );
+    }
+
+    if (baseContent.includes('qr-signature-img') || baseContent.includes('alt="QR Signature"')) {
+      let cleaned = baseContent.replace(/margin:\s*-12px\s+0\s+4px\s+0/gi, 'margin: 4px 0 4px 0');
       cleaned = cleaned.replace(/margin:\s*-?\d+px\s+0\s+\d+px\s+0\s*!important/gi, 'margin: 4px 0 4px 0 !important');
       setHtmlContentWithSignatures(cleaned);
       return;
     }
 
     if (!signatureRows.length || Object.keys(signatureQrMap).length !== signatureRows.length) {
-      setHtmlContentWithSignatures(htmlContent);
+      setHtmlContentWithSignatures(baseContent);
       return;
     }
 
-    let enhanced = htmlContent;
+    let enhanced = baseContent;
     if (!/<!doctype html>/i.test(enhanced)) enhanced = `<!doctype html>\n${enhanced}`;
 
     const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

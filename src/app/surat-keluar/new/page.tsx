@@ -44,6 +44,7 @@ import {
   openPrintWindow,
   ATTACHMENT_CSS,
   AttachmentImage,
+  normalizeTeamListToOrderedList,
 } from "@/lib/pdf-preview";
 
 // List of available templates
@@ -368,28 +369,28 @@ const DEFAULT_ISI_KONTRIBUSI_DPS = `<ol style="margin-top: 0; margin-bottom: 8px
 </ol>`;
 
 const DEFAULT_NAMA_TIM_SURAT_TUGAS = `<div style="line-height: 1.25;">
-  <div style="font-weight: bold;">1. Penanggung Jawab:</div>
-  <div style="margin-left: 16px; margin-bottom: 2px;">
-    1) K.H. M. Cholil Nafis, Lc., Ph.D.<br>
-    2) Dr. H. Amisyah Tambunan, M.A.<br>
-    3) Hj. Trisna Ningsih Yuliati Djuwaeli, S.E., M.M.
-  </div>
-  <div style="font-weight: bold;">2. Pengarah:</div>
-  <div style="margin-left: 16px; margin-bottom: 2px;">
-    1) Prof. Dr. K.H. Hasanudin, M.Ag.<br>
-    2) Prof. Dr. K.H. M. Asrorun Niam Sholeh, S.H., M.A.<br>
-    3) Drs. H. Muhammad Ziyad, M.A.<br>
-    4) Prof. Dr. H. Jaih Mubarok, S.E., M.H., M.Ag.
-  </div>
-  <div style="font-weight: bold;">3. Pelaksana:</div>
-  <div style="margin-left: 16px;">
-    1) Dr. K.H. Moch. Bukhori Muslim, Lc., M.A.<br>
-    2) Dr. Yulizar Djamaluddin Sanrego, M.Ec.<br>
-    3) K.H. Mahbub Ma’afi Ramdlan, S.H.I., M.Hum.<br>
-    4) K.H. Muhammad Faishol, Lc., M.A.<br>
-    5) Ibnu Wazi<br>
-    6) Dr. Asep Supyadillah, M.Ag.
-  </div>
+  <div style="font-weight: bold; margin-bottom: 1px;">1. Penanggung Jawab:</div>
+  <ol style="margin-top: 1px; margin-bottom: 3px; padding-left: 20px; list-style-type: decimal;">
+    <li>K.H. M. Cholil Nafis, Lc., Ph.D.</li>
+    <li>Dr. H. Amisyah Tambunan, M.A.</li>
+    <li>Hj. Trisna Ningsih Yuliati Djuwaeli, S.E., M.M.</li>
+  </ol>
+  <div style="font-weight: bold; margin-bottom: 1px;">2. Pengarah:</div>
+  <ol style="margin-top: 1px; margin-bottom: 3px; padding-left: 20px; list-style-type: decimal;">
+    <li>Prof. Dr. K.H. Hasanudin, M.Ag.</li>
+    <li>Prof. Dr. K.H. M. Asrorun Niam Sholeh, S.H., M.A.</li>
+    <li>Drs. H. Muhammad Ziyad, M.A.</li>
+    <li>Prof. Dr. H. Jaih Mubarok, S.E., M.H., M.Ag.</li>
+  </ol>
+  <div style="font-weight: bold; margin-bottom: 1px;">3. Pelaksana:</div>
+  <ol style="margin-top: 1px; margin-bottom: 2px; padding-left: 20px; list-style-type: decimal;">
+    <li>Dr. K.H. Moch. Bukhori Muslim, Lc., M.A.</li>
+    <li>Dr. Yulizar Djamaluddin Sanrego, M.Ec.</li>
+    <li>K.H. Mahbub Ma’afi Ramdlan, S.H.I., M.Hum.</li>
+    <li>K.H. Muhammad Faishol, Lc., M.A.</li>
+    <li>Ibnu Wazi</li>
+    <li>Dr. Asep Supyadillah, M.Ag.</li>
+  </ol>
 </div>`;
 
 const DEFAULT_KEPERLUAN_SURAT_TUGAS_TIM = `<p style="margin: 0; line-height: 1.25; text-align: justify;">
@@ -417,6 +418,10 @@ const DEFAULT_KETERANGAN_SURAT_TUGAS_TIM = `<div style="line-height: 1.25;">
     </tr>
   </table>
 </div>`;
+
+const DEFAULT_PEMBUKA_SURAT_TUGAS = `<p style="text-align: justify; margin-top: 0; margin-bottom: 0; text-indent: 30px; line-height: 1.25;">Menunjuk surat dari Lembaga Penggerak Ekonomi Umat (LPEU) Majelis Ulama Indonesia No. A-120/LPEU MUI/VII/2026 tertanggal 28 Juli 2026, dan berdasarkan keputusan Rapat Kesekretarisan Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) tanggal 6 Agustus 2026, DSN-MUI dengan ini <strong>menugaskan</strong> kepada:</p>`;
+
+const DEFAULT_PEMBUKA_SURAT_TUGAS_TIM = `<p style="text-align: justify; margin-top: 0; margin-bottom: 0; line-height: 1.3;">Menunjuk keputusan Rapat Pimpinan Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) tanggal 5 Agustus 2026, DSN-MUI dengan ini <strong>menugaskan kepada</strong>:</p>`;
 
 // Gregorian to Hijriah date approximation
 function getEstimatedHijriah(gregorianDateString: string): string {
@@ -1260,6 +1265,16 @@ const CreateDocumentPage = () => {
       if (isBlankKeterangan) {
         setVar("keterangan", DEFAULT_KETERANGAN_SURAT_TUGAS_TIM);
       }
+      const isBlankPembukaTim =
+        !newVars.pembukaSurat ||
+        newVars.pembukaSurat.trim() === "" ||
+        newVars.pembukaSurat === "<p></p>" ||
+        newVars.pembukaSurat === "<p><br></p>" ||
+        newVars.pembukaSurat === "<p>&nbsp;</p>" ||
+        newVars.pembukaSurat.trim() === "<br>";
+      if (isBlankPembukaTim) {
+        setVar("pembukaSurat", DEFAULT_PEMBUKA_SURAT_TUGAS_TIM);
+      }
       if (!newVars.headerTtd || newVars.headerTtd.trim() === "") {
         setVar("headerTtd", "BADAN PENGURUS\nDEWAN SYARIAH NASIONAL-\nMAJELIS ULAMA INDONESIA");
       }
@@ -1278,7 +1293,17 @@ const CreateDocumentPage = () => {
       if (!newVars.lampiranDisplay) {
         setVar("lampiranDisplay", "none");
       }
-    } else if (selectedTemplate === "ST-0650-TUGAS") {
+    } else if (selectedTemplate === "ST-0650-TUGAS" || selectedTemplate === "SK-TUGAS") {
+      const isBlankPembukaSt =
+        !newVars.pembukaSurat ||
+        newVars.pembukaSurat.trim() === "" ||
+        newVars.pembukaSurat === "<p></p>" ||
+        newVars.pembukaSurat === "<p><br></p>" ||
+        newVars.pembukaSurat === "<p>&nbsp;</p>" ||
+        newVars.pembukaSurat.trim() === "<br>";
+      if (isBlankPembukaSt) {
+        setVar("pembukaSurat", DEFAULT_PEMBUKA_SURAT_TUGAS);
+      }
       if (!newVars.jabatan || newVars.jabatan.trim() === "" || newVars.jabatan === "Pengurus DSN-MUI") {
         setVar("jabatan", "1. Koordinator Bidang Layanan, Literasi, Relasi Industri dan Regulasi\n2. Anggota Bidang Fatwa");
       }
@@ -1959,6 +1984,8 @@ const CreateDocumentPage = () => {
         (_: string, key: string) => {
           let val = templateVariables[key] || "";
           if (
+            key === "pembukaSurat" ||
+            key === "namaTim" ||
             key === "agendaDetail" ||
             key === "daftarUndangan" ||
             key === "daftarUndanganLampiran" ||
@@ -1968,19 +1995,34 @@ const CreateDocumentPage = () => {
             key === "deskripsiTransaksi" ||
             key === "isiSurat" ||
             key === "lampiranKonten" ||
+            key.toLowerCase().includes("pembuka") ||
             key.toLowerCase().includes("lampiran") ||
             key.toLowerCase().includes("wysiwyg") ||
             key.toLowerCase().includes("isisurat")
           ) {
+            if (key === "namaTim" && typeof val === "string") {
+              val = normalizeTeamListToOrderedList(val);
+            }
             const hasHtmlTags = /<\s*(?:p|div|table|tbody|tr|td|th|ul|ol|li|br|h[1-6]|span)\b[^>]*>/i.test(val);
             if (!hasHtmlTags) {
               val = val.replace(/\n/g, "<br>");
             } else {
               val = val.replace(/>\s*\r?\n\s*</g, "><");
             }
-            // Strip any accidental <br> directly inside <table>, <thead>, <tbody>, <tfoot>, <tr>
+            // Strip any accidental <br> directly outside <td>/<th> (e.g. between <table>, <tbody>, <tr>)
             val = val.replace(/(<table\b[^>]*>[\s\S]*?<\/table>)/gi, (tbl: string) => {
-              return tbl.replace(/<br\s*\/?>/gi, "");
+              return tbl
+                .replace(/(<table\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                .replace(/<br\s*\/?>\s*(<\/table>)/gi, "$1")
+                .replace(/(<thead\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                .replace(/<br\s*\/?>\s*(<\/thead>)/gi, "$1")
+                .replace(/(<tbody\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                .replace(/<br\s*\/?>\s*(<\/tbody>)/gi, "$1")
+                .replace(/(<tfoot\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                .replace(/<br\s*\/?>\s*(<\/tfoot>)/gi, "$1")
+                .replace(/(<tr\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                .replace(/<br\s*\/?>\s*(<\/tr>)/gi, "$1")
+                .replace(/(<\/td>|<\/th>)\s*<br\s*\/?>\s*(<td\b|<th\b)/gi, "$1$2");
             });
           }
           return val;
@@ -3002,6 +3044,9 @@ const CreateDocumentPage = () => {
                               '.kop-surat-img, img[alt*="Kop Surat"] { width: 100% !important; max-width: 100% !important; height: auto !important; display: block !important; margin: 0 auto 6px auto !important; }' +
                               'img[src*="bismillah"], img[alt*="Bismillah"], .bismillah-img { width: 260px !important; max-width: 45% !important; height: auto !important; max-height: 48px !important; display: block !important; margin: 8px auto 14px auto !important; object-fit: contain !important; filter: brightness(0) !important; }' +
                               'p, td, li, span { font-size: 10.5pt; line-height: 1.45; }' +
+                              'ol { list-style-type: decimal !important; padding-left: 20px !important; margin: 2px 0 4px 0 !important; }' +
+                              'ul { list-style-type: disc !important; padding-left: 20px !important; margin: 2px 0 4px 0 !important; }' +
+                              'li { margin-bottom: 2px; }' +
                               'table { font-size: 10.5pt; }' +
                               'table td { vertical-align: top; }' +
                               '.page-break { page-break-before: always; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1; position: relative; }' +
@@ -3019,9 +3064,23 @@ const CreateDocumentPage = () => {
                                 (_: string, key: string) => {
                                   let val = templateVariables[key];
                                   if (val !== undefined && val !== "") {
+                                    if (key === "namaTim" && typeof val === "string") {
+                                      val = normalizeTeamListToOrderedList(val);
+                                    }
                                     if (typeof val === "string" && val.includes("<table")) {
                                       val = val.replace(/(<table\b[^>]*>[\s\S]*?<\/table>)/gi, (tbl: string) => {
-                                        return tbl.replace(/<br\s*\/?>/gi, "");
+                                        return tbl
+                                          .replace(/(<table\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                                          .replace(/<br\s*\/?>\s*(<\/table>)/gi, "$1")
+                                          .replace(/(<thead\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                                          .replace(/<br\s*\/?>\s*(<\/thead>)/gi, "$1")
+                                          .replace(/(<tbody\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                                          .replace(/<br\s*\/?>\s*(<\/tbody>)/gi, "$1")
+                                          .replace(/(<tfoot\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                                          .replace(/<br\s*\/?>\s*(<\/tfoot>)/gi, "$1")
+                                          .replace(/(<tr\b[^>]*>)\s*<br\s*\/?>/gi, "$1")
+                                          .replace(/<br\s*\/?>\s*(<\/tr>)/gi, "$1")
+                                          .replace(/(<\/td>|<\/th>)\s*<br\s*\/?>\s*(<td\b|<th\b)/gi, "$1$2");
                                       });
                                     }
                                     return val;
@@ -3633,6 +3692,7 @@ const CreateDocumentPage = () => {
                               const hasErr = !!formErrors[errKey];
                               const isRichText =
                                 v.type === "wysiwyg" ||
+                                v.key === "pembukaSurat" ||
                                 v.key === "agendaDetail" ||
                                 v.key === "daftarUndangan" ||
                                 v.key === "daftarUndanganLampiran" ||
@@ -3644,6 +3704,7 @@ const CreateDocumentPage = () => {
                                 v.key === "lampiranKonten" ||
                                 v.key === "namaTim" ||
                                 v.key === "keperluan" ||
+                                v.key.toLowerCase().includes("pembuka") ||
                                 v.key.toLowerCase().includes("lampiran") ||
                                 v.key.toLowerCase().includes("wysiwyg") ||
                                 v.key.toLowerCase().includes("isisurat");
@@ -3792,6 +3853,7 @@ const CreateDocumentPage = () => {
                                           value={templateVariables[v.key] || ""}
                                           placeholder={v.placeholder || `Masukkan ${v.label}`}
                                           hasError={hasErr}
+                                          minHeight={v.key === "pembukaSurat" ? 110 : undefined}
                                           onChange={(val) => {
                                             setTemplateVariables({ ...templateVariables, [v.key]: val });
                                             clearFieldError(errKey);
