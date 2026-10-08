@@ -66,24 +66,31 @@ export const InvitePresentationModal: React.FC<InvitePresentationModalProps> = (
       setErrorMessage("Silakan pilih tanggal pelaksanaan presentasi.");
       return;
     }
-    if (format === "ONLINE" && !zoomUrl) {
+    if (format === "ONLINE" && !zoomUrl.trim()) {
       setErrorMessage("Tautan Zoom / Google Meet wajib diisi untuk format daring.");
+      return;
+    }
+    if (format === "OFFLINE" && !venue.trim()) {
+      setErrorMessage("Lokasi ruang / tempat pertemuan wajib diisi untuk format tatap muka.");
       return;
     }
 
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      const venueOrLink = format === "ONLINE" ? zoomUrl.trim() : venue.trim();
       await api.post(`/documents/${documentId}/invite-presentation`, {
         presentationDate,
         presentationTime,
         format,
-        venue: format === "OFFLINE" ? venue : undefined,
-        zoomUrl: format === "ONLINE" ? zoomUrl : undefined,
-        zoomMeetingId: format === "ONLINE" ? zoomMeetingId : undefined,
-        zoomPasscode: format === "ONLINE" ? zoomPasscode : undefined,
-        picName,
-        agendaNotes,
+        venueOrLink,
+        venue: format === "OFFLINE" ? venue.trim() : undefined,
+        zoomUrl: format === "ONLINE" ? zoomUrl.trim() : undefined,
+        zoomMeetingId: format === "ONLINE" ? zoomMeetingId.trim() : undefined,
+        zoomPasscode: format === "ONLINE" ? zoomPasscode.trim() : undefined,
+        picName: picName.trim(),
+        agendaNotes: agendaNotes.trim(),
+        notes: agendaNotes.trim(),
       });
       onSuccess();
     } catch (err: any) {
