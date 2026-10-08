@@ -522,23 +522,42 @@ export function openPrintWindow(htmlText: string, fileName: string, attachmentHt
       font-size: ${isCompact ? "9.5pt" : "10.5pt"} !important;
     }
     ol {
-      list-style-type: decimal !important;
+      list-style-type: decimal;
       list-style-position: outside !important;
       margin-top: ${isCompact ? "1px" : "2px"} !important;
       margin-bottom: ${isCompact ? "3px" : "4px"} !important;
-      padding-left: 20px !important;
+      padding-left: 24px !important;
+    }
+    ol[style*="lower-alpha"], ol[type="a"] {
+      list-style-type: lower-alpha !important;
+    }
+    ol[style*="upper-alpha"], ol[type="A"] {
+      list-style-type: upper-alpha !important;
+    }
+    ol[style*="lower-roman"], ol[type="i"] {
+      list-style-type: lower-roman !important;
+    }
+    ol[style*="upper-roman"], ol[type="I"] {
+      list-style-type: upper-roman !important;
     }
     ul {
-      list-style-type: disc !important;
+      list-style-type: disc;
       list-style-position: outside !important;
       margin-top: ${isCompact ? "1px" : "2px"} !important;
       margin-bottom: ${isCompact ? "3px" : "4px"} !important;
-      padding-left: 20px !important;
+      padding-left: 24px !important;
+    }
+    ul[style*="circle"] {
+      list-style-type: circle !important;
+    }
+    ul[style*="square"] {
+      list-style-type: square !important;
     }
     li {
       margin-bottom: ${isCompact ? "1px" : "2px"} !important;
       font-size: ${isCompact ? "9.5pt" : "10.5pt"} !important;
-      line-height: 1.25 !important;
+      line-height: 1.35 !important;
+      text-align: justify;
     }
     p {
       margin-top: 0px !important;

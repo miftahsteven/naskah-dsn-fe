@@ -1877,6 +1877,53 @@ const EditTemplateLetterPage = () => {
               color: #111827;
               text-align: justify;
             }
+            .letter-body-custom ol {
+              list-style-type: decimal;
+              margin: 4px 0 6px 0;
+              padding-left: 24px;
+            }
+            .letter-body-custom ol[type="a"], .letter-body-custom ol[style*="lower-alpha"] {
+              list-style-type: lower-alpha;
+            }
+            .letter-body-custom ol[type="A"], .letter-body-custom ol[style*="upper-alpha"] {
+              list-style-type: upper-alpha;
+            }
+            .letter-body-custom ol[type="i"], .letter-body-custom ol[style*="lower-roman"] {
+              list-style-type: lower-roman;
+            }
+            .letter-body-custom ol[type="I"], .letter-body-custom ol[style*="upper-roman"] {
+              list-style-type: upper-roman;
+            }
+            .letter-body-custom ul {
+              list-style-type: disc;
+              margin: 4px 0 6px 0;
+              padding-left: 24px;
+            }
+            .letter-body-custom ul[style*="square"] {
+              list-style-type: square;
+            }
+            .letter-body-custom ul[style*="circle"] {
+              list-style-type: circle;
+            }
+            .letter-body-custom li {
+              margin-bottom: 2px;
+              line-height: 1.35;
+              text-align: justify;
+            }
+            .letter-body-custom p {
+              margin-top: 0;
+              margin-bottom: 6px;
+              line-height: 1.35;
+            }
+            .letter-body-custom table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 8px 0;
+            }
+            .letter-body-custom td, .letter-body-custom th {
+              border: 1px solid #cbd5e1;
+              padding: 4px 8px;
+            }
             table {
               border-collapse: collapse;
             }
@@ -2417,6 +2464,17 @@ const EditTemplateLetterPage = () => {
                             ref={editorRef}
                             contentEditable
                             suppressContentEditableWarning
+                            onKeyDown={(e) => {
+                              // Support Tab key for indentation in ordered/unordered lists
+                              if (e.key === "Tab") {
+                                e.preventDefault();
+                                if (e.shiftKey) {
+                                  document.execCommand("outdent", false, undefined);
+                                } else {
+                                  document.execCommand("indent", false, undefined);
+                                }
+                              }
+                            }}
                             onPaste={(e) => {
                               e.preventDefault();
                               const text = e.clipboardData.getData("text/plain");
@@ -2424,7 +2482,7 @@ const EditTemplateLetterPage = () => {
                               const sanitized = cleanPastedHtmlAndText(html, text);
                               document.execCommand("insertHTML", false, sanitized);
                             }}
-                            className="outline-none min-h-[350px] border border-dashed border-slate-200 hover:border-primary/40 focus:border-primary/60 py-2 focus:ring-1 focus:ring-primary/20 rounded-xl px-3 transition-all"
+                            className="universal-letter-editor-content outline-none min-h-[350px] border border-dashed border-slate-200 hover:border-primary/40 focus:border-primary/60 py-2 focus:ring-1 focus:ring-primary/20 rounded-xl px-3 transition-all"
                             style={{
                               fontSize: "10.5pt",
                               fontFamily: "Arial, sans-serif",
