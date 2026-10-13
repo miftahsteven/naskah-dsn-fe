@@ -468,6 +468,40 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         ? penandatanganSteps.findIndex((st: any) => st.userId === row.userId)
         : rowIndex;
 
+      const userLower = ((row.fullName || '') + ' ' + (row.jobTitle || '')).toLowerCase();
+      const isNameMatch = (userName: string, targetName: string) => {
+        if (!userName || !targetName) return false;
+        const cleanTokens = (str: string) => str
+          .toLowerCase()
+          .replace(/\b(dr|kh|prof|drs|h|lc|phd|ma|sh|mag|msi|ir|se|ag|mb|mba)\b\.?/gi, '')
+          .replace(/[^a-z0-9]/g, ' ')
+          .trim()
+          .split(/\s+/)
+          .filter(t => t.length >= 3);
+        const uTokens = cleanTokens(userName);
+        const tTokens = cleanTokens(targetName);
+        if (uTokens.length === 0 || tTokens.length === 0) return false;
+        return uTokens.some(ut => tTokens.includes(ut));
+      };
+
+      const targetKetua = templateVariables?.namaKetua || templateVariables?.namaKiri;
+      const targetSekretaris = templateVariables?.namaSekretaris || templateVariables?.namaKanan;
+      const targetSingle = templateVariables?.namaPenandatangan;
+
+      const isUserKetua = Boolean(
+        (targetKetua && isNameMatch(row.fullName || '', targetKetua)) ||
+        userLower.includes('cholil') || userLower.includes('nafis') || userLower.includes('adiwarman') || userLower.includes('hasanuddin') ||
+        (/ketua|ketum/i.test(row.jobTitle || '') && !/wakil|sekretaris/i.test(row.jobTitle || ''))
+      );
+
+      const isUserSekretaris = Boolean(
+        (targetSekretaris && isNameMatch(row.fullName || '', targetSekretaris)) ||
+        userLower.includes('amirsyah') || userLower.includes('tambunan') || userLower.includes('asrori') || userLower.includes('anwar abbas') ||
+        (/sekretaris|sekjen/i.test(row.jobTitle || '') && !/wakil\s*ketua/i.test(row.jobTitle || ''))
+      );
+
+      const isUserSingle = Boolean(targetSingle && isNameMatch(row.fullName || '', targetSingle));
+
       // Build comprehensive candidates list for matching
       const candidates: string[] = [];
       if (row.fullName) {
@@ -480,19 +514,20 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           candidates.push(cleanName);
         }
       }
-      if (templateVariables) {
-        if (signerIndex === 0 && templateVariables.namaKetua) candidates.push(templateVariables.namaKetua);
-        if (signerIndex === 1 && templateVariables.namaSekretaris) candidates.push(templateVariables.namaSekretaris);
-        if (templateVariables.namaPenandatangan) candidates.push(templateVariables.namaPenandatangan);
-      }
-      // DSN-MUI official name fallbacks
-      const userLower = (row.fullName || '').toLowerCase();
-      if (signerIndex === 0 || userLower.includes('cholil') || userLower.includes('nafis') || userLower.includes('hasan') || userLower.includes('ketua')) {
+
+      // ONLY add designated role target names if this signer actually matches that role
+      if (isUserKetua) {
+        if (targetKetua) candidates.push(targetKetua);
         candidates.push("CHOLIL NAFIS");
+        candidates.push("ADIWARMAN");
         candidates.push("HASANUDDIN");
-      } else if (signerIndex === 1 || userLower.includes('amirsyah') || userLower.includes('tambunan') || userLower.includes('anwar') || userLower.includes('sekretaris')) {
+      } else if (isUserSekretaris) {
+        if (targetSekretaris) candidates.push(targetSekretaris);
         candidates.push("AMIRSYAH TAMBUNAN");
+        candidates.push("ASRORI KARNI");
         candidates.push("ANWAR ABBAS");
+      } else if (isUserSingle) {
+        if (targetSingle) candidates.push(targetSingle);
       }
 
       let bestMatch: { m: RegExpExecArray, cand: string, score: number, index: number } | null = null;
@@ -595,9 +630,15 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
           }
         }
       } else {
-        // Safe Role-based Fallback
-        const isKetua = signerIndex === 0 || /ketua|ketum/i.test(row.jobTitle || '') || /cholil|nafis/i.test((candidates || []).join(' '));
-        const targetRole = isKetua ? '(?:Ketua|Menyetujui|Ketum)' : '(?:Sekretaris|Mengetahui|Sekjen)';
+        // Safe Role-based Fallback: Only inject if signer matches Ketua, Sekretaris, or Single
+        if (!isUserKetua && !isUserSekretaris && !isUserSingle) {
+          return;
+        }
+
+        const isKetua = isUserKetua && !isUserSekretaris;
+        const targetRole = isKetua
+          ? '(?:Ketua|Menyetujui|Ketum)'
+          : (isUserSekretaris ? '(?:Sekretaris|Mengetahui|Sekjen)' : '(?:Ketua|Direktur|Pimpinan|Kepala|Menyetujui)');
 
         const lampiranMatch = enhanced.match(/Lampiran\s+[0-9I|IVX]+/i);
         const lampiranIndex = lampiranMatch ? lampiranMatch.index : -1;

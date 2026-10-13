@@ -353,6 +353,36 @@ const DEFAULT_AGENDA_DETAIL_KESEKRETARISAN = `<ol style="margin-top: 0; margin-b
   <li style="margin-bottom: 6px; padding-left: 6px;">Dan lain-lain.</li>
 </ol>`;
 
+export const DEFAULT_DAFTAR_UNDANGAN_LAYANAN = `<div style="font-size: 10.5pt; line-height: 1.35;">
+  <div style="font-weight: bold; margin-bottom: 4px;">1. Unsur Pimpinan:</div>
+  <table style="margin-left: 16px; border-collapse: collapse; font-size: 10.5pt; line-height: 1.35; margin-bottom: 12px;">
+    <tr><td style="width: 140px; vertical-align: top; padding: 2px 0;">Wakil Ketua</td><td style="width: 15px; vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">K.H. Sholahudin Al Aiyub, M.Si.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Ketua</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Ir. H. Adiwarman A. Karim, S.E., M.B.A., M.A.E.P.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Kanny Hidaya, S.E., M.A.</td></tr>
+    <tr><td style="vertical-align: top; padding: 2px 0;">Wakil Sekretaris</td><td style="vertical-align: top; padding: 2px 0;">:</td><td style="padding: 2px 0;">Dr. Asrori S. Karni, S.Ag., M.H.</td></tr>
+  </table>
+  <div style="font-weight: bold; margin-bottom: 4px;">2. Koordinator Bidang Layanan, Literasi, Relasi Industri, dan Regulasi:</div>
+  <div style="margin-left: 16px; margin-bottom: 12px;">Dr. H. Asep Supyadillah, M.Ag.</div>
+  <div style="font-weight: bold; margin-bottom: 4px;">3. Anggota Bidang Layanan, Literasi, Relasi Industri, dan Regulasi:</div>
+  <ol style="margin-top: 0; margin-bottom: 10px; padding-left: 32px;">
+    <li style="margin-bottom: 4px;">Ah. Azharuddin Latif, M.Ag., M.H.</li>
+    <li style="margin-bottom: 4px;">Dr. Yuke Rahmawati, M.A.</li>
+  </ol>
+</div>`;
+
+export const DEFAULT_AGENDA_DETAIL_LAYANAN = `<div style="font-size: 10.5pt; line-height: 1.35; text-align: justify;">
+  <ol style="margin-top: 0; margin-bottom: 10px; padding-left: 20px;">
+    <li style="margin-bottom: 6px; padding-left: 6px;">Tindak Lanjut atas Rapat Kesekretarisan DSN-MUI:
+      <ol type="a" style="margin-top: 4px; margin-bottom: 4px; padding-left: 18px;">
+        <li style="margin-bottom: 4px; padding-left: 4px;">Permohonan Izin Penelitian Skripsi dari Velisa Universitas Darussalam.</li>
+        <li style="margin-bottom: 4px; padding-left: 4px;">Permohonan Surat Rekomendasi Dewan Pengawas Syariah dari PT LKM Artha Kerta Raharja (Perseroda).</li>
+      </ol>
+    </li>
+    <li style="margin-bottom: 6px; padding-left: 6px;">Pembahasan Program Kerja Bidang Layanan, Literasi, Relasi Industri, dan Regulasi.</li>
+    <li style="margin-bottom: 6px; padding-left: 6px;">Dan lain-lain.</li>
+  </ol>
+</div>`;
+
 const DEFAULT_ISI_KONTRIBUSI_DPS = `<ol style="margin-top: 0; margin-bottom: 8px; padding-left: 24px; text-align: justify; line-height: 1.35;">
   <li style="margin-bottom: 8px; padding-left: 6px;">
     Rapat Pimpinan DSN-MUI Tanggal 4 Februari 2026 telah menetapkan bahwa setiap DPS memberikan iuran bulanan kepada DSN-MUI, paling sedikit 5% dari penerimaan honor/gaji sebagai DPS. Untuk mendukung pelaksanaan kegiatan dan program DSN-MUI.
@@ -1559,6 +1589,64 @@ const EditTemplateLetterPage = () => {
         newVars.agendaDetail.trim() === "<br>";
       if (isBlankAgenda) {
         setVar("agendaDetail", DEFAULT_AGENDA_DETAIL_KESEKRETARISAN);
+      }
+    } else if (selectedTemplate === "U-0667-UNDANGAN-LAYANAN") {
+      if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
+        setVar("jabatanKiri", "Ketua");
+      }
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, Lc., Ph.D.");
+      }
+      if (!newVars.jabatanKanan || newVars.jabatanKanan.trim() === "") {
+        setVar("jabatanKanan", "Sekretaris");
+      }
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "Dr. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.perihalRapat || newVars.perihalRapat.trim() === "") {
+        setVar("perihalRapat", newVars.namaRapat || "Rapat Bidang Layanan, Literasi, Relasi Industri, dan Regulasi DSN-MUI");
+      }
+      if (!newVars.namaRapat || newVars.namaRapat.trim() === "") {
+        setVar("namaRapat", newVars.perihalRapat || "Rapat Bidang Layanan, Literasi, Relasi Industri, dan Regulasi DSN-MUI");
+      }
+      if (!newVars.hariTanggalRapat || newVars.hariTanggalRapat.trim() === "") {
+        setVar("hariTanggalRapat", "Selasa, 11 Agustus 2026");
+      }
+      if (!newVars.waktuRapat || newVars.waktuRapat.trim() === "") {
+        setVar("waktuRapat", "13.00 – 15.00 WIB");
+      }
+      if (!newVars.tempatRapat || newVars.tempatRapat.trim() === "") {
+        setVar("tempatRapat", "Kantor DSN-MUI\nJl. Dempo No. 19, Pegangsaan, Jakarta Pusat 10320");
+      }
+      if (!newVars.agendaRapat || newVars.agendaRapat.trim() === "") {
+        setVar("agendaRapat", "Terlampir");
+      }
+      if (!newVars.daftarPenerima || newVars.daftarPenerima.trim() === "") {
+        setVar(
+          "daftarPenerima",
+          "1. Pimpinan DSN-MUI Bidang Layanan dan Literasi\n2. Pimpinan DSN-MUI Bidang Relasi Industri dan Regulasi\n3. Bidang Layanan, Literasi, Relasi Industri, dan Regulasi\nDewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI)\n(Nama-nama terlampir)"
+        );
+      }
+      if (!newVars.tempatPenerima || newVars.tempatPenerima.trim() === "") {
+        setVar("tempatPenerima", "TEMPAT");
+      }
+      const isBlankDaftar =
+        !newVars.daftarUndangan ||
+        newVars.daftarUndangan.trim() === "" ||
+        newVars.daftarUndangan === "<p></p>" ||
+        newVars.daftarUndangan === "<p><br></p>" ||
+        newVars.daftarUndangan.trim() === "<br>";
+      if (isBlankDaftar) {
+        setVar("daftarUndangan", DEFAULT_DAFTAR_UNDANGAN_LAYANAN);
+      }
+      const isBlankAgenda =
+        !newVars.agendaDetail ||
+        newVars.agendaDetail.trim() === "" ||
+        newVars.agendaDetail === "<p></p>" ||
+        newVars.agendaDetail === "<p><br></p>" ||
+        newVars.agendaDetail.trim() === "<br>";
+      if (isBlankAgenda) {
+        setVar("agendaDetail", DEFAULT_AGENDA_DETAIL_LAYANAN);
       }
     } else if (selectedTemplate === "U-0477-KONTRIBUSI-DPS") {
       if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
