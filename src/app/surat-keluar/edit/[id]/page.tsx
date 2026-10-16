@@ -450,6 +450,27 @@ const DEFAULT_PEMBUKA_SURAT_TUGAS = `<p style="text-align: justify; margin-top: 
 
 const DEFAULT_PEMBUKA_SURAT_TUGAS_TIM = `<p style="text-align: justify; margin-top: 0; margin-bottom: 0; line-height: 1.3;">Menunjuk keputusan Rapat Pimpinan Dewan Syariah Nasional-Majelis Ulama Indonesia (DSN-MUI) tanggal 5 Agustus 2026, DSN-MUI dengan ini <strong>menugaskan kepada</strong>:</p>`;
 
+const DEFAULT_ISI_SURAT_INVOICE = `<p style="text-align: justify; margin-top: 0; margin-bottom: 8px; line-height: 1.35;">
+  Puji syukur ke hadirat Allah Subhanahu wa Ta'ala, teriring doa semoga Saudara dalam keadaan sehat wal'afiat dan mendapat lindungan dari Allah SWT dalam menjalankan tugas sehari-hari.
+</p>
+<p style="text-align: justify; margin-top: 0; margin-bottom: 8px; line-height: 1.35;">
+  Merujuk pada (i) Perjanjian Kerja Sama antara Pemerintah Republik Indonesia dengan Majelis Ulama Indonesia Nomor: PRJ-73/PR/2026, Nomor B-0119/DSN-MUI/II/2026 tanggal 11 Februari 2026 tentang Penerbitan dan Pengembangan Surat Berharga Syariah Negara, dan (ii) Pernyataan Kesesuaian Syariah Nomor B-0649/DSN-MUI/VIII/2026, bersama ini kami sampaikan bahwa kami telah menyelesaikan kegiatan penyusunan dan penerbitan Pernyataan Kesesuaian Syariah SBSN Cash Waqf Linked Sukuk (CWLS) Seri SWR007 Tahun 2026.
+</p>
+<p style="text-align: justify; margin-top: 0; margin-bottom: 8px; line-height: 1.35;">
+  Sehubungan dengan hal tersebut di atas, maka bersama ini kami lampirkan invoice No: 024/DSN-MUI/X/2026 sebesar Rp175.000.000 (<em>seratus tujuh puluh lima juta rupiah</em>), termasuk Pajak Pertambahan Nilai (PPN), dan setelah pembebanan PPN menjadi sebesar Rp 157.657.658 (<em>Seratus lima puluh tujuh juta enam ratus lima puluh tujuh ribu enam ratus lima puluh delapan rupiah</em>).
+</p>
+<p style="text-align: justify; margin-top: 0; margin-bottom: 8px; line-height: 1.35;">
+  Demikian kami sampaikan. Atas perhatian dan kerja sama Saudara, kami ucapkan terima kasih, <em>jazakumullah khairan</em>.
+</p>`;
+
+const DEFAULT_RINCIAN_PEMBAYARAN_INVOICE = `Pembayaran kontribusi pembiayaan atas kegiatan penyusunan dan penerbitan Pernyataan Kesesuaian Syariah SBSN Cash Waqf Linked Sukuk (CWLS) Seri SWR007 Tahun 2026`;
+
+const DEFAULT_INFORMASI_REKENING_INVOICE = `Ke Rekening:<br>
+No: <strong>7001316747</strong> atas nama <strong>Dewan Syariah Nasional MUI</strong><br>
+di <strong>Bank Syariah Indonesia</strong><br>
+Kantor Cabang Thamrin<br>
+Jl. M.H. Thamrin No.5 – Jakarta Pusat`;
+
 // Gregorian to Hijriah date approximation
 function getEstimatedHijriah(gregorianDateString: string): string {
   if (!gregorianDateString) return "";
@@ -1682,6 +1703,140 @@ const EditTemplateLetterPage = () => {
       if (!newVars.paragrafPenutup || newVars.paragrafPenutup.trim() === "") {
         setVar("paragrafPenutup", "Demikian informasi ini kami sampaikan. Atas perhatian Bapak/Ibu, kami ucapkan terima kasih.");
       }
+    } else if (selectedTemplate === "B-0771-INVOICE") {
+      if (!newVars.jabatanKetua || newVars.jabatanKetua.trim() === "") {
+        setVar("jabatanKetua", "Ketua");
+      }
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, LC., PH.D.");
+      }
+      if (!newVars.jabatanSekretaris || newVars.jabatanSekretaris.trim() === "") {
+        setVar("jabatanSekretaris", "Sekretaris");
+      }
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "DR. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.tujuanSurat || newVars.tujuanSurat.trim() === "") {
+        setVar("tujuanSurat", "Direktur Evaluasi, Akuntansi dan Setelmen,\nDirektorat Jenderal Pengelolaan Pembiayaan dan Risiko\nKementerian Keuangan RI");
+      }
+      if (!newVars.tempatTujuan || newVars.tempatTujuan.trim() === "") {
+        setVar("tempatTujuan", "JAKARTA");
+      }
+      if (!newVars.tujuanInvoice || newVars.tujuanInvoice.trim() === "") {
+        setVar("tujuanInvoice", "Direktur Evaluasi, Akuntansi dan Setelmen,\nDirektorat Jenderal Pengelolaan Pembiayaan dan Risiko\nKementerian Keuangan RI");
+      }
+      if (!newVars.tempatTujuanInvoice || newVars.tempatTujuanInvoice.trim() === "") {
+        setVar("tempatTujuanInvoice", "JAKARTA");
+      }
+      if (!newVars.nomorInvoice || newVars.nomorInvoice.trim() === "") {
+        setVar("nomorInvoice", "024/DSN-MUI/X/2026");
+      }
+      if (!newVars.tembusanInvoice || newVars.tembusanInvoice.trim() === "") {
+        setVar("tembusanInvoice", "Kepada Yth. Direktur Pembiayaan Syariah, Direktorat Jenderal Pengelolaan Pembiayaan dan Risiko, Kementerian Keuangan RI");
+      }
+      if (!newVars.namaPenandatanganInvoice || newVars.namaPenandatanganInvoice.trim() === "") {
+        setVar("namaPenandatanganInvoice", "K.H. M. CHOLIL NAFIS, LC., PH.D.");
+      }
+      if (!newVars.labelMaterai || newVars.labelMaterai.trim() === "") {
+        setVar("labelMaterai", "Materai 10.000");
+      }
+      if (!newVars.npwpMui || newVars.npwpMui.trim() === "") {
+        setVar("npwpMui", "01.334.448.6-071.000");
+      }
+      if (!newVars.nominalBruto || newVars.nominalBruto.trim() === "") {
+        setVar("nominalBruto", "175.000.000");
+      }
+      if (!newVars.labelPajak || newVars.labelPajak.trim() === "") {
+        setVar("labelPajak", "PPN");
+      }
+      if (!newVars.nominalPajak || newVars.nominalPajak.trim() === "") {
+        setVar("nominalPajak", "17.342.342");
+      }
+      if (!newVars.labelTotalPembayaran || newVars.labelTotalPembayaran.trim() === "") {
+        setVar("labelTotalPembayaran", "Total jumlah yang dibayarkan");
+      }
+      if (!newVars.terbilangTotal || newVars.terbilangTotal.trim() === "") {
+        setVar("terbilangTotal", "Seratus lima puluh tujuh juta enam ratus lima puluh tujuh ribu enam ratus lima puluh delapan rupiah");
+      }
+      if (!newVars.nominalTotal || newVars.nominalTotal.trim() === "") {
+        setVar("nominalTotal", "157.657.658");
+      }
+      const isBlankIsi =
+        !newVars.isiSurat ||
+        newVars.isiSurat.trim() === "" ||
+        newVars.isiSurat === "<p></p>" ||
+        newVars.isiSurat === "<p><br></p>" ||
+        newVars.isiSurat.trim() === "<br>";
+      if (isBlankIsi) {
+        setVar("isiSurat", DEFAULT_ISI_SURAT_INVOICE);
+      }
+      const isBlankRekening =
+        !newVars.informasiRekening ||
+        newVars.informasiRekening.trim() === "" ||
+        newVars.informasiRekening === "<p></p>" ||
+        newVars.informasiRekening === "<p><br></p>" ||
+        newVars.informasiRekening.trim() === "<br>";
+      if (isBlankRekening) {
+        setVar("informasiRekening", DEFAULT_INFORMASI_REKENING_INVOICE);
+      }
+      const isBlankRincian =
+        !newVars.rincianPembayaran ||
+        newVars.rincianPembayaran.trim() === "" ||
+        newVars.rincianPembayaran === "<p></p>" ||
+        newVars.rincianPembayaran === "<p><br></p>" ||
+        newVars.rincianPembayaran.trim() === "<br>";
+      if (isBlankRincian) {
+        setVar("rincianPembayaran", DEFAULT_RINCIAN_PEMBAYARAN_INVOICE);
+      }
+    } else if (selectedTemplate === "U-0731-TAGIHAN-IURAN") {
+      if (!newVars.jabatanKetua || newVars.jabatanKetua.trim() === "") {
+        setVar("jabatanKetua", "Ketua");
+      }
+      if (!newVars.namaKetua || newVars.namaKetua.trim() === "") {
+        setVar("namaKetua", "K.H. M. CHOLIL NAFIS, LC., PH.D.");
+      }
+      if (!newVars.jabatanSekretaris || newVars.jabatanSekretaris.trim() === "") {
+        setVar("jabatanSekretaris", "Sekretaris,");
+      }
+      if (!newVars.namaSekretaris || newVars.namaSekretaris.trim() === "") {
+        setVar("namaSekretaris", "DR. H. AMIRSYAH TAMBUNAN, M.A.");
+      }
+      if (!newVars.tujuanSurat || newVars.tujuanSurat.trim() === "") {
+        setVar("tujuanSurat", "Kepala Divisi Syariah\nPT BPD Kalimantan Timur dan Kalimantan Utara");
+      }
+      if (!newVars.tempatTujuan || newVars.tempatTujuan.trim() === "") {
+        setVar("tempatTujuan", "TEMPAT");
+      }
+      if (!newVars.salamPembuka || newVars.salamPembuka.trim() === "") {
+        setVar("salamPembuka", "Assalamu’alaikum Warahmatullah Wabarakatuh,");
+      }
+      if (!newVars.paragrafPembuka || newVars.paragrafPembuka.trim() === "") {
+        setVar("paragrafPembuka", "Puji syukur ke hadirat Allah Subhanahu wa Ta’ala, teriring doa semoga Saudara dalam keadaan sehat wal afiat dan mendapat lindungan dari Allah SWT dalam menjalankan tugas sehari-hari.");
+      }
+      if (!newVars.namaLembaga || newVars.namaLembaga.trim() === "") {
+        setVar("namaLembaga", "lembaga keuangan syariah yang Saudara pimpin");
+      }
+      if (!newVars.bulanLunasTerakhir || newVars.bulanLunasTerakhir.trim() === "") {
+        setVar("bulanLunasTerakhir", "bulan Desember 2025");
+      }
+      if (!newVars.periodeTagihan || newVars.periodeTagihan.trim() === "") {
+        setVar("periodeTagihan", "bulan Januari sd Desember 2026 (12 bulan)");
+      }
+      if (!newVars.perhitunganTagihan || newVars.perhitunganTagihan.trim() === "") {
+        setVar("perhitunganTagihan", "12 x Rp 1.500.000 = Rp 18.000.000 (delapan belas juta rupiah)");
+      }
+      if (!newVars.instruksiPembayaran || newVars.instruksiPembayaran.trim() === "") {
+        setVar("instruksiPembayaran", "No Virtual Account Dewan Syariah Nasional MUI di Bank Muamalat: 8550000000000028");
+      }
+      if (!newVars.kontakKonfirmasi || newVars.kontakKonfirmasi.trim() === "") {
+        setVar("kontakKonfirmasi", "email: keuangan@dsnmui.or.id atau ke Hotline Keuangan DSN-MUI di 0811-9000-3456");
+      }
+      if (!newVars.paragrafPenutup || newVars.paragrafPenutup.trim() === "") {
+        setVar("paragrafPenutup", "Demikianlah, atas perhatian dan kerjasama Saudara, kami ucapkan terima kasih.");
+      }
+      if (!newVars.salamPenutup || newVars.salamPenutup.trim() === "") {
+        setVar("salamPenutup", "Wassalamu’alaikum Warahmatullah Wabarakatuh");
+      }
     } else {
       if (selectedTemplateObj.variables?.some((v: any) => v.key === "jabatanKiri")) {
         if (!newVars.jabatanKiri || newVars.jabatanKiri.trim() === "") {
@@ -2120,6 +2275,8 @@ const EditTemplateLetterPage = () => {
             key === "deskripsiTransaksi" ||
             key === "isiSurat" ||
             key === "lampiranKonten" ||
+            key === "rincianPembayaran" ||
+            key === "informasiRekening" ||
             key.toLowerCase().includes("pembuka") ||
             key.toLowerCase().includes("lampiran") ||
             key.toLowerCase().includes("wysiwyg") ||
@@ -3400,6 +3557,8 @@ const EditTemplateLetterPage = () => {
                           v.key === "deskripsiTransaksi" ||
                           v.key === "isiSurat" ||
                           v.key === "lampiranKonten" ||
+                          v.key === "rincianPembayaran" ||
+                          v.key === "informasiRekening" ||
                           v.key === "namaTim" ||
                           v.key === "keperluan" ||
                           v.key.toLowerCase().includes("pembuka") ||
@@ -3418,6 +3577,15 @@ const EditTemplateLetterPage = () => {
                                 v.key === "tempatKegiatan" ||
                                 v.key === "keperluan" ||
                                 v.key === "waktuTugas" ||
+                                v.key === "tembusanInvoice" ||
+                                v.key === "tujuanInvoice" ||
+                                v.key === "tujuanSurat" ||
+                                v.key === "terbilangTotal" ||
+                                v.key === "paragrafPembuka" ||
+                                v.key === "paragrafPenutup" ||
+                                v.key === "instruksiPembayaran" ||
+                                v.key === "kontakKonfirmasi" ||
+                                v.key === "catatanTambahan" ||
                                 isRichText) &&
                                 "md:col-span-2"
                             )}

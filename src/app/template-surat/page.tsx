@@ -63,6 +63,8 @@ const categoryColor: Record<string, string> = {
   "Surat Keputusan": "bg-orange-50 text-orange-700 border-orange-200",
   "Surat Mandat": "bg-rose-50 text-rose-700 border-rose-200",
   "Surat Tugas": "bg-teal-50 text-teal-700 border-teal-200",
+  Invoice: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  Keuangan: "bg-emerald-50 text-emerald-800 border-emerald-300",
   Lainnya: "bg-slate-100 text-slate-600 border-slate-200",
 };
 const getCategoryStyle = (cat: string) =>
