@@ -786,6 +786,12 @@ const EditTemplateLetterPage = () => {
       Boolean(selectedTemplateObj?.htmlContent?.includes("cert-page"));
   }, [selectedTemplate, selectedTemplateObj]);
 
+  const isKwitansi = React.useMemo(() => {
+    return selectedTemplate === "KWITANSI-KEUANGAN" ||
+      selectedTemplateObj?.code === "KWITANSI-KEUANGAN" ||
+      Boolean(selectedTemplateObj?.htmlContent?.includes("kwitansi-card"));
+  }, [selectedTemplate, selectedTemplateObj]);
+
   const [tempatDibuat, setTempatDibuat] = useState("Jakarta");
   const [tanggalMasehi, setTanggalMasehi] = useState(() => {
     const today = new Date();
@@ -1900,6 +1906,27 @@ const EditTemplateLetterPage = () => {
     }
   }, [selectedTemplateObj, categories, categoryId]);
 
+  // Dynamic signer binding for KWITANSI-KEUANGAN in edit page
+  useEffect(() => {
+    if (isKwitansi && penandatanganList.length > 0 && users.length > 0) {
+      const selectedId = penandatanganList[0]?.userId;
+      if (selectedId) {
+        const u = users.find((user: any) => user.id === selectedId);
+        if (u) {
+          const rawJob = cleanJobTitle(u.jobTitle);
+          const finalJob = rawJob 
+            ? (rawJob.toLowerCase().includes('dsn') ? rawJob : `${rawJob} DSN-MUI`) 
+            : "Bendahara DSN-MUI";
+          setTemplateVariables((prev) => ({
+            ...prev,
+            namaPenandatangan: u.fullName || prev.namaPenandatangan || "",
+            jabatanPenandatangan: finalJob,
+          }));
+        }
+      }
+    }
+  }, [isKwitansi, penandatanganList, users]);
+
   // Date Change Handler
   const handleDateChange = (val: string) => {
     setTanggalMasehi(val);
@@ -1984,7 +2011,7 @@ const EditTemplateLetterPage = () => {
       for (const v of selectedTemplateObj.variables) {
         if (
           v.required &&
-          !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail", "lampiranDisplay"].includes(v.key)
+          !["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail", "lampiranDisplay", "namaPenandatangan", "jabatanPenandatangan"].includes(v.key)
         ) {
           if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {
             continue;
@@ -2369,8 +2396,10 @@ const EditTemplateLetterPage = () => {
       finalHtml = finalHtml.replace(/src=["'][^"']*wqa-ukas\.png["']/gi, `src="${wqaUkasBase64}"`);
     }
 
-    // Auto-wrap body in letter-body-wrapper if not already present
-    if (!finalHtml.includes('letter-body-wrapper')) {
+    // Auto-wrap body in letter-body-wrapper if not already present (bypassed for certs and receipts)
+    const isCertDoc = selectedTemplate === "SERTIFIKAT-KS-RS" || selectedTemplateObj?.code === "SERTIFIKAT-KS-RS" || (selectedTemplateObj?.htmlContent?.includes("certificate-sheet")) || (selectedTemplateObj?.htmlContent?.includes("cert-page"));
+    const isKwitansiDoc = selectedTemplate === "KWITANSI-KEUANGAN" || selectedTemplateObj?.code === "KWITANSI-KEUANGAN" || (selectedTemplateObj?.htmlContent?.includes("kwitansi-card"));
+    if (!isCertDoc && !isKwitansiDoc && !finalHtml.includes('letter-body-wrapper')) {
       const bismillahEndRegex = /(<img[^>]*(?:bismillah|Bismillah)[^>]*>[\s\S]*?<\/div>)/i;
       const bismillahMatch = bismillahEndRegex.exec(finalHtml);
       if (bismillahMatch) {
@@ -2509,6 +2538,19 @@ const EditTemplateLetterPage = () => {
       if (!selectedTemplateObj) return;
       if (isCert) {
         html = selectedTemplateObj.htmlContent || "";
+      } else if (isKwitansi) {
+        let kwHtml = selectedTemplateObj.htmlContent || "";
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const kwBgUrl = origin + getAssetUrl('/images/kwitansi-bg.jpg');
+        kwHtml = kwHtml
+          .replace(/url\(['"]?[^'"]*kwitansi-bg\.jpg['"]?\)/gi, `url('${kwBgUrl}')`)
+          .replace(/src=["'][^"']*kwitansi-bg\.jpg["']/gi, `src="${kwBgUrl}"`)
+          .replace(/(\\?\${KWITANSI_BG}|\${KWITANSI_BG})/g, kwBgUrl);
+
+        html = kwHtml.replace(
+          /\{\{(\w+)\}\}/g,
+          (_: string, key: string) => templateVariables[key] || ""
+        );
       } else {
         html = (selectedTemplateObj.htmlContent || "").replace(
           /\{\{(\w+)\}\}/g,
@@ -2573,7 +2615,7 @@ const EditTemplateLetterPage = () => {
         <div className="flex flex-col min-h-0 bg-slate-100 dark:bg-slate-800/40 p-4 sm:p-6 rounded-[32px] border border-slate-200/60 dark:border-slate-800/80 shadow-inner">
           <div className="flex flex-wrap items-center justify-between shrink-0 mb-3 px-2 gap-2">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              {isCert ? "Sertifikat Live Preview" : "A4 Live Letter Preview & Editor"}
+              {isCert ? "Sertifikat Live Preview" : (isKwitansi ? "Kwitansi Live Preview" : "A4 Live Letter Preview & Editor")}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -2587,7 +2629,7 @@ const EditTemplateLetterPage = () => {
               </button>
               <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full uppercase tracking-tight flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span>{isCert ? "Real-time Binding (A4 Landscape)" : "Real-time Binding (A4 Format)"}</span>
+                <span>{isCert ? "Real-time Binding (A4 Landscape)" : (isKwitansi ? "Real-time Binding (240mm x 106mm Landscape)" : "Real-time Binding (A4 Format)")}</span>
               </span>
             </div>
           </div>
@@ -2595,11 +2637,11 @@ const EditTemplateLetterPage = () => {
           {/* Scrollable container with responsive height */}
           <div className={cn(
             "overflow-y-auto custom-scrollbar p-2 sm:p-4 flex justify-center transition-all",
-            isCert ? "h-[580px] sm:h-[680px] lg:h-[760px]" : "h-[450px]"
+            isCert ? "h-[580px] sm:h-[680px] lg:h-[760px]" : (isKwitansi ? "h-[460px] sm:h-[500px]" : "h-[450px]")
           )}>
             <div className={cn(
               "w-full transition-all",
-              isCert ? "max-w-[1240px]" : "max-w-[950px]"
+              isCert ? "max-w-[1240px]" : (isKwitansi ? "max-w-[1000px]" : "max-w-[950px]")
             )}>
               {isEditorMode ? (
                 <>
@@ -2794,11 +2836,101 @@ const EditTemplateLetterPage = () => {
                       "p-2 sm:p-4 rounded-2xl border flex justify-center items-center overflow-x-auto transition-all",
                       isCert
                         ? "bg-slate-200/80 dark:bg-slate-950/80 border-slate-300 dark:border-slate-800 shadow-inner min-h-[520px] sm:min-h-[620px] lg:min-h-[700px]"
-                        : "bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800"
+                        : isKwitansi
+                          ? "bg-slate-200/80 dark:bg-slate-950/80 border-slate-300 dark:border-slate-800 shadow-inner min-h-[440px]"
+                          : "bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800"
                     )}>
                       {(() => {
                         const renderDocHtml = () => {
                           if (!selectedTemplateObj) return "";
+                          if (isKwitansi) {
+                            let kwHtml = selectedTemplateObj.htmlContent || "";
+                            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                            const kwBgUrl = origin + getAssetUrl('/images/kwitansi-bg.jpg');
+
+                            kwHtml = kwHtml
+                              .replace(/url\(['"]?[^'"]*kwitansi-bg\.jpg['"]?\)/gi, `url('${kwBgUrl}')`)
+                              .replace(/src=["'][^"']*kwitansi-bg\.jpg["']/gi, `src="${kwBgUrl}"`)
+                              .replace(/(\\?\${KWITANSI_BG}|\${KWITANSI_BG})/g, kwBgUrl);
+
+                            kwHtml = kwHtml.replace(
+                              /\{\{(\w+)\}\}/g,
+                              (_: string, key: string) => {
+                                let val = templateVariables[key];
+                                if (val !== undefined && val !== "") {
+                                  return val;
+                                }
+                                return '<span style="background:#fef3c7;padding:0 2px;">{{' + key + '}}</span>';
+                              }
+                            );
+
+                            const kwitansiFitInjection = `
+<style>
+  @media screen {
+    html, body {
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background-color: transparent !important;
+    }
+    .kwitansi-card {
+      background-color: #ffffff !important;
+      margin: 0 auto !important;
+      transform-origin: center center !important;
+      box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+      flex-shrink: 0 !important;
+    }
+  }
+  @media print {
+    html, body {
+      width: 240mm !important;
+      height: 106mm !important;
+      overflow: hidden !important;
+      display: block !important;
+      background: transparent !important;
+    }
+    .kwitansi-card {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+</style>
+<script>
+  function autoFitKwitansi() {
+    const card = document.querySelector('.kwitansi-card');
+    if (!card) return;
+    const cardW = 907.08;
+    const cardH = 400.63;
+    const padding = 20;
+    const availW = Math.max(100, window.innerWidth - padding);
+    const availH = Math.max(100, window.innerHeight - padding);
+    const scale = Math.min(availW / cardW, availH / cardH);
+    card.style.transform = 'scale(' + scale + ')';
+    card.style.transformOrigin = 'center center';
+  }
+  window.addEventListener('resize', autoFitKwitansi);
+  window.addEventListener('load', autoFitKwitansi);
+  document.addEventListener('DOMContentLoaded', autoFitKwitansi);
+  setTimeout(autoFitKwitansi, 30);
+  setTimeout(autoFitKwitansi, 100);
+  setTimeout(autoFitKwitansi, 300);
+  setTimeout(autoFitKwitansi, 600);
+</script>
+`;
+
+                            if (kwHtml.includes('</head>')) {
+                              kwHtml = kwHtml.replace('</head>', `${kwitansiFitInjection}\n</head>`);
+                            } else {
+                              kwHtml = `${kwitansiFitInjection}\n${kwHtml}`;
+                            }
+                            return kwHtml;
+                          }
+
                           if (isCert) {
                             let certHtml = selectedTemplateObj.htmlContent || "";
                             const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -2987,7 +3119,9 @@ const EditTemplateLetterPage = () => {
                               "border-0 rounded-2xl bg-transparent transition-all",
                               isCert
                                 ? "w-full max-w-[1200px] h-[520px] sm:h-[620px] lg:h-[710px]"
-                                : "w-full min-h-[1150px]"
+                                : isKwitansi
+                                  ? "w-full max-w-[950px] h-[440px]"
+                                  : "w-full min-h-[1150px]"
                             )}
                             title="preview"
                           />
@@ -3534,7 +3668,7 @@ const EditTemplateLetterPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                     {selectedTemplateObj.variables
                       .filter((v: any) => {
-                        if (["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail", "lampiranDisplay"].includes(v.key)) {
+                        if (["nomorSurat", "perihal", "lampiran", "tempatDibuat", "tanggalSurat", "tanggalMasehi", "tanggalHijriah", "showAgendaDetail", "lampiranDisplay", "namaPenandatangan", "jabatanPenandatangan"].includes(v.key)) {
                           return false;
                         }
                         if (v.key === "agendaDetail" && templateVariables.showAgendaDetail !== "block") {

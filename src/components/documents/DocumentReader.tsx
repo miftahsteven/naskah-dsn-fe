@@ -40,6 +40,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
   const [logoBase64, setLogoBase64] = React.useState<string>("");
   const [wqaUkasBase64, setWqaUkasBase64] = React.useState<string>("");
   const [certBgBase64, setCertBgBase64] = React.useState<string>("");
+  const [kwitansiBgBase64, setKwitansiBgBase64] = React.useState<string>("");
   const [stempelBase64, setStempelBase64] = React.useState<string>("");
   const [bismillahCertBase64, setBismillahCertBase64] = React.useState<string>("");
   const [logoCertBase64, setLogoCertBase64] = React.useState<string>("");
@@ -76,6 +77,9 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
     toDataURL("/images/cert-ks-rs-bg.jpg")
       .then(b64 => setCertBgBase64(b64))
       .catch(err => console.warn("Failed to convert cert-ks-rs-bg to base64", err));
+    toDataURL("/images/kwitansi-bg.jpg")
+      .then(b64 => setKwitansiBgBase64(b64))
+      .catch(err => console.warn("Failed to convert kwitansi-bg to base64", err));
     toDataURL("/images/stempel-dsn.png")
       .then(b64 => setStempelBase64(b64))
       .catch(err => console.warn("Failed to convert stempel-dsn to base64", err));
@@ -638,7 +642,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         const isKetua = isUserKetua && !isUserSekretaris;
         const targetRole = isKetua
           ? '(?:Ketua|Menyetujui|Ketum)'
-          : (isUserSekretaris ? '(?:Sekretaris|Mengetahui|Sekjen)' : '(?:Ketua|Direktur|Pimpinan|Kepala|Menyetujui)');
+          : (isUserSekretaris ? '(?:Sekretaris|Mengetahui|Sekjen)' : '(?:Ketua|Direktur|Pimpinan|Kepala|Menyetujui|Bendahara)');
 
         const lampiranMatch = enhanced.match(/Lampiran\s+[0-9I|IVX]+/i);
         const lampiranIndex = lampiranMatch ? lampiranMatch.index : -1;
@@ -795,7 +799,7 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
         }
       </style>
     `;
-    if (!enhanced.includes('certificate-sheet') && !enhanced.includes('cert-page')) {
+    if (!enhanced.includes('certificate-sheet') && !enhanced.includes('cert-page') && !enhanced.includes('kwitansi-card')) {
       if (enhanced.includes('</head>')) {
         enhanced = enhanced.replace('</head>', `${imageStyle}\n</head>`);
       } else {
@@ -897,6 +901,83 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ title, fileUrl, docId, 
             '$1Wassalamu’alaikum Warahmatullah Wabarakatuh.$3'
           );
           processed = processed.replace(/font-size:\s*11pt/gi, 'font-size: 10.5pt');
+
+          const isKwitansi = processed.includes('kwitansi-card') || /kwitansi-bg/i.test(processed);
+          if (isKwitansi) {
+            if (kwitansiBgBase64) {
+              processed = processed
+                .replace(/(\\?\${KWITANSI_BG}|\${KWITANSI_BG})/g, kwitansiBgBase64)
+                .replace(/url\(['"]?[^'"]*kwitansi-bg\.jpg['"]?\)/gi, `url('${kwitansiBgBase64}')`)
+                .replace(/src=["'][^"']*kwitansi-bg\.jpg["']/gi, 'src="' + kwitansiBgBase64 + '"');
+            } else {
+              processed = processed.replace(/\/images\/kwitansi-bg\.jpg/g, getAssetUrl('/images/kwitansi-bg.jpg'));
+            }
+
+            const kwitansiFitInjection = `
+<style>
+  @media screen {
+    html, body {
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #f1f5f9 !important;
+    }
+    .kwitansi-card {
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+      border-radius: 4px !important;
+    }
+  }
+  @media print {
+    @page {
+      size: 240mm 106mm !important;
+      margin: 0 !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: transparent !important;
+    }
+    .kwitansi-card {
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+  }
+</style>
+<script>
+  function autoFitKwitansi() {
+    const card = document.querySelector('.kwitansi-card');
+    if (!card) return;
+    const cardW = 907.09; // 240mm at 96dpi
+    const cardH = 400.63; // 106mm at 96dpi
+    const padding = 28;
+    const availW = Math.max(100, window.innerWidth - padding);
+    const availH = Math.max(100, window.innerHeight - padding);
+    const scale = Math.min(availW / cardW, availH / cardH);
+    card.style.transform = 'scale(' + scale + ')';
+    card.style.transformOrigin = 'center center';
+  }
+  window.addEventListener('resize', autoFitKwitansi);
+  window.addEventListener('load', autoFitKwitansi);
+  document.addEventListener('DOMContentLoaded', autoFitKwitansi);
+  setTimeout(autoFitKwitansi, 30);
+  setTimeout(autoFitKwitansi, 100);
+  setTimeout(autoFitKwitansi, 300);
+</script>
+`;
+            if (processed.includes('</head>')) {
+              processed = processed.replace('</head>', `${kwitansiFitInjection}\n</head>`);
+            } else {
+              processed = `${kwitansiFitInjection}\n${processed}`;
+            }
+
+            setHtmlContent(processed);
+            return;
+          }
 
           const isCert = processed.includes('certificate-sheet') || processed.includes('cert-page') || /size:\s*A4\s*landscape/i.test(processed);
           if (isCert) {
