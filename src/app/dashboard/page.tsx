@@ -22,54 +22,63 @@ import {
   Calendar,
   CheckCircle2,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Database,
+  BookOpen,
+  Sparkles
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import api from "@/lib/api";
 
-const StatCard = ({ icon: Icon, label, value, trend, color, code }: any) => (
-  <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-all group overflow-hidden">
-    <div className={`h-1.5 w-full ${color}`} />
-    <div className="p-5">
-      <div className="flex justify-between items-start mb-3">
-        <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{code}</span>
-        {trend && (
-          <div className="flex items-center gap-1 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-900/30 uppercase tracking-wider">
-            <span>{trend}</span>
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
-          <Icon size={20} />
+const StatCard = ({ icon: Icon, label, value, trend, color, code, href }: any) => {
+  const cardBody = (
+    <div className={`bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-all group overflow-hidden ${href ? 'hover:border-[#D4AF37]/60 hover:shadow-md cursor-pointer' : ''}`}>
+      <div className={`h-1.5 w-full ${color}`} />
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-3">
+          <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{code}</span>
+          {trend && (
+            <div className="flex items-center gap-1 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-900/30 uppercase tracking-wider">
+              <span>{trend}</span>
+            </div>
+          )}
         </div>
-        <div className="space-y-0.5">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">{label}</p>
-          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono">{value}</h3>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:scale-105 transition-transform">
+            <Icon size={20} />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-slate-500 dark:text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">{label}</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono">{value}</h3>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+
+  return href ? <Link href={href} className="block">{cardBody}</Link> : cardBody;
+};
 
 const DashboardPage = () => {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const [statsData, setStatsData] = useState<any>(null);
+  const [fatwaStats, setFatwaStats] = useState<any>(null);
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const [statsRes, docsRes] = await Promise.all([
+      const [statsRes, docsRes, fatwaRes] = await Promise.allSettled([
         api.get("/dashboard/stats"),
-        api.get("/documents", { params: { limit: 5 } })
+        api.get("/documents", { params: { limit: 5 } }),
+        api.get("/fatwa/stats")
       ]);
-      setStatsData(statsRes.data.data);
-      setRecentDocs(docsRes.data.data || []);
+      if (statsRes.status === "fulfilled") setStatsData(statsRes.value.data.data);
+      if (docsRes.status === "fulfilled") setRecentDocs(docsRes.value.data.data || []);
+      if (fatwaRes.status === "fulfilled") setFatwaStats(fatwaRes.value.data.data);
     } catch (err: any) {
-      // Don't use console.error to avoid Next.js dev overlay for 401s
       if (err?.response?.status !== 401) {
         console.log("Gagal memuat dashboard", err);
       }
@@ -114,6 +123,15 @@ const DashboardPage = () => {
       value: statsData?.signedDocs?.toString() || "0",
       trend: "TERSEGEL",
       color: "bg-emerald-600"
+    },
+    {
+      icon: Database,
+      code: "METRIC-05 / FATWA",
+      label: "Database Fatwa",
+      value: (fatwaStats?.totalResmi || fatwaStats?.total || 166).toString(),
+      trend: `${fatwaStats?.totalPleno || 60} PLENO`,
+      color: "bg-[#006633]",
+      href: "/fatwa-database"
     },
   ];
 
@@ -176,10 +194,85 @@ const DashboardPage = () => {
       </div>
 
       {/* ── KPI METRICS GRID (SAP BUSINESS ONE STYLE) ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
         {stats.map((stat, i) => (
           <StatCard key={i} {...stat} />
         ))}
+      </div>
+
+      {/* ── SECTION: HIGHLIGHT DATABASE FATWA DSN-MUI ── */}
+      <div className="bg-gradient-to-r from-[#00381B] via-[#004D25] to-[#0B1325] rounded-xl border border-emerald-900/60 shadow-lg p-5 sm:p-6 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37] bg-[#D4AF37]/15 px-2.5 py-0.5 rounded-full border border-[#D4AF37]/30 font-mono flex items-center gap-1.5">
+                <BookOpen size={11} /> Master Database Fatwa
+              </span>
+              <span className="text-[10px] text-emerald-300 font-mono font-bold">
+                166 Fatwa Resmi • 60 Rapat Pleno (2000 - 2026)
+              </span>
+            </div>
+            
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Koleksi Resmi Fatwa DSN-MUI Dari Masa Ke Masa
+            </h2>
+            
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Arsip digital komprehensif seluruh fatwa Dewan Syariah Nasional MUI sejak berdirinya hingga saat ini. Dilengkapi pencarian kilat, filter rapat pleno, pimpinan penandatangan, serta fitur kelola (Edit & Hapus) data.
+            </p>
+
+            {/* Quick Metrics Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold">Total Fatwa</span>
+                <span className="text-lg font-black text-[#D4AF37] font-mono">{fatwaStats?.totalResmi || 166} Fatwa</span>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold">Rapat Pleno</span>
+                <span className="text-lg font-black text-white font-mono">{fatwaStats?.totalPleno || 60} Pleno</span>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold">Rentang Masa</span>
+                <span className="text-lg font-black text-white font-mono">2000 - 2026</span>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold">Status Validasi</span>
+                <span className="text-lg font-black text-emerald-400 font-mono">100% Sah</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Button & Quick Entry list */}
+          <div className="w-full lg:w-auto flex flex-col gap-3 shrink-0">
+            <Link
+              href="/fatwa-database"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-slate-950 font-black rounded-lg hover:brightness-105 active:scale-95 transition-all text-xs uppercase tracking-wider shadow-lg shadow-[#D4AF37]/20"
+            >
+              <Database size={16} /> Buka Database Fatwa
+              <ArrowUpRight size={16} />
+            </Link>
+
+            {fatwaStats?.recent && fatwaStats.recent.length > 0 && (
+              <div className="bg-black/40 backdrop-blur border border-white/10 rounded-lg p-3 space-y-2 max-w-sm">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold border-b border-white/10 pb-1">
+                  <span>Fatwa Terakhir Disahkan</span>
+                  <span className="text-[#D4AF37] font-mono">Tahun {fatwaStats.recent[0]?.tahun || 2026}</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-bold text-white line-clamp-1">
+                    {fatwaStats.recent[0]?.nomorFatwa || `Fatwa No. ${fatwaStats.recent[0]?.noUrut}`}: {fatwaStats.recent[0]?.title}
+                  </div>
+                  <div className="text-[9px] text-slate-400 line-clamp-1">
+                    Rapat Pleno ke-{fatwaStats.recent[0]?.pleno} • {fatwaStats.recent[0]?.penandatangan1}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── MAIN CONTENT GRID: TABULAR DATABASE & SECURITY PANEL ── */}
