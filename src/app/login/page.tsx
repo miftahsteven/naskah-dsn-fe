@@ -33,6 +33,9 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [otpToken, setOtpToken] = useState("");
   const [userId, setUserId] = useState("");
+  const [twoFactorMethod, setTwoFactorMethod] = useState<"GOOGLE_AUTH" | "EMAIL">("GOOGLE_AUTH");
+  const [resendingOtp, setResendingOtp] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   // 2FA Setup state
   const [qrCode, setQrCode] = useState(""); // base64 data url
@@ -57,18 +60,21 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setResendMessage("");
     try {
       const res = await api.post("/auth/login", { email, password });
-      const { data, requires2FA, requires_2fa_setup, userId: uid } = res.data;
+      const { data, requires2FA, requires_2fa_setup, twoFactorMethod: method, userId: uid } = res.data;
 
       if (requires_2fa_setup) {
         // First time — must setup Google Authenticator
         setUserId(uid);
+        setTwoFactorMethod("GOOGLE_AUTH");
         await fetchQRCode(uid);
         setStep("setup_2fa");
       } else if (requires2FA) {
-        // Already setup — just need OTP
+        // Already setup or Email 2FA — just need OTP
         setUserId(uid);
+        setTwoFactorMethod(method === "EMAIL" ? "EMAIL" : "GOOGLE_AUTH");
         setStep("verify_otp");
       } else {
         setAuth(data.user, data.accessToken, data.refreshToken);
@@ -78,6 +84,21 @@ const LoginPage = () => {
       setError(err.response?.data?.message || "Terjadi kesalahan saat login");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendEmailOtp = async () => {
+    if (!userId) return;
+    setResendingOtp(true);
+    setError("");
+    setResendMessage("");
+    try {
+      const res = await api.post("/auth/resend-2fa-email", { userId });
+      setResendMessage(res.data?.message || "Kode OTP baru telah dikirim ke email Anda.");
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Gagal mengirim ulang kode OTP.");
+    } finally {
+      setResendingOtp(false);
     }
   };
 
@@ -123,12 +144,21 @@ const LoginPage = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/auth/verify-2fa", { userId, token: otpToken });
+      const res = await api.post("/auth/verify-2fa", {
+        userId,
+        token: otpToken,
+        method: twoFactorMethod,
+      });
       const { data } = res.data;
       setAuth(data.user, data.accessToken, data.refreshToken);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Token 2FA tidak valid. Pastikan waktu di perangkat Anda sudah sinkron (Automatic Time).");
+      setError(
+        err.response?.data?.message ||
+          (twoFactorMethod === "EMAIL"
+            ? "Kode OTP email tidak valid atau telah kedaluwarsa."
+            : "Token 2FA tidak valid. Pastikan waktu di perangkat Anda sudah sinkron (Automatic Time).")
+      );
     } finally {
       setLoading(false);
     }
@@ -137,6 +167,7 @@ const LoginPage = () => {
   const resetToLogin = () => {
     setStep("credentials");
     setError("");
+    setResendMessage("");
     setOtpToken("");
     setSetupOtp("");
     setQrCode("");
@@ -204,11 +235,19 @@ const LoginPage = () => {
             {step === "verify_otp" && (
               <>
                 <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-[#E8F5EE] border border-[#006633]/15">
-                  <ShieldCheck size={24} className="text-[#006633]" />
+                  {twoFactorMethod === "EMAIL" ? (
+                    <Mail size={24} className="text-[#006633]" />
+                  ) : (
+                    <ShieldCheck size={24} className="text-[#006633]" />
+                  )}
                 </div>
-                <h2 className="text-2xl font-extrabold tracking-tight text-slate-800 mb-2">Otentikasi Dua Faktor</h2>
+                <h2 className="text-2xl font-extrabold tracking-tight text-slate-800 mb-2">
+                  {twoFactorMethod === "EMAIL" ? "Verifikasi 2FA Email" : "Otentikasi Dua Faktor"}
+                </h2>
                 <p className="text-slate-500 text-sm leading-relaxed">
-                  Masukkan kode verifikasi 6 digit yang dihasilkan oleh aplikasi otentikator Anda.
+                  {twoFactorMethod === "EMAIL"
+                    ? `Masukkan 6 digit kode OTP yang telah dikirim ke alamat email ${email || "Anda"}.`
+                    : "Masukkan kode verifikasi 6 digit yang dihasilkan oleh aplikasi Google Authenticator Anda."}
                 </p>
               </>
             )}
@@ -219,6 +258,13 @@ const LoginPage = () => {
             <div className="mb-6 p-4 rounded-2xl bg-red-50/80 backdrop-blur-sm border border-red-100 flex items-start gap-3 text-red-600 text-sm animate-in fade-in zoom-in duration-300">
               <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-500" />
               <span className="font-medium">{error}</span>
+            </div>
+          )}
+
+          {resendMessage && (
+            <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-700 text-sm animate-in fade-in zoom-in duration-300">
+              <Check size={18} className="shrink-0 mt-0.5 text-emerald-600" />
+              <span className="font-medium">{resendMessage}</span>
             </div>
           )}
 
@@ -371,6 +417,18 @@ const LoginPage = () => {
               >
                 {loading ? <Loader2 className="animate-spin" size={20} /> : "Verifikasi & Masuk"}
               </button>
+
+              {twoFactorMethod === "EMAIL" && (
+                <button
+                  type="button"
+                  disabled={resendingOtp}
+                  onClick={handleResendEmailOtp}
+                  className="w-full py-2.5 rounded-xl border border-slate-200 hover:border-[#006633]/40 text-xs font-bold text-[#006633] flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw size={14} className={resendingOtp ? "animate-spin" : ""} />
+                  <span>{resendingOtp ? "Mengirim ulang..." : "Kirim Ulang Kode OTP ke Email"}</span>
+                </button>
+              )}
 
               <button type="button" onClick={resetToLogin} className="w-full text-slate-400 hover:text-slate-600 text-xs font-bold transition-colors py-1">
                 ← Kembali ke Halaman Login

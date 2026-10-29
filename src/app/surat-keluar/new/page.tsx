@@ -2447,7 +2447,11 @@ const CreateDocumentPage = () => {
         const cutIndex = bismillahMatch.index + bismillahMatch[0].length;
         const headerPart = finalHtml.substring(0, cutIndex);
         const restPart = finalHtml.substring(cutIndex);
-        finalHtml = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+        if (/<\/body>/i.test(restPart)) {
+          finalHtml = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart.replace(/<\/body>/i, '</div>\n</body>')}`;
+        } else {
+          finalHtml = `${headerPart}\n<div class="letter-body-wrapper" style="margin-left: 15mm; margin-right: 10mm;">\n${restPart}\n</div>`;
+        }
       }
     }
 
